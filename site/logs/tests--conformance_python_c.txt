@@ -1,0 +1,20 @@
+exec ${PAGER:-/usr/bin/less} "$0" || exit 1
+Executing tests from //tests:conformance_python_c
+-----------------------------------------------------------------------------
+PASS first_exchange seed=73821
+PASS lost_initial seed=73821
+PASS authorization seed=73821
+PASS lost_receipts seed=73821
+PASS lost_application_report seed=73821
+PASS rejected_name seed=73821
+PASS reordered_snapshots seed=73821
+PASS tamper_and_reflect seed=73821
+PASS reboot seed=73821
+PASS failed_commits seed=73821
+PASS buffer_and_provider_failures seed=73821
+PASS unavailable_randomness seed=73821
+PASS exact_uint64 seed=73821
+PASS bounded_withholding seed=73821
+PASS generated_schedule seed=73821
+PASS generated_schedule seed=73822
+PASS generated_schedule seed=73823

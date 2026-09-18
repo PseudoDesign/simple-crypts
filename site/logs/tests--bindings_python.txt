@@ -1,0 +1,4 @@
+exec ${PAGER:-/usr/bin/less} "$0" || exit 1
+Executing tests from //tests:bindings_python
+-----------------------------------------------------------------------------
+PASS Python CFFI buffer ownership, errors, close, and exact uint64

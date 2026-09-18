@@ -1,0 +1,5 @@
+exec ${PAGER:-/usr/bin/less} "$0" || exit 1
+Executing tests from //tests:relay_replay
+-----------------------------------------------------------------------------
+Replayed 201 recorded actions (seed 773521)
+PASS exact transcript replay including restarted persistent endpoints

@@ -4,6 +4,9 @@ A sample device/server library for encrypted state synchronization through an
 untrusted, intermittently connected relay. The device reports its temperature;
 the server requests a name. Applications work with state and opaque frames.
 
+View the [published test report](https://pseudodesign.github.io/simple-crypts/)
+for the language matrix, scenario logs, and MCU resource evidence.
+
 Milestone 1 uses a bounded C99 protocol core, nanopb, and NaCl box
 (X25519/XSalsa20-Poly1305). Python uses CFFI, Rust wraps the C ABI, and Go uses
 cgo. Each SDK supports both roles. A server context represents one serial
@@ -74,6 +77,7 @@ bytes per envelope. Base64 and JSON are used only by the test adapters.
   static RAM, declared workspaces, and compiler stack-usage information.
 
 [Testing and replay](docs/testing.md) explains the harness and failure artifacts.
+[Publishing the report](docs/publishing.md) explains how to refresh Pages from a tested commit.
 [The protocol](docs/protocol.md) specifies the frame and state rules.
 [Platform integration](docs/platforms.md) states the keystore, entropy, and
 durability contracts.

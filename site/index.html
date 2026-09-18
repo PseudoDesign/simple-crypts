@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Recorded cross-language conformance, cryptographic compatibility, and Cortex-M4 resource evidence for Simple Crypts.">
+  <title>Simple Crypts · Test report</title>
+  <style>
+    :root { --paper:#f6f7f5; --white:#fff; --ink:#172b2b; --muted:#576b69; --line:#dbe3df; --green:#116347; --green-soft:#e7f4ed; --red:#a52634; --red-soft:#fff0f0; --amber:#806014; --amber-soft:#fff6dc; --blue:#214e8a; --radius:14px; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; scroll-padding-top:24px; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:15px; line-height:1.6; }
+    a { color:var(--blue); text-underline-offset:3px; }
+    button,input { font:inherit; }
+    button,a,input,summary { -webkit-tap-highlight-color:transparent; }
+    :focus-visible { outline:3px solid var(--blue); outline-offset:4px; }
+    .skip { position:absolute; left:20px; top:-80px; z-index:10; background:var(--white); padding:12px 20px; }
+    .skip:focus { top:12px; }
+    .wrap { width:min(1160px,calc(100% - 64px)); margin-inline:auto; }
+    .topbar { border-bottom:1px solid var(--line); background:rgba(255,255,255,.75); }
+    .topbar .wrap { min-height:76px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
+    .brand { display:flex; align-items:center; gap:12px; font-weight:750; font-size:18px; letter-spacing:-.6px; }
+    .mark { display:grid; place-items:center; width:32px; height:32px; border:1.5px solid var(--ink); border-radius:8px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:14px; letter-spacing:-2px; }
+    .nav { display:flex; align-items:center; gap:24px; font-size:13px; }
+    .nav a { text-decoration:none; color:var(--muted); }
+    .nav a:hover { text-decoration:underline; color:var(--ink); }
+    main { padding-bottom:64px; }
+    .hero { padding:64px 0 35px; display:grid; grid-template-columns:1fr auto; align-items:start; gap:30px; }
+    .eyebrow { margin:0 0 13px; color:var(--green); font-size:11px; font-weight:750; letter-spacing:1.8px; text-transform:uppercase; }
+    h1 { margin:0; font-size:clamp(34px,5vw,54px); font-weight:650; letter-spacing:-2.3px; line-height:1.12; }
+    .lede { color:var(--muted); max-width:650px; margin:20px 0 0; font-size:16px; }
+    .status { display:inline-flex; align-items:center; gap:8px; font-size:12px; font-weight:700; line-height:1.5; border-radius:100px; padding:6px 11px; white-space:nowrap; color:var(--muted); background:#edf0ee; }
+    .status::before { content:""; width:7px; height:7px; background:currentColor; border-radius:50%; }
+    .status.pass { color:var(--green); background:var(--green-soft); }
+    .status.fail { color:var(--red); background:var(--red-soft); }
+    .status.unknown { color:var(--amber); background:var(--amber-soft); }
+    .hero-status { margin-top:28px; }
+    .metadata { display:flex; gap:12px 28px; flex-wrap:wrap; padding:18px 0 26px; margin:0; border-bottom:1px solid var(--line); color:var(--muted); font-size:12px; }
+    .metadata div { display:flex; gap:8px; }
+    dt { font-weight:600; }
+    dd { margin:0; }
+    code,.mono { font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace; font-size:.91em; }
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); margin:26px 0 42px; border:1px solid var(--line); border-radius:var(--radius); background:var(--white); overflow:hidden; }
+    .stat { padding:22px 26px; }
+    .stat + .stat { border-left:1px solid var(--line); }
+    .stat strong { display:block; font-size:34px; font-weight:650; letter-spacing:-1px; line-height:1.3; }
+    .stat span { display:block; color:var(--muted); margin-top:3px; font-size:12px; }
+    .stat .good { color:var(--green); }
+    .stat .bad { color:var(--red); }
+    .section-head { display:flex; align-items:end; justify-content:space-between; gap:24px; margin-bottom:18px; }
+    h2 { font-size:22px; line-height:1.35; letter-spacing:-.6px; font-weight:650; margin:0; }
+    .section-head p,.section-copy { color:var(--muted); font-size:13px; margin:6px 0 0; max-width:760px; }
+    .section-label { font-size:11px; color:var(--muted); white-space:nowrap; letter-spacing:.5px; }
+    .panel { background:var(--white); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
+    .table-scroll { overflow-x:auto; }
+    table { border-collapse:collapse; width:100%; text-align:left; }
+    caption { text-align:left; color:var(--muted); padding:18px 22px; font-size:12px; border-bottom:1px solid var(--line); }
+    .matrix { min-width:570px; table-layout:fixed; }
+    .matrix th,.matrix td { border-bottom:1px solid var(--line); border-right:1px solid var(--line); }
+    .matrix tr:last-child th,.matrix tr:last-child td { border-bottom:0; }
+    .matrix th:last-child,.matrix td:last-child { border-right:0; }
+    .matrix th { padding:17px 22px; font-size:13px; font-weight:650; }
+    .matrix thead th { background:#f8faf8; }
+    .matrix thead th:first-child { width:18%; font-size:11px; color:var(--muted); font-weight:500; }
+    .matrix tbody th { background:#fcfdfb; }
+    .matrix td { padding:0; vertical-align:top; }
+    .matrix a,.matrix .missing { display:block; padding:20px 22px; text-decoration:none; color:var(--ink); min-height:88px; transition:background .15s; }
+    .matrix a:hover { background:#f2f8f4; }
+    .matrix a:focus-visible { outline-offset:-4px; }
+    .matrix .cell-state { display:block; font-size:13px; font-weight:700; color:var(--green); }
+    .matrix .cell-state.fail { color:var(--red); }
+    .matrix .cell-state.unknown { color:var(--amber); }
+    .matrix .cell-meta { display:block; color:var(--muted); font-size:11px; margin-top:4px; }
+    .matrix-note { margin:13px 0 0; font-size:12px; color:var(--muted); }
+    .evidence-grid { display:grid; grid-template-columns:1fr 1fr; gap:22px; margin:42px 0; }
+    .evidence { padding:26px; }
+    .evidence h2 { font-size:19px; }
+    .evidence .eyebrow { font-size:10px; margin-bottom:10px; }
+    .evidence p { color:var(--muted); font-size:13px; margin:12px 0 0; }
+    .crypto-checks { list-style:none; padding:0; margin:18px 0 0; }
+    .crypto-checks li { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-top:1px solid var(--line); font-size:12px; }
+    .crypto-checks a { overflow-wrap:anywhere; }
+    .resource-numbers { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:22px 0; }
+    .resource-numbers dt { color:var(--muted); font-size:11px; font-weight:500; }
+    .resource-numbers dd { font-size:23px; font-weight:650; line-height:1.4; margin-top:4px; letter-spacing:-.5px; }
+    .resource-numbers dd span { color:var(--muted); font-size:11px; font-weight:400; letter-spacing:0; margin-left:3px; }
+    .resource-link { display:inline-block; font-size:12px; margin-top:15px; }
+    .compiler { overflow-wrap:anywhere; }
+    .toolbar { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+    .search { flex:1; }
+    .search label { display:block; font-size:11px; color:var(--muted); margin-bottom:5px; }
+    .search input { width:100%; background:var(--white); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:9px 12px; font-size:13px; }
+    .filter { margin-top:22px; border:1px solid var(--line); border-radius:8px; padding:9px 14px; color:var(--muted); background:var(--white); font-size:12px; cursor:pointer; }
+    .filter[aria-pressed="true"] { background:var(--ink); color:var(--white); border-color:var(--ink); }
+    .target { scroll-margin-top:24px; border:1px solid var(--line); background:var(--white); border-radius:10px; margin-bottom:9px; }
+    .target:target { border-color:var(--green); box-shadow:0 0 0 2px var(--green-soft); }
+    .target summary { cursor:pointer; padding:17px 19px; display:flex; align-items:center; gap:14px; list-style:none; }
+    .target summary::-webkit-details-marker { display:none; }
+    .target summary::before { content:"+"; flex:none; display:grid; place-items:center; width:19px; height:19px; font-size:18px; color:var(--muted); }
+    .target[open] summary::before { content:"−"; }
+    .target-name { flex:1; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:12px; overflow-wrap:anywhere; }
+    .target-time { color:var(--muted); font-size:11px; white-space:nowrap; }
+    .target-body { padding:0 22px 22px 52px; font-size:12px; }
+    .target-body p { margin:0 0 12px; color:var(--muted); }
+    .scenario-table { margin:14px 0; font-size:12px; }
+    .scenario-table th,.scenario-table td { padding:7px 10px 7px 0; border-bottom:1px solid var(--line); }
+    .scenario-table th { color:var(--muted); font-size:10px; font-weight:650; text-transform:uppercase; letter-spacing:.7px; }
+    .scenario-table td:first-child { overflow-wrap:anywhere; }
+    .scenario-table td:last-child { white-space:nowrap; width:100px; }
+    .scenario-table tr:last-child td { border-bottom:0; }
+    .result-count { color:var(--muted); font-size:12px; margin:12px 0 0; }
+    .limits { margin-top:40px; padding:24px 26px; border-left:3px solid #adbbb4; background:#edf1ed; border-radius:0 10px 10px 0; }
+    .limits h2 { font-size:16px; }
+    .limits ul { margin:12px 0 0; padding-left:18px; color:var(--muted); font-size:12px; }
+    .limits li + li { margin-top:7px; }
+    footer { border-top:1px solid var(--line); padding:24px 0 30px; color:var(--muted); font-size:11px; }
+    footer .wrap { display:flex; justify-content:space-between; gap:24px; }
+    footer p { margin:0; max-width:680px; }
+    .empty { color:var(--muted); font-size:13px; padding:20px 0; }
+    [hidden] { display:none !important; }
+    @media (max-width:760px) {
+      .wrap { width:calc(100% - 32px); }
+      .topbar .wrap { min-height:64px; }
+      .nav { gap:16px; }
+      .nav a:first-child { display:none; }
+      .hero { padding-top:38px; grid-template-columns:1fr; gap:16px; }
+      .hero-status { margin:0; }
+      h1 { letter-spacing:-1.5px; }
+      .stats { grid-template-columns:repeat(2,1fr); margin-bottom:32px; }
+      .stat { padding:18px 20px; }
+      .stat:nth-child(3) { border-left:0; }
+      .stat:nth-child(n+3) { border-top:1px solid var(--line); }
+      .evidence-grid { grid-template-columns:1fr; gap:16px; margin:32px 0; }
+      .section-label { display:none; }
+      .target summary { gap:9px; padding:14px 12px; flex-wrap:wrap; }
+      .target-name { min-width:calc(100% - 40px); }
+      .target-time { margin-left:28px; }
+      .target-body { padding:0 16px 18px 40px; }
+      .target .status { font-size:10px; padding:3px 8px; }
+      footer .wrap { flex-direction:column; gap:12px; }
+    }
+    @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } * { transition:none !important; } }
+    @media print { .toolbar,.nav,.skip { display:none; } body { background:white; font-size:11px; } .wrap { width:100%; } .hero { padding-top:20px; } .panel,.target { break-inside:avoid; } a { color:inherit; } }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to test report</a>
+  <header class="topbar">
+    <div class="wrap">
+      <div class="brand"><span class="mark" aria-hidden="true">&lt;/&gt;</span><span id="project">Simple Crypts</span></div>
+      <nav class="nav" aria-label="Report navigation"><a href="#matrix">Language matrix</a><a href="#targets">Test details</a><a id="repository-link" hidden>Repository ↗</a></nav>
+    </div>
+  </header>
+  <main class="wrap" id="main">
+    <section class="hero" aria-labelledby="title">
+      <div><p class="eyebrow">Milestone 1 · Recorded test evidence</p><h1 id="title">Cross-language<br>conformance report.</h1><p class="lede">Encrypted device/server state synchronization, exercised through an unreliable relay. One bounded C core, four language APIs, and a shared behavioral test suite.</p></div>
+      <div class="hero-status"><span class="status unknown" id="overall-status">Loading evidence</span></div>
+    </section>
+    <dl class="metadata">
+      <div><dt>Source</dt><dd><a id="source-link" class="mono">Unknown</a></dd></div>
+      <div><dt>Captured</dt><dd id="captured-at">Unknown</dd></div>
+      <div><dt>Generated</dt><dd id="generated-at">Unknown</dd></div>
+      <div><dt>Cached targets</dt><dd id="cached-targets">Unknown</dd></div>
+      <div><dt>Command</dt><dd><code id="command">Unknown</code></dd></div>
+    </dl>
+    <p class="matrix-note" id="evidence-origin" hidden></p>
+    <section class="stats" aria-label="Recorded test totals">
+      <div class="stat"><strong id="stat-targets">—</strong><span>Test targets</span></div>
+      <div class="stat"><strong id="stat-passed" class="good">—</strong><span>Passed targets</span></div>
+      <div class="stat"><strong id="stat-failed">—</strong><span>Failed targets</span></div>
+      <div class="stat"><strong id="stat-scenarios">—</strong><span>Behavioral scenario runs</span></div>
+    </section>
+    <section id="matrix" aria-labelledby="matrix-title">
+      <div class="section-head"><div><h2 id="matrix-title">Every device. Every server.</h2><p>Each pairing exercises traffic in both directions. Select a result to inspect its scenarios and log.</p></div><span class="section-label">DEVICE ↓ &nbsp; SERVER →</span></div>
+      <div class="panel table-scroll"><table class="matrix"><caption>Device language by server language. Results describe the recorded run.</caption><thead><tr><th scope="col">Device / Server</th><th scope="col">C</th><th scope="col">Python</th><th scope="col">Rust</th><th scope="col">Go</th></tr></thead><tbody id="matrix-body"></tbody></table></div>
+      <p class="matrix-note">These pairings validate the public bindings and shared protocol behavior. They are not sixteen independent cryptographic implementations.</p>
+    </section>
+    <div class="evidence-grid">
+      <section class="panel evidence" aria-labelledby="crypto-title"><p class="eyebrow">Cryptographic compatibility</p><h2 id="crypto-title">An independent cross-check.</h2><p>Published NaCl vectors and Go’s independent <code>x/crypto/nacl/box</code> implementation check the libsodium provider. The compatibility tests cover encryption and decryption in both directions.</p><ul id="crypto-checks" class="crypto-checks"></ul><p id="crypto-empty" hidden>No cryptographic test results were included in this report.</p></section>
+      <section class="panel evidence" aria-labelledby="resource-title"><p class="eyebrow">Cortex-M4 · Static resource evidence</p><h2 id="resource-title">Linked with the crypto provider.</h2><dl class="resource-numbers"><div><dt>Flash sections</dt><dd id="resource-flash">—</dd></div><div><dt>Static RAM</dt><dd id="resource-ram">—</dd></div><div><dt>Core context</dt><dd id="resource-context">—</dd></div></dl><p>The linked probe includes the C core and reference crypto provider. Flash and RAM totals also include probe and runtime support.</p><p class="compiler" id="compiler"></p><p>This is build and static-size evidence; it does not establish runtime peak memory, timing, or hardware security suitability.</p><a id="resource-link" class="resource-link" hidden>Read the full resource report ↗</a></section>
+    </div>
+    <section id="targets" aria-labelledby="targets-title">
+      <div class="section-head"><div><h2 id="targets-title">Inspect the evidence.</h2><p>Expand a target for its recorded scenarios, reproducible seeds, and captured test output.</p></div><span class="section-label">PUBLIC RESULTS · NO DEVICE SECRETS</span></div>
+      <div class="toolbar"><div class="search"><label for="target-search">Filter by target or scenario</label><input id="target-search" type="search" placeholder="Try enrollment, restart, or crypto" autocomplete="off"></div><button type="button" class="filter" id="failed-filter" aria-pressed="false">Failed only</button></div>
+      <div id="target-list"></div><p class="result-count" id="result-count" role="status" aria-live="polite"></p>
+    </section>
+    <aside class="limits" aria-labelledby="limits-title"><h2 id="limits-title">What this report does—and does not—establish</h2><ul id="limitations"></ul></aside>
+    <noscript><p class="empty">JavaScript is needed to render the embedded report data. The same evidence is available in <a href="report.json">report.json</a>.</p></noscript>
+  </main>
+  <footer><div class="wrap"><p>Evidence was captured from local Bazel test runs at the source revision above. This page is a published snapshot, not a claim that GitHub Actions ran these tests.</p><a href="report.json">Download report data</a></div></footer>
+  <script id="report-data" type="application/json">{"format": 1, "project": "Simple Crypts", "repository_url": "https://github.com/PseudoDesign/simple-crypts", "source_commit": "35391a44cc2acce93cec8874185453c27a31fded", "source_url": "https://github.com/PseudoDesign/simple-crypts/commit/35391a44cc2acce93cec8874185453c27a31fded", "generated_at": "2026-09-18T21:07:16+00:00", "captured_at": "2026-09-18T21:01:27.529Z", "command": "bazel test //...", "evidence_origin": "Local Bazel execution; cached results are identified per target.", "build_success": true, "summary": {"targets": 26, "passed": 26, "failed": 0, "scenario_runs": 272, "cached_targets": 26}, "targets": [{"label": "//bindings/go:sdk_test", "status": "PASSED", "duration_seconds": 0.141, "cached": true, "started_at": "2026-09-18T20:41:59.199Z", "finished_at": "2026-09-18T20:41:59.340Z", "scenarios": [], "log_url": "logs/bindings--go--sdk_test.txt"}, {"label": "//bindings/rust:sdk_test", "status": "PASSED", "duration_seconds": 0.158, "cached": true, "started_at": "2026-09-18T20:41:57.351Z", "finished_at": "2026-09-18T20:41:57.509Z", "scenarios": [], "log_url": "logs/bindings--rust--sdk_test.txt"}, {"label": "//examples:production_api_test", "status": "PASSED", "duration_seconds": 0.285, "cached": true, "started_at": "2026-09-18T20:46:01.449Z", "finished_at": "2026-09-18T20:46:01.734Z", "scenarios": [], "log_url": "logs/examples--production_api_test.txt"}, {"label": "//tests/crypto:interop", "status": "PASSED", "duration_seconds": 1.295, "cached": true, "started_at": "2026-09-18T20:46:35.292Z", "finished_at": "2026-09-18T20:46:36.587Z", "scenarios": [], "log_url": "logs/tests--crypto--interop.txt"}, {"label": "//tests:bindings_python", "status": "PASSED", "duration_seconds": 0.162, "cached": true, "started_at": "2026-09-18T20:46:16.716Z", "finished_at": "2026-09-18T20:46:16.878Z", "scenarios": [], "log_url": "logs/tests--bindings_python.txt"}, {"label": "//tests:conformance_c_c", "status": "PASSED", "duration_seconds": 6.543, "cached": true, "started_at": "2026-09-18T20:46:17.464Z", "finished_at": "2026-09-18T20:46:24.007Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_c_c.txt"}, {"label": "//tests:conformance_c_go", "status": "PASSED", "duration_seconds": 7.274, "cached": true, "started_at": "2026-09-18T20:46:20.964Z", "finished_at": "2026-09-18T20:46:28.238Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_c_go.txt"}, {"label": "//tests:conformance_c_python", "status": "PASSED", "duration_seconds": 8.522, "cached": true, "started_at": "2026-09-18T20:46:08.919Z", "finished_at": "2026-09-18T20:46:17.441Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_c_python.txt"}, {"label": "//tests:conformance_c_rust", "status": "PASSED", "duration_seconds": 7.163, "cached": true, "started_at": "2026-09-18T20:46:01.491Z", "finished_at": "2026-09-18T20:46:08.654Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_c_rust.txt"}, {"label": "//tests:conformance_go_c", "status": "PASSED", "duration_seconds": 7.132, "cached": true, "started_at": "2026-09-18T20:46:28.259Z", "finished_at": "2026-09-18T20:46:35.391Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_go_c.txt"}, {"label": "//tests:conformance_go_go", "status": "PASSED", "duration_seconds": 7.544, "cached": true, "started_at": "2026-09-18T20:46:30.773Z", "finished_at": "2026-09-18T20:46:38.317Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_go_go.txt"}, {"label": "//tests:conformance_go_python", "status": "PASSED", "duration_seconds": 8.237, "cached": true, "started_at": "2026-09-18T20:46:31.993Z", "finished_at": "2026-09-18T20:46:40.230Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_go_python.txt"}, {"label": "//tests:conformance_go_rust", "status": "PASSED", "duration_seconds": 7.946, "cached": true, "started_at": "2026-09-18T20:46:22.805Z", "finished_at": "2026-09-18T20:46:30.751Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_go_rust.txt"}, {"label": "//tests:conformance_python_c", "status": "PASSED", "duration_seconds": 8.522, "cached": true, "started_at": "2026-09-18T20:46:12.250Z", "finished_at": "2026-09-18T20:46:20.772Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_python_c.txt"}, {"label": "//tests:conformance_python_go", "status": "PASSED", "duration_seconds": 9.392, "cached": true, "started_at": "2026-09-18T20:46:25.874Z", "finished_at": "2026-09-18T20:46:35.266Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_python_go.txt"}, {"label": "//tests:conformance_python_python", "status": "PASSED", "duration_seconds": 10.661, "cached": true, "started_at": "2026-09-18T20:46:01.495Z", "finished_at": "2026-09-18T20:46:12.156Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_python_python.txt"}, {"label": "//tests:conformance_python_rust", "status": "PASSED", "duration_seconds": 9.383, "cached": true, "started_at": "2026-09-18T20:46:13.401Z", "finished_at": "2026-09-18T20:46:22.784Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_python_rust.txt"}, {"label": "//tests:conformance_rust_c", "status": "PASSED", "duration_seconds": 7.066, "cached": true, "started_at": "2026-09-18T20:46:09.469Z", "finished_at": "2026-09-18T20:46:16.535Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_rust_c.txt"}, {"label": "//tests:conformance_rust_go", "status": "PASSED", "duration_seconds": 7.938, "cached": true, "started_at": "2026-09-18T20:46:24.032Z", "finished_at": "2026-09-18T20:46:31.970Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_rust_go.txt"}, {"label": "//tests:conformance_rust_python", "status": "PASSED", "duration_seconds": 9.315, "cached": true, "started_at": "2026-09-18T20:46:02.023Z", "finished_at": "2026-09-18T20:46:11.338Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_rust_python.txt"}, {"label": "//tests:conformance_rust_rust", "status": "PASSED", "duration_seconds": 7.859, "cached": true, "started_at": "2026-09-18T20:46:01.519Z", "finished_at": "2026-09-18T20:46:09.378Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--conformance_rust_rust.txt"}, {"label": "//tests:core_fuzz_smoke", "status": "PASSED", "duration_seconds": 0.061, "cached": true, "started_at": "2026-09-18T20:43:13.600Z", "finished_at": "2026-09-18T20:43:13.661Z", "scenarios": [], "log_url": "logs/tests--core_fuzz_smoke.txt"}, {"label": "//tests:core_test", "status": "PASSED", "duration_seconds": 0.021, "cached": true, "started_at": "2026-09-18T20:43:14.063Z", "finished_at": "2026-09-18T20:43:14.084Z", "scenarios": [], "log_url": "logs/tests--core_test.txt"}, {"label": "//tests:relay_replay", "status": "PASSED", "duration_seconds": 1.979, "cached": true, "started_at": "2026-09-18T20:46:11.362Z", "finished_at": "2026-09-18T20:46:13.341Z", "scenarios": [], "log_url": "logs/tests--relay_replay.txt"}, {"label": "//tests:sanitizers", "status": "PASSED", "duration_seconds": 8.945, "cached": true, "started_at": "2026-09-18T20:46:16.903Z", "finished_at": "2026-09-18T20:46:25.848Z", "scenarios": [{"name": "first_exchange", "seed": 73821}, {"name": "lost_initial", "seed": 73821}, {"name": "authorization", "seed": 73821}, {"name": "lost_receipts", "seed": 73821}, {"name": "lost_application_report", "seed": 73821}, {"name": "rejected_name", "seed": 73821}, {"name": "reordered_snapshots", "seed": 73821}, {"name": "tamper_and_reflect", "seed": 73821}, {"name": "reboot", "seed": 73821}, {"name": "failed_commits", "seed": 73821}, {"name": "buffer_and_provider_failures", "seed": 73821}, {"name": "unavailable_randomness", "seed": 73821}, {"name": "exact_uint64", "seed": 73821}, {"name": "bounded_withholding", "seed": 73821}, {"name": "generated_schedule", "seed": 73821}, {"name": "generated_schedule", "seed": 73822}, {"name": "generated_schedule", "seed": 73823}], "log_url": "logs/tests--sanitizers.txt"}, {"label": "//tools:schema_check", "status": "PASSED", "duration_seconds": 0.136, "cached": true, "started_at": "2026-09-18T20:46:16.559Z", "finished_at": "2026-09-18T20:46:16.695Z", "scenarios": [], "log_url": "logs/tools--schema_check.txt"}], "matrix": [{"device": "c", "server": "c", "label": "//tests:conformance_c_c", "status": "PASSED", "duration_seconds": 6.543, "scenario_runs": 17}, {"device": "c", "server": "python", "label": "//tests:conformance_c_python", "status": "PASSED", "duration_seconds": 8.522, "scenario_runs": 17}, {"device": "c", "server": "rust", "label": "//tests:conformance_c_rust", "status": "PASSED", "duration_seconds": 7.163, "scenario_runs": 17}, {"device": "c", "server": "go", "label": "//tests:conformance_c_go", "status": "PASSED", "duration_seconds": 7.274, "scenario_runs": 17}, {"device": "python", "server": "c", "label": "//tests:conformance_python_c", "status": "PASSED", "duration_seconds": 8.522, "scenario_runs": 17}, {"device": "python", "server": "python", "label": "//tests:conformance_python_python", "status": "PASSED", "duration_seconds": 10.661, "scenario_runs": 17}, {"device": "python", "server": "rust", "label": "//tests:conformance_python_rust", "status": "PASSED", "duration_seconds": 9.383, "scenario_runs": 17}, {"device": "python", "server": "go", "label": "//tests:conformance_python_go", "status": "PASSED", "duration_seconds": 9.392, "scenario_runs": 17}, {"device": "rust", "server": "c", "label": "//tests:conformance_rust_c", "status": "PASSED", "duration_seconds": 7.066, "scenario_runs": 17}, {"device": "rust", "server": "python", "label": "//tests:conformance_rust_python", "status": "PASSED", "duration_seconds": 9.315, "scenario_runs": 17}, {"device": "rust", "server": "rust", "label": "//tests:conformance_rust_rust", "status": "PASSED", "duration_seconds": 7.859, "scenario_runs": 17}, {"device": "rust", "server": "go", "label": "//tests:conformance_rust_go", "status": "PASSED", "duration_seconds": 7.938, "scenario_runs": 17}, {"device": "go", "server": "c", "label": "//tests:conformance_go_c", "status": "PASSED", "duration_seconds": 7.132, "scenario_runs": 17}, {"device": "go", "server": "python", "label": "//tests:conformance_go_python", "status": "PASSED", "duration_seconds": 8.237, "scenario_runs": 17}, {"device": "go", "server": "rust", "label": "//tests:conformance_go_rust", "status": "PASSED", "duration_seconds": 7.946, "scenario_runs": 17}, {"device": "go", "server": "go", "label": "//tests:conformance_go_go", "status": "PASSED", "duration_seconds": 7.544, "scenario_runs": 17}], "resources": {"flash_bytes": 62520, "static_ram_bytes": 3848, "context_bytes": 952, "compiler": "arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009", "report_url": "resources/cortex-m4.md"}, "limitations": ["Results identify a tested source commit; this is a published snapshot, not a claim that later commits have passed.", "Bazel cache hits reuse successful results for unchanged inputs. Per-target logs retain the recorded execution output.", "The sixteen pairings share one C core. The Go NaCl oracle supplies a separate cryptographic compatibility check.", "Cortex-M4 figures are linked static resources including probe and runtime support, not peak RAM, timing, or board qualification."], "assets": {"logs/bindings--go--sdk_test.txt": "b6e055a20a4ff6920ac144bfaf35be495afb3d5c45e5975caecabd66b9ea39f9", "logs/bindings--rust--sdk_test.txt": "41e98fbaa32afb95f48f3121d034956db3920a1e56067947367806246698f79b", "logs/examples--production_api_test.txt": "9bf938755d70867dce05552907ea35551caa4f5bd81d298f787bf6e483e4acde", "logs/tests--crypto--interop.txt": "23595f7baaefc5551da80a205ee4a8c2eb8780ba3bbde20e99c5bb52a74c5ceb", "logs/tests--bindings_python.txt": "8840a1950a0e50e1ae61878fd61272a3ec64b2a0a3339f16d71a9971dbef8cb8", "logs/tests--conformance_c_c.txt": "d634d1076a6798cb40c7608ab65c23080e686c465fd35754db8d01e1f0c54cf7", "logs/tests--conformance_c_go.txt": "0badeab195116ebd54ee8a7ce4f36c343f407f2493d657b94a1c4a70142badaa", "logs/tests--conformance_c_python.txt": "2cdb0aaa4e522afa063e31d08f7930c29142f741a0504867230bfc7ce092a418", "logs/tests--conformance_c_rust.txt": "276cc03b9a3b1a68c252ed3b96831d201fd1db381f581c30772bc79385d9c259", "logs/tests--conformance_go_c.txt": "e4ab4ceafe52b64fdfea8723214fb46b92075046ceeac2d547023194cc04c89e", "logs/tests--conformance_go_go.txt": "a873b59eb9e329cb931e4999c7a413b54cb46129dc7b02220cf72b3b19f2a4bf", "logs/tests--conformance_go_python.txt": "9073d436b0f2e000f7f03540526401a0e5c7c3aafbb050642c011c8572b671e0", "logs/tests--conformance_go_rust.txt": "a8457a1da072b792944803cf2eb423916889d22afd1ff9415931ea186f0bcc72", "logs/tests--conformance_python_c.txt": "d9605eb51e3ca8eea9af160ba6151195b77ae99d9866036dc47a73106b678003", "logs/tests--conformance_python_go.txt": "838713d6ca9dd923f4d93678034e57f3d4a31f6f5a90b8cdf290528ab6aeea1e", "logs/tests--conformance_python_python.txt": "8090bb026025ccb30bae3cce65e6dffb30737d9ebd4828be5728062175744484", "logs/tests--conformance_python_rust.txt": "1ac84020b1f31a8c5dd4001eb9a5c91ac8665afcef52233538b91ac4deb1678d", "logs/tests--conformance_rust_c.txt": "82cb8c6f58327720818dc97f2d64dfe9066fb2588810dd59e73819eb84b27d8d", "logs/tests--conformance_rust_go.txt": "623cb9306e04acf45ca864b1f9a9cbcc5dac5e6c97a9590f68038ecf4977bf1d", "logs/tests--conformance_rust_python.txt": "3eb1f1add25cc66a8b502a4f8784ea379c29dab25e0cdb0e8c4f23c084e96a22", "logs/tests--conformance_rust_rust.txt": "dfb8a36a5af452365c1a6556219434c5de7607fbdedc0a946080e9d193b58e85", "logs/tests--core_fuzz_smoke.txt": "2c733870e157e5d0ea148e5cf2fc897b806b40d60e0ccfb6faef7f302d9abaaf", "logs/tests--core_test.txt": "9b7ce57021650025331bce387651b0aa55afffe4c26448074acafa75a96b6573", "logs/tests--relay_replay.txt": "4d25196cf026824c074c511ec809c16675402002994bda338952f0bc923ae319", "logs/tests--sanitizers.txt": "d79a62d8a7606ce27b8c4d0190974d1b58e059a5b644d4feb1c63b402acfadbe", "logs/tools--schema_check.txt": "3be8e108346b2aefa5b67568ff291a0ae8d6f3de12ade4f9d220a89394085d95", "resources/cortex-m4.json": "56b21e3b31183ca0cf6e0d0727472f02e09004537bcb74fd9c19d1def0a6740e", "resources/cortex-m4.md": "4a33e6b5665573e5bfddda40281da62f642a704fbb1c95cbe3716a062622d685"}}</script>
+  <script>
+    "use strict";
+    (() => {
+      const byId = id => document.getElementById(id);
+      let report;
+      try { report = JSON.parse(byId("report-data").textContent); }
+      catch (_) { byId("overall-status").textContent = "Report data unavailable"; return; }
+      if (!report || typeof report !== "object") { byId("overall-status").textContent = "Report data unavailable"; return; }
+      const targets = Array.isArray(report.targets) ? report.targets : [];
+      const matrix = Array.isArray(report.matrix) ? report.matrix : [];
+      const summary = report.summary || {};
+      const resources = report.resources || {};
+      const number = value => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+      const integer = value => number(value) === null ? "—" : value.toLocaleString("en-US");
+      const duration = value => number(value) === null ? "time unavailable" : `${value.toFixed(2)} s`;
+      const timestamp = value => { const date = new Date(value); return !value || Number.isNaN(date.getTime()) ? "Unknown" : `${date.toISOString().slice(0,19).replace("T"," ")} UTC`; };
+      const label = value => typeof value === "string" && value ? value : "Unknown";
+      const result = value => {
+        const normalized = String(value || "").toUpperCase();
+        if (["PASS", "PASSED", "SUCCESS"].includes(normalized)) return { css:"pass", text:"Passed" };
+        if (["FAIL", "FAILED", "ERROR", "TIMEOUT", "TIMED_OUT", "FAILED_TO_BUILD", "INCOMPLETE", "REMOTE_FAILURE", "TOOL_HALTED_BEFORE_TESTING"].includes(normalized)) return { css:"fail", text:"Failed" };
+        return { css:"unknown", text:normalized ? normalized.replace(/_/g," ").toLowerCase() : "Not recorded" };
+      };
+      const node = (tag, className, text) => { const element = document.createElement(tag); if (className) element.className = className; if (text !== undefined) element.textContent = String(text); return element; };
+      const link = (element, value) => {
+        if (typeof value !== "string" || !value.trim()) return false;
+        try { const parsed = new URL(value, document.baseURI); if (!["http:", "https:", "file:"].includes(parsed.protocol)) return false; element.href = value; element.hidden = false; return true; }
+        catch (_) { return false; }
+      };
+      const badge = value => { const status = result(value); return node("span", `status ${status.css}`, status.text); };
+      const targetIds = new Map();
+      targets.forEach((target, index) => { if (target && typeof target.label === "string") targetIds.set(target.label, `target-${index + 1}`); });
+      byId("project").textContent = label(report.project);
+      link(byId("repository-link"), report.repository_url);
+      byId("source-link").textContent = typeof report.source_commit === "string" ? report.source_commit.slice(0,12) : "Unknown";
+      link(byId("source-link"), report.source_url);
+      byId("generated-at").textContent = timestamp(report.generated_at);
+      byId("captured-at").textContent = timestamp(report.captured_at);
+      byId("cached-targets").textContent = number(summary.cached_targets) === null ? "Unknown" : `${integer(summary.cached_targets)} / ${integer(summary.targets)}`;
+      if (typeof report.evidence_origin === "string" && report.evidence_origin) { byId("evidence-origin").textContent = report.evidence_origin; byId("evidence-origin").hidden = false; }
+      byId("command").textContent = label(report.command);
+      byId("stat-targets").textContent = integer(summary.targets);
+      byId("stat-passed").textContent = integer(summary.passed);
+      byId("stat-failed").textContent = integer(summary.failed);
+      byId("stat-scenarios").textContent = integer(summary.scenario_runs);
+      let overall = { css:"unknown", text:"Evidence incomplete" };
+      if (report.build_success === false) overall = { css:"fail", text:"Bazel invocation failed" };
+      else if (number(summary.failed) !== null && summary.failed > 0) overall = { css:"fail", text:"Failures recorded" };
+      else if (number(summary.targets) !== null && summary.targets > 0 && summary.passed === summary.targets && summary.failed === 0) overall = { css:"pass", text:"All recorded targets passed" };
+      byId("overall-status").className = `status ${overall.css}`;
+      byId("overall-status").textContent = overall.text;
+      if (summary.failed > 0) byId("stat-failed").classList.add("bad");
+      const languages = ["C","Python","Rust","Go"];
+      languages.forEach(device => {
+        const row = node("tr"); const heading = node("th", "", device); heading.scope = "row"; row.append(heading);
+        languages.forEach(server => {
+          const match = matrix.find(item => item && String(item.device).toLowerCase() === device.toLowerCase() && String(item.server).toLowerCase() === server.toLowerCase());
+          const cell = node("td"); const content = node(match && targetIds.has(match.label) ? "a" : "span", match ? "" : "missing");
+          if (match && targetIds.has(match.label)) content.href = `#${targetIds.get(match.label)}`;
+          const status = result(match && match.status);
+          content.setAttribute("aria-label", `${device} device to ${server} server: ${status.text}`);
+          content.append(node("span", `cell-state ${status.css}`, `${status.css === "pass" ? "✓ " : status.css === "fail" ? "× " : ""}${status.text}`));
+          content.append(node("span", "cell-meta", match ? `${integer(match.scenario_runs)} runs · ${duration(match.duration_seconds)}` : "No result supplied"));
+          cell.append(content); row.append(cell);
+        });
+        byId("matrix-body").append(row);
+      });
+      const cryptoTargets = targets.filter(target => target && /crypto|oracle|vector/i.test(target.label));
+      cryptoTargets.forEach(target => { const item = node("li"); const name = node("a", "mono", label(target.label)); name.href = `#${targetIds.get(target.label)}`; item.append(name, badge(target.status)); byId("crypto-checks").append(item); });
+      byId("crypto-empty").hidden = cryptoTargets.length !== 0;
+      [["resource-flash",resources.flash_bytes],["resource-ram",resources.static_ram_bytes],["resource-context",resources.context_bytes]].forEach(([id,value]) => { byId(id).textContent = integer(value); if (number(value) !== null) byId(id).append(node("span","","B")); });
+      if (typeof resources.compiler === "string") byId("compiler").textContent = `Compiler: ${resources.compiler}`;
+      link(byId("resource-link"), resources.report_url);
+      const targetElements = [];
+      targets.forEach((target, index) => {
+        if (!target || typeof target !== "object") return;
+        const scenarios = Array.isArray(target.scenarios) ? target.scenarios : [];
+        const details = node("details", "target"); details.id = `target-${index + 1}`;
+        const title = node("summary"); title.append(node("span","target-name",label(target.label)), node("span","target-time",duration(target.duration_seconds)),badge(target.status));
+        const body = node("div", "target-body");
+        if (typeof target.cached === "boolean") body.append(node("p", "", target.cached ? "Bazel reused this cached test result. Its execution can predate this report." : "This target ran during the recorded Bazel invocation."));
+        if (target.started_at || target.finished_at) body.append(node("p", "", `Recorded execution: ${timestamp(target.started_at)} → ${timestamp(target.finished_at)}`));
+        body.append(node("p","",scenarios.length ? `${scenarios.length.toLocaleString("en-US")} scenario runs recorded. Seeds reproduce generated relay schedules.` : "This target has no individual behavioral scenarios listed. Its captured log records the check output."));
+        if (scenarios.length) {
+          const table = node("table", "scenario-table"); const tableCaption = node("caption", "", `Scenarios for ${label(target.label)}`); tableCaption.style.padding = "0 0 8px"; tableCaption.style.border = "0"; table.append(tableCaption);
+          const head = node("thead"); const headerRow = node("tr"); ["Scenario", "Seed"].forEach(text => { const th = node("th", "", text); th.scope = "col"; headerRow.append(th); }); head.append(headerRow); table.append(head);
+          const rows = node("tbody"); scenarios.forEach(scenario => { if (!scenario || typeof scenario !== "object") return; const row = node("tr"); row.append(node("td", "", label(scenario.name)), node("td","mono",scenario.seed === undefined || scenario.seed === null ? "—" : String(scenario.seed))); rows.append(row); }); table.append(rows); body.append(table);
+        }
+        const log = node("a", "", "View captured test log ↗"); if (link(log, target.log_url)) body.append(log);
+        details.append(title,body); byId("target-list").append(details);
+        targetElements.push({ element:details, status:result(target.status).css, searchable:[target.label,...scenarios.map(scenario => scenario && scenario.name)].join(" ").toLowerCase() });
+      });
+      let failedOnly = false;
+      const filter = () => { const query = byId("target-search").value.toLowerCase().trim(); let count = 0; targetElements.forEach(item => { const visible = (!failedOnly || item.status === "fail") && item.searchable.includes(query); item.element.hidden = !visible; if (visible) count++; }); byId("result-count").textContent = `${count} of ${targetElements.length} targets shown`; };
+      byId("target-search").addEventListener("input",filter);
+      byId("failed-filter").addEventListener("click",() => { failedOnly = !failedOnly; byId("failed-filter").setAttribute("aria-pressed",String(failedOnly)); filter(); });
+      const revealTarget = () => { const id = location.hash.slice(1); const item = targetElements.find(item => item.element.id === id); if (!item) return; byId("target-search").value = ""; failedOnly = false; byId("failed-filter").setAttribute("aria-pressed","false"); filter(); item.element.open = true; };
+      window.addEventListener("hashchange",revealTarget);
+      filter(); revealTarget();
+      const limitations = Array.isArray(report.limitations) && report.limitations.length ? report.limitations : ["The four language APIs share one C protocol core; the Go NaCl oracle provides a separate cryptographic compatibility check.","Static Cortex-M4 measurements do not establish peak RAM, timing, physical-board behavior, or side-channel resistance.","A recorded passing test suite provides evidence for the tested scenarios, not a proof that all possible faults are covered."];
+      limitations.forEach(value => byId("limitations").append(node("li","",String(value))));
+    })();
+  </script>
+</body>
+</html>

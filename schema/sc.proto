@@ -1,0 +1,46 @@
+syntax = "proto2";
+package simplecrypts;
+
+// Authenticated inner object. Every semantic routing field is repeated here;
+// the untrusted outer frame is only a bounded decoding/routing aid.
+message Packet {
+  required uint32 version = 1;
+  required uint32 profile = 2;
+  required uint32 direction = 3;
+  required uint32 kind = 4;
+  required bytes serial = 5;
+  required bytes sender_key = 6;
+  required bytes recipient_key = 7;
+  required uint64 key_generation = 8;
+  required uint64 revision = 9;
+  required bytes name = 10;
+  optional sint32 temperature_mC = 11;
+  optional uint64 processed_desired_revision = 12;
+  optional uint64 applied_desired_revision = 13;
+  optional uint32 apply_status = 14;
+  optional uint64 acked_reported_revision = 15;
+  optional bool enrollment_confirmed = 16;
+  optional bytes enrollment_token = 17;
+}
+
+// Atomic bounded snapshot. Nonce reservations are a separate durable provider
+// namespace and can never be rolled back by committing this record.
+message Record {
+  required uint32 version = 1;
+  required uint32 role = 2;
+  required bytes serial = 3;
+  required bytes local_key = 4;
+  required bytes peer_key = 5;
+  required bool registered = 6;
+  required bytes desired_name = 7;
+  required bytes actual_name = 8;
+  optional sint32 temperature_mC = 9;
+  required uint64 desired_revision = 10;
+  required uint64 reported_revision = 11;
+  required uint64 processed_desired_revision = 12;
+  required uint64 applied_desired_revision = 13;
+  required uint64 acked_reported_revision = 14;
+  required uint64 last_sent_reported_revision = 15;
+  required uint64 last_sent_desired_revision = 16;
+  required uint32 apply_status = 17;
+}

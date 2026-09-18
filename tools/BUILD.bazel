@@ -1,0 +1,4 @@
+load("//build:defs.bzl", "py_test")
+package(default_visibility=["//visibility:public"])
+exports_files(["build_action.py", "bootstrap.py", "downloads.lock.json"])
+py_test(name="schema_check", main="check_schema.py", data=["//schema:sc.proto", "//schema:sc.options", "//schema:sc.pb.c", "//schema:sc.pb.h", "//third_party/nanopb:generator", "@protobuf_sdk//:files"])

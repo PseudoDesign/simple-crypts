@@ -1,0 +1,57 @@
+[
+  {
+    "file": "cargo-1.85.1.tar.xz",
+    "sha256": "7373132c13e394755d15f01bda4374af59b4daef01b12a83cb3df3f3be38e289",
+    "url": "https://static.rust-lang.org/dist/cargo-1.85.1-x86_64-unknown-linux-gnu.tar.xz"
+  },
+  {
+    "file": "cffi-1.17.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+    "sha256": "b62ce867176a75d03a665bad002af8e6d54644fad99a3c70905c543130e39d93",
+    "url": "https://files.pythonhosted.org/packages/b2/d5/da47df7004cb17e4955df6a43d14b3b4ae77737dff8bf7f8f333196717bf/cffi-1.17.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+  },
+  {
+    "file": "go1.24.4.linux-amd64.tar.gz",
+    "sha256": "77e5da33bb72aeaef1ba4418b6fe511bc4d041873cbf82e5aa6318740df98717",
+    "url": "https://go.dev/dl/go1.24.4.linux-amd64.tar.gz"
+  },
+  {
+    "file": "libsodium-1.0.20.tar.gz",
+    "sha256": "ebb65ef6ca439333c2bb41a0c1990587288da07f6c7fd07cb3a18cc18d30ce19",
+    "url": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.20.tar.gz"
+  },
+  {
+    "file": "nanopb-0.4.9.1.tar.gz",
+    "sha256": "4575944a468718ef25f05eb01d994364650b581563089a9841986bb1e460eac3",
+    "url": "https://codeload.github.com/nanopb/nanopb/tar.gz/refs/tags/0.4.9.1"
+  },
+  {
+    "file": "platforms-0.0.11.tar.gz",
+    "sha256": "ace459f5d033c86e6578df817f739b21101c0ebcd409a97badc2979c22ce9fdc",
+    "url": "https://codeload.github.com/bazelbuild/platforms/tar.gz/refs/tags/0.0.11"
+  },
+  {
+    "file": "protobuf-5.29.3-cp38-abi3-manylinux2014_x86_64.whl",
+    "sha256": "c027e08a08be10b67c06bf2370b99c811c466398c357e615ca88c91c07f0910f",
+    "url": "https://files.pythonhosted.org/packages/a8/45/2ebbde52ad2be18d3675b6bee50e68cd73c9e0654de77d595540b5129df8/protobuf-5.29.3-cp38-abi3-manylinux2014_x86_64.whl"
+  },
+  {
+    "file": "protoc-29.3.zip",
+    "sha256": "3e866620c5be27664f3d2fa2d656b5f3e09b5152b42f1bedbf427b333e90021a",
+    "url": "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-x86_64.zip"
+  },
+  {
+    "file": "pycparser-2.22-py3-none-any.whl",
+    "sha256": "c3702b6d3dd8c7abc1afa565d7e63d53a1d0bd86cdc24edd75470f4de499cfcc",
+    "url": "https://files.pythonhosted.org/packages/13/a3/a812df4e2dd5696d1f351d58b8fe16a405b234ad2886a0dab9183fb78109/pycparser-2.22-py3-none-any.whl"
+  },
+  {
+    "file": "rust-std-1.85.1.tar.xz",
+    "sha256": "0aaeffba85359503f874315cd08e0ae8490275d14b41470d36d4fa57fd085916",
+    "url": "https://static.rust-lang.org/dist/rust-std-1.85.1-x86_64-unknown-linux-gnu.tar.xz"
+  },
+  {
+    "file": "rustc-1.85.1.tar.xz",
+    "sha256": "92a5c532b9e87912190128704e0d65825912e3b08a6ee9203c4068d6d1df62c4",
+    "url": "https://static.rust-lang.org/dist/rustc-1.85.1-x86_64-unknown-linux-gnu.tar.xz"
+  }
+]

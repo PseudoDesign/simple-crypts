@@ -1,0 +1,13 @@
+load("//build:defs.bzl", "sdk_test")
+package(default_visibility=["//visibility:public"])
+filegroup(name="sources", srcs=glob(["src/**", "Cargo.*"]))
+sdk_test(
+    name = "sdk_test",
+    kind = "rust",
+    test_build = True,
+    module = "bindings/rust",
+    sdk = "@rust_sdk//:files",
+    sdk_marker = "@rust_sdk//:bin/rustc",
+    shared = "//providers/host:libsimplecrypts_testing",
+    srcs = [":sources", "//third_party/rust_crates:sources"],
+)

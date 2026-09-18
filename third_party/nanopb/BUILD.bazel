@@ -1,0 +1,5 @@
+load("//build:defs.bzl", "c_library")
+package(default_visibility = ["//visibility:public"])
+c_library(name = "runtime", srcs = ["pb_common.c", "pb_encode.c", "pb_decode.c"], hdrs = ["pb.h", "pb_common.h", "pb_encode.h", "pb_decode.h"], includes = ["third_party/nanopb"])
+filegroup(name = "generator", srcs = glob(["generator/**"], exclude=["generator/**/__pycache__/**", "generator/**/*.pyc"]))
+filegroup(name = "sources", srcs = ["pb_common.c", "pb_encode.c", "pb_decode.c", "pb.h", "pb_common.h", "pb_encode.h", "pb_decode.h"])

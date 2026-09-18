@@ -1,0 +1,5 @@
+.toolchains
+third_party/platforms
+third_party/nanopb/extra
+third_party/nanopb/examples
+third_party/nanopb/tests

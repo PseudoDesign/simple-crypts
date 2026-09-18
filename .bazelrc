@@ -1,0 +1,8 @@
+startup --output_user_root=/tmp/simple-crypts-bazel
+startup --batch
+common --enable_bzlmod
+common --experimental_collect_system_network_usage=false
+common --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build --jobs=4
+test --test_output=errors
+build --incompatible_autoload_externally=

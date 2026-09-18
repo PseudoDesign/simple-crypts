@@ -1,0 +1,19 @@
+load("//build:defs.bzl", "py_binary", "py_test")
+py_binary(
+    name = "device_server_demo",
+    main = "device_server_demo.py",
+    data = ["//tests:coordinator.py", "//adapters/c:adapter", "//adapters/python:adapter"],
+    script_args = ["--device", "adapters/c/adapter", "--server", "adapters/python/adapter"],
+)
+py_binary(
+    name = "python_api",
+    main = "python_api.py",
+    shared = "//providers/host:libsimplecrypts",
+    data = ["//bindings/python:simplecrypts.py"],
+)
+py_test(
+    name = "production_api_test",
+    main = "python_api.py",
+    shared = "//providers/host:libsimplecrypts",
+    data = ["//bindings/python:simplecrypts.py"],
+)

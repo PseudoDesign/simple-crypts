@@ -1,0 +1,17 @@
+load("//build:defs.bzl", "c_test", "py_test", "conformance_matrix")
+exports_files(["coordinator.py"])
+c_test(name="core_test", srcs=["core_test.c"], deps=["//core:sc_testing"], copts=["-DSC_ENABLE_TESTING"])
+py_test(name="bindings_python", main="bindings_python.py", shared="//providers/host:libsimplecrypts_testing", data=["//bindings/python:simplecrypts.py"])
+conformance_matrix()
+c_test(name="core_fuzz_smoke", srcs=["core_fuzz.c"], deps=["//core:sc_testing"], copts=["-DSC_ENABLE_TESTING", "-DSC_FUZZ_STANDALONE"])
+py_test(name="relay_replay", main="relay_replay.py", data=["coordinator.py", "conformance.py", "//adapters/c:adapter", "//adapters/python:adapter"], script_args=["--device", "adapters/c/adapter", "--server", "adapters/python/adapter"])
+py_test(
+    name="sanitizers",
+    main="sanitizers.py",
+    data=[
+        "core_test.c", "core_fuzz.c", "conformance.py", "coordinator.py",
+        "//core:sources", "//schema:sources", "//third_party/nanopb:sources",
+        "//providers/sodium:sources", "//providers/host:sources", "//adapters/c:sources",
+        "//third_party/libsodium:headers", "//third_party/libsodium:sodium",
+    ],
+)

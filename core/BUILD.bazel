@@ -1,0 +1,5 @@
+load("//build:defs.bzl", "c_library")
+package(default_visibility=["//visibility:public"])
+c_library(name="sc", srcs=["sc.c"], hdrs=["sc.h"], deps=["//schema:proto"])
+c_library(name="sc_testing", srcs=["sc.c"], hdrs=["sc.h", "sc_test.h"], deps=["//schema:proto"], copts=["-DSC_ENABLE_TESTING"])
+filegroup(name="sources", srcs=glob(["*.c", "*.h"]))

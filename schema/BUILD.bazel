@@ -1,0 +1,5 @@
+load("//build:defs.bzl", "c_library")
+package(default_visibility = ["//visibility:public"])
+c_library(name = "proto", srcs = ["sc.pb.c"], hdrs = ["sc.pb.h"], deps = ["//third_party/nanopb:runtime"])
+exports_files(glob(["*.proto", "*.options", "*.pb.c", "*.pb.h"]))
+filegroup(name="sources", srcs=["sc.pb.c", "sc.pb.h"])

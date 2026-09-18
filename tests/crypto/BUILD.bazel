@@ -1,0 +1,4 @@
+load("//build:defs.bzl", "c_binary", "sdk_binary", "py_test")
+c_binary(name="oracle_sodium", srcs=["oracle_sodium.c"], deps=["//third_party/libsodium:sodium"])
+sdk_binary(name="oracle_go", kind="go", module="tests/crypto", sdk="@go_sdk//:files", sdk_marker="@go_sdk//:bin/go", srcs=["oracle.go", "go.mod", "go.sum"]+glob(["vendor/**"]))
+py_test(name="interop", main="interop.py", data=[":oracle_sodium", ":oracle_go", "vector.json", "//tests:coordinator.py"], script_args=["--sodium", "tests/crypto/oracle_sodium", "--go", "tests/crypto/oracle_go", "--vector", "tests/crypto/vector.json"])

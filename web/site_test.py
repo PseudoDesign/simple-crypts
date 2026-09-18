@@ -9,6 +9,17 @@ spec=importlib.util.spec_from_file_location('demo_site',Path(__file__).with_name
 site=importlib.util.module_from_spec(spec);spec.loader.exec_module(site)
 
 class SiteTest(unittest.TestCase):
+    def test_replace_readonly_generated_asset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source=Path(tmp)/'built.wasm';destination=Path(tmp)/'published.wasm'
+            source.write_bytes(b'new');source.chmod(0o444)
+            destination.write_bytes(b'old');destination.chmod(0o444)
+            site.copy_asset(source,destination)
+            self.assertEqual(destination.read_bytes(),b'new')
+            site.copy_asset(source,destination)
+            self.assertEqual(destination.read_bytes(),b'new')
+            self.assertFalse((Path(tmp)/'published.wasm.tmp').exists())
+
     def test_published_assets_and_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)/'site';shutil.copytree('web/site',root,copy_function=shutil.copyfile)

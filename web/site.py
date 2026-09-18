@@ -7,6 +7,16 @@ from test_report import verify_site as verify_report
 FILES=('index.html','style.css','app.mjs','lab.mjs','endpoint.mjs','worker.mjs','THIRD_PARTY_NOTICES.txt')
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+def copy_asset(source,destination):
+    # Bazel outputs are read-only. Copy bytes to a fresh sibling and replace,
+    # so assembling into the previously published site works repeatedly.
+    destination=Path(destination)
+    temporary=destination.with_name(destination.name+'.tmp')
+    try:
+        shutil.copyfile(source,temporary)
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
 def verify(root,require_commit=True):
     root=Path(root).resolve();m=json.loads((root/'demo.json').read_text())
     if require_commit and not re.fullmatch('[0-9a-f]{40}',m['source_commit']):raise ValueError('Demo needs an immutable source commit')
@@ -33,9 +43,9 @@ def assemble(output,module,source_commit):
         for directory in ('logs','resources'):
             shutil.copytree(snapshot/directory,root/directory,dirs_exist_ok=True)
         shutil.copy2(snapshot/'report.json',root/'report.json')
-    for name in FILES:shutil.copy2(Path('web')/name,root/name)
-    shutil.copy2(module,root/'endpoint.wasm.mjs')
-    shutil.copy2(module.with_suffix('.wasm'),root/'endpoint.wasm.wasm')
+    for name in FILES:copy_asset(Path('web')/name,root/name)
+    copy_asset(module,root/'endpoint.wasm.mjs')
+    copy_asset(module.with_suffix('.wasm'),root/'endpoint.wasm.wasm')
     (root/'.nojekyll').write_text('')
     manifest={'source_commit':source_commit,'runtime':'C core + nanopb + libsodium 1.0.20 / Emscripten 4.0.10','storage':'temporary; simulated durable storage across reboot control only','assets':{name:digest(root/name) for name in (*FILES,'endpoint.wasm.mjs','endpoint.wasm.wasm')}}
     (root/'demo.json').write_text(json.dumps(manifest,indent=2)+'\n')

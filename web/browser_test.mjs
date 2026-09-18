@@ -1,0 +1,69 @@
+import assert from 'node:assert/strict';
+import {createServer} from 'node:http';
+import {readFile} from 'node:fs/promises';
+import {resolve,extname,sep} from 'node:path';
+import {chromium,firefox} from 'playwright';
+const root=resolve(process.argv[2]||'bazel-bin/web/site');
+const mime={'.html':'text/html','.mjs':'text/javascript','.css':'text/css','.wasm':'application/wasm','.json':'application/json'};
+const server=createServer(async(req,res)=>{try{
+ let route=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
+ if(!route.startsWith('/simple-crypts/')){res.writeHead(404);return res.end();}
+ route=route.slice('/simple-crypts/'.length);if(!route||route.endsWith('/'))route+='index.html';
+ const file=resolve(root,route);if(!file.startsWith(root+sep))throw new Error('Invalid path');
+ res.setHeader('Content-Type',mime[extname(file)]||'text/plain');res.end(await readFile(file));
+}catch{res.writeHead(404);res.end('Not found');}});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}/simple-crypts/`;
+async function ready(page){await page.waitForFunction(()=>!document.querySelector('#next').disabled);}
+async function update(page,form,input,value){await page.locator(input).fill(value);await page.locator(form+' button').click();await ready(page);}
+async function send(page,role){await page.locator(`[data-transmit="${role}"]`).click();await ready(page);}
+async function action(page,action,index=0){await page.locator(`[data-action="${action}"]`).nth(index).click();await ready(page);}
+try{
+for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
+ const browser=await browserType.launch({headless:true});
+ try{
+  const context=await browser.newContext({viewport:{width:1440,height:1100},reducedMotion:'reduce'});const page=await context.newPage();const errors=[],outside=[];
+  page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(!r.url().startsWith(base))outside.push(r.url());});
+  await page.goto(base);await ready(page);
+  assert.equal(await page.locator('.packet').count(),0);
+  const firstIdentity=await page.locator('#device-details').textContent();
+  for(let step=0;step<7;step++){
+   await page.locator('#next').click();await ready(page);
+   assert.equal(await page.locator('#error').isVisible(),false,await page.locator('#error').textContent());
+   assert.match(await page.locator('#tour-progress').textContent(),new RegExp(`STEP ${step+1} OF 7`));
+   if(step===3){assert.equal(await page.locator('#server-status').textContent(),'Pending');assert.equal(await page.locator('#device-name').textContent(),'Freezer 3');}
+  }
+  assert.equal(await page.locator('#device-status').textContent(),'Confirmed');assert.equal(await page.locator('#server-status').textContent(),'Confirmed');
+  assert.equal(await page.locator('.packet').count(),0);assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');
+  await page.screenshot({path:`/tmp/simple-crypts-${name}-tour.png`,fullPage:true});
+  await page.locator('#sandbox').click();
+  await update(page,'#temperature-form','#temperature','12.345');await send(page,'device');
+  await action(page,'duplicate');await action(page,'corrupt');await action(page,'deliver');
+  assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');assert.match(await page.locator('#events').textContent(),/rejected/);
+  await action(page,'deliver');assert.equal(await page.locator('#server-temperature').textContent(),'12.345 °C');
+  await update(page,'#temperature-form','#temperature','13');await send(page,'device');await update(page,'#temperature-form','#temperature','14');await send(page,'device');
+  await action(page,'deliver',1);await action(page,'deliver',0);assert.equal(await page.locator('#server-temperature').textContent(),'14.000 °C');
+  await update(page,'#name-form','#name','é'.repeat(33));assert.match(await page.locator('#error').textContent(),/64 UTF-8/);
+  await update(page,'#name-form','#name','<img src=x onerror=alert(1)>');await send(page,'server');await action(page,'deliver');assert.equal(await page.locator('#device-name img').count(),0);assert.match(await page.locator('#device-name').textContent(),/<img/);
+  await page.locator('#budget').fill('1');await send(page,'device');assert.match(await page.locator('#error').textContent(),/bounds/);await page.locator('#budget').fill('512');
+  await send(page,'device');
+  // Fill queue through real UI duplication; no endpoints run on their own.
+  for(let i=1;i<64;i++)await action(page,'duplicate',0);
+  assert.equal(await page.locator('.packet').count(),64);assert(await page.locator('[data-transmit="device"]').isDisabled());assert(await page.locator('[data-action="duplicate"]').first().isDisabled());
+  await action(page,'drop');assert.equal(await page.locator('.packet').count(),63);assert(!(await page.locator('[data-transmit="device"]').isDisabled()));
+  await page.locator('#reset').click();await ready(page);assert.equal(await page.locator('.packet').count(),0);assert.notEqual(await page.locator('#device-details').textContent(),firstIdentity);
+  const resetIdentity=await page.locator('#device-details').textContent();await page.reload();await ready(page);assert.notEqual(await page.locator('#device-details').textContent(),resetIdentity);
+  // Browser remains idle across rendering turns: initialization sends no frames.
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.equal(await page.locator('.packet').count(),0);
+  await page.setViewportSize({width:390,height:844});await page.keyboard.press('Tab');assert(await page.evaluate(()=>document.activeElement!==document.body));
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:`/tmp/simple-crypts-${name}-mobile.png`,fullPage:true});
+  assert.equal((await page.request.get(base+'report/')).status(),200);assert.equal((await page.request.get(base+'resources/cortex-m4.md')).status(),200);
+  assert.deepEqual(errors,[]);assert.deepEqual(outside,[]);
+  await context.close();
+  // Hold a report command, reset, then release the stale command to a terminated worker.
+  const resetContext=await browser.newContext();await resetContext.addInitScript(()=>{const Original=Worker;window.__held=[];window.Worker=class extends Original{postMessage(message,...rest){if(message.command==='report')window.__held.push(()=>super.postMessage(message,...rest));else super.postMessage(message,...rest);}};});
+  const p=await resetContext.newPage();await p.goto(base);await ready(p);await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/7 STEPS/);await resetContext.close();
+  const noRng=await browser.newContext();await noRng.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const r=await noRng.newPage();await r.goto(base);await r.locator('#error').waitFor({state:'visible'});assert.match(await r.locator('#error').textContent(),/randomness/);assert(await r.locator('#next').isDisabled());await noRng.close();
+  console.log(`PASS ${name}: live tour, hostile relay, bounds, reset, UTF-8, keyboard/mobile, no external requests, RNG failure`);
+ }finally{await browser.close();}
+}
+}finally{await new Promise(r=>server.close(r));}

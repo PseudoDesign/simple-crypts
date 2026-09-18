@@ -47,7 +47,7 @@ def main():
     options = parser.parse_args()
     if platform.system() != 'Linux' or platform.machine() not in ('x86_64', 'AMD64') or sys.version_info[:2] != (3, 12):
         raise SystemExit('This pinned sample build profile requires Linux x86_64 and Python 3.12.')
-    for name in ('cc', 'ar', 'make', 'bazel', 'arm-none-eabi-gcc', 'arm-none-eabi-ar', 'arm-none-eabi-size'):
+    for name in ('cc', 'ar', 'make', 'bazel', 'arm-none-eabi-gcc', 'arm-none-eabi-ar', 'arm-none-eabi-size', 'node'):
         if not shutil.which(name):
             raise SystemExit('Missing system prerequisite: ' + name)
     rows = json.loads((ROOT / 'tools/downloads.lock.json').read_text())
@@ -60,7 +60,12 @@ def main():
         archive = download(row)
         if options.verify_only:
             continue
-        if name.startswith('go'):
+        if name.startswith('emscripten-'):
+            with tarfile.open(archive) as tar:
+                with tempfile.TemporaryDirectory(dir=CACHE) as temporary:
+                    tar.extractall(temporary, filter='data')
+                    shutil.copytree(Path(temporary) / 'install', CACHE / 'emscripten', dirs_exist_ok=True)
+        elif name.startswith('go'):
             with tarfile.open(archive) as tar:
                 tar.extractall(CACHE, filter='data')
         elif name.startswith(('rustc-', 'rust-std-', 'cargo-')):
@@ -77,7 +82,7 @@ def main():
             with zipfile.ZipFile(archive) as wheel:
                 wheel.extractall(CACHE / 'python')
     if not options.verify_only:
-        for name in ('go', 'rust', 'python', 'protobuf'):
+        for name in ('go', 'rust', 'python', 'protobuf', 'emscripten'):
             repo_files(CACHE / name)
     print('Pinned SDKs verified' if options.verify_only else 'Pinned SDKs installed. Run bazel test //... (first Bazel module fetch requires network).')
 

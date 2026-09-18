@@ -1,0 +1,253 @@
+{
+  "profile": "Cortex-M4 / Thumb / -Os / no assembly / link-only",
+  "compiler": "arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009",
+  "text_bytes": 61064,
+  "data_bytes": 1456,
+  "bss_bytes": 2392,
+  "flash_sections_bytes": 62520,
+  "static_ram_bytes": 3848,
+  "peak_stack_bytes": null,
+  "required_symbols_retained": [
+    "crypto_box_easy",
+    "crypto_box_open_easy",
+    "sc_sodium_seal",
+    "sc_sodium_open",
+    "sc_receive",
+    "sc_outbound"
+  ],
+  "largest_linked_function_stack_frames": [
+    {
+      "function": "save",
+      "bytes": 888,
+      "classification": "static"
+    },
+    {
+      "function": "sc_outbound",
+      "bytes": 712,
+      "classification": "static"
+    },
+    {
+      "function": "sc_receive",
+      "bytes": 712,
+      "classification": "static"
+    },
+    {
+      "function": "ge25519_scalarmult_base",
+      "bytes": 488,
+      "classification": "static"
+    },
+    {
+      "function": "sc_init",
+      "bytes": 472,
+      "classification": "static"
+    },
+    {
+      "function": "crypto_secretbox_detached",
+      "bytes": 432,
+      "classification": "static"
+    },
+    {
+      "function": "crypto_scalarmult_curve25519_ref10.part.0",
+      "bytes": 392,
+      "classification": "static"
+    },
+    {
+      "function": "sc_report_temperature",
+      "bytes": 296,
+      "classification": "static"
+    },
+    {
+      "function": "crypto_scalarmult_curve25519_ref10_base",
+      "bytes": 288,
+      "classification": "static"
+    },
+    {
+      "function": "fe25519_mul",
+      "bytes": 184,
+      "classification": "static"
+    },
+    {
+      "function": "fe25519_mul",
+      "bytes": 184,
+      "classification": "static"
+    },
+    {
+      "function": "fe25519_invert",
+      "bytes": 176,
+      "classification": "static"
+    },
+    {
+      "function": "crypto_onetimeauth_poly1305_donna",
+      "bytes": 176,
+      "classification": "static"
+    },
+    {
+      "function": "crypto_secretbox_open_detached",
+      "bytes": 168,
+      "classification": "static"
+    },
+    {
+      "function": "stream_ref_xor_ic",
+      "bytes": 160,
+      "classification": "static"
+    },
+    {
+      "function": "ge25519_cmov8",
+      "bytes": 152,
+      "classification": "static"
+    },
+    {
+      "function": "crypto_core_salsa20",
+      "bytes": 144,
+      "classification": "static"
+    },
+    {
+      "function": "stream_ref",
+      "bytes": 144,
+      "classification": "static"
+    },
+    {
+      "function": "pb_decode_inner",
+      "bytes": 144,
+      "classification": "static"
+    },
+    {
+      "function": "ge25519_p3_dbl",
+      "bytes": 136,
+      "classification": "static"
+    }
+  ],
+  "data_symbols": [
+    {
+      "symbol": "__malloc_av_",
+      "bytes": 1032
+    },
+    {
+      "symbol": "endpoint",
+      "bytes": 952
+    },
+    {
+      "symbol": "frame",
+      "bytes": 512
+    },
+    {
+      "symbol": "saved",
+      "bytes": 512
+    },
+    {
+      "symbol": "__sf",
+      "bytes": 312
+    },
+    {
+      "symbol": "_impure_data",
+      "bytes": 288
+    },
+    {
+      "symbol": "__malloc_current_mallinfo",
+      "bytes": 40
+    },
+    {
+      "symbol": "private_key",
+      "bytes": 32
+    },
+    {
+      "symbol": "public_key",
+      "bytes": 32
+    },
+    {
+      "symbol": "crypto_onetimeauth_poly1305_donna_implementation",
+      "bytes": 20
+    },
+    {
+      "symbol": "crypto_scalarmult_curve25519_ref10_implementation",
+      "bytes": 8
+    },
+    {
+      "symbol": "crypto_stream_salsa20_ref_implementation",
+      "bytes": 8
+    },
+    {
+      "symbol": "generation",
+      "bytes": 8
+    },
+    {
+      "symbol": "keys.0",
+      "bytes": 8
+    },
+    {
+      "symbol": "reservation",
+      "bytes": 8
+    },
+    {
+      "symbol": "__malloc_max_sbrked_mem",
+      "bytes": 4
+    },
+    {
+      "symbol": "__malloc_max_total_mem",
+      "bytes": 4
+    },
+    {
+      "symbol": "__malloc_sbrk_base",
+      "bytes": 4
+    },
+    {
+      "symbol": "__malloc_top_pad",
+      "bytes": 4
+    },
+    {
+      "symbol": "__malloc_trim_threshold",
+      "bytes": 4
+    },
+    {
+      "symbol": "__stdio_exit_handler",
+      "bytes": 4
+    },
+    {
+      "symbol": "_impure_ptr",
+      "bytes": 4
+    },
+    {
+      "symbol": "_misuse_handler",
+      "bytes": 4
+    },
+    {
+      "symbol": "_sodium_lock",
+      "bytes": 4
+    },
+    {
+      "symbol": "errno",
+      "bytes": 4
+    },
+    {
+      "symbol": "heap_end.0",
+      "bytes": 4
+    },
+    {
+      "symbol": "implementation",
+      "bytes": 4
+    },
+    {
+      "symbol": "implementation",
+      "bytes": 4
+    },
+    {
+      "symbol": "implementation",
+      "bytes": 4
+    },
+    {
+      "symbol": "saved_length",
+      "bytes": 4
+    },
+    {
+      "symbol": "observed",
+      "bytes": 1
+    }
+  ],
+  "limitations": [
+    "Not executed on hardware; no latency or energy claim.",
+    "Stack frame sizes are not a call-chain, interrupt, or whole-program peak.",
+    "Includes measurement harness state and buffers; not a board firmware budget.",
+    "Platform callbacks are nonproduction measurement stubs; linker address space is not a board capacity.",
+    "Generic software crypto defaults; no sodium_init/RNG/platform startup linked. Real board initialization must be validated."
+  ]
+}

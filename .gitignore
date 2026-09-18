@@ -4,3 +4,5 @@ __pycache__/
 *.pyc
 .venv/
 target/
+web/node_modules/
+web/test-results/

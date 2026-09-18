@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Run a real encrypted device/server exchange. Drop packets, change state, and watch the endpoints recover.">
+<meta name="color-scheme" content="light"><title>Simple Crypts · See the exchange</title>
+<link rel="stylesheet" href="./style.css"><script type="module" src="./app.mjs"></script>
+</head>
+<body>
+<a class="skip" href="#walkthrough">Skip to demo</a>
+<header class="top"><a class="brand" href="./"><span class="mark" aria-hidden="true">s:c</span> simple crypts</a><nav aria-label="Main"><a href="./report/">Test evidence ↗</a><a href="https://github.com/PseudoDesign/simple-crypts">Source ↗</a></nav></header>
+<main>
+<section class="hero"><div><p class="eyebrow">A small API. A real encrypted exchange.</p><h1>Keep the data in sync.<br><em>Even when the host won’t help.</em></h1><p class="lede">A device reports temperature. A server assigns its name. The host between them can forward, lose, or tamper with messages. Try it.</p></div><div class="live-note"><span class="dot"></span> Real cryptography, in your browser <small>C library · WebAssembly · NaCl box</small></div></section>
+<section id="walkthrough" class="walkthrough" aria-labelledby="tour-title">
+<div class="tour-copy" aria-live="polite" aria-atomic="true"><p class="eyebrow" id="tour-progress">THE GUIDED EXCHANGE · 7 STEPS</p><h2 id="tour-title">Let’s lose a few packets.</h2><p id="tour-text">Follow a temperature report from enrollment to confirmation, with a dropped message and a reboot along the way. Then take control of the relay yourself.</p></div>
+<div class="tour-actions"><button id="next" class="primary" disabled>Start guided tour <span aria-hidden="true">→</span></button><button id="sandbox" disabled>Explore sandbox</button></div>
+<div class="progress" aria-hidden="true"><span id="progress-fill"></span></div>
+</section>
+<div class="session-bar"><p id="session-status" role="status">Loading the cryptographic library…</p><div><span class="session-label">Temporary session</span><button id="reset">Reset session ↺</button></div></div>
+<p id="error" class="error" role="alert" hidden></p>
+<section class="lanes" aria-label="Live device, relay, and server">
+<article class="endpoint" id="device-panel"><header><span class="node-icon" aria-hidden="true">◉</span><div><p class="eyebrow">01 / DEVICE</p><h2>Temperature sensor</h2></div><span id="device-status" class="badge">Starting</span></header>
+<div class="readings"><div><span class="label">Measured temperature</span><strong id="device-temperature">—</strong></div><div><span class="label">Applied name</span><strong id="device-name" class="name">Not assigned</strong></div></div>
+<form id="temperature-form"><label for="temperature">Report a temperature <span>°C</span></label><div class="input-row"><input id="temperature" type="number" value="-18.125" step="0.001" min="-2147483.648" max="2147483.647" required><button type="submit">Update</button></div></form>
+<div class="endpoint-actions"><button data-transmit="device" class="send">Send opportunity →</button><button data-reboot="device" class="quiet">Reboot</button></div>
+<details><summary>Identity &amp; revisions</summary><pre id="device-details"></pre></details></article>
+<article class="relay"><header><div><p class="eyebrow">02 / UNTRUSTED HOST</p><h2>The relay</h2></div><span id="queue-count" class="count">0 / 64</span></header><p class="relay-copy">It can see bytes. It cannot read the contents.<br>Queued frames stay here until you act.</p>
+<label class="budget" for="budget">Budget per opportunity <span><input id="budget" type="number" min="0" max="512" step="1" value="512"> bytes</span></label>
+<div id="queue" class="queue"><p class="empty">No frames in transit.<br><span>Nothing is sent automatically.</span></p></div>
+<p class="relay-foot">Deliver any frame first to try reordering.<br>Corrupt changes a ciphertext byte.</p></article>
+<article class="endpoint" id="server-panel"><header><span class="node-icon" aria-hidden="true">▤</span><div><p class="eyebrow">03 / SERVER</p><h2>Device registry</h2></div><span id="server-status" class="badge">Starting</span></header>
+<div class="readings"><div><span class="label">Last reported temperature</span><strong id="server-temperature">—</strong></div><div><span class="label">Desired name</span><strong id="server-name" class="name">Not assigned</strong><small id="server-applied">No application report yet</small></div></div>
+<form id="name-form"><label for="name">Set the device’s name <span>up to 64 UTF-8 bytes</span></label><div class="input-row"><input id="name" value="Freezer 3" required><button type="submit">Update</button></div></form>
+<div class="endpoint-actions"><button data-transmit="server" class="send">← Send opportunity</button><button data-reboot="server" class="quiet">Reboot</button></div>
+<details><summary>Identity &amp; revisions</summary><pre id="server-details"></pre></details></article>
+</section>
+<section class="below"><article class="history"><div class="section-title"><h2>What happened</h2><span>Latest 200 events</span></div><ol id="events" aria-label="Exchange history"></ol></article><article class="code-panel"><p class="eyebrow">THE API BEHIND THE STEP</p><h2>A few calls do the work.</h2><pre><code id="step-code">sc_report_temperature(&amp;device, -18125);
+sc_set_name(&amp;server, "Freezer 3");
+// Forward opaque frames when a link is available.</code></pre><p>The same C core powers the language bindings and this demo. Encryption, enrollment, revisions, and receipts run inside the library.</p><div class="code-links"><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/core/sc.h">C API ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/examples/python_api.py">Python example ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/bindings/rust/src/lib.rs">Rust ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/bindings/go/simplecrypts.go">Go ↗</a></div></article></section>
+<section class="notes"><h2>What this demonstrates</h2><div><p><strong>Private contents. Visible delivery.</strong> The host handles encrypted frames and public routing information. Endpoint panels show each endpoint’s own knowledge; they are not a host decryption view.</p><p><strong>Agreement needs delivery.</strong> Cryptography detects tampering; it cannot make the host forward a message. Updates stay pending until the required authenticated report or receipt arrives.</p><p><strong>A local simulation with real code.</strong> Both endpoints run in this tab, each in its own worker. Reboot preserves simulated storage; refresh or Reset starts fresh. This is not a hardware keystore or a production server.</p></div></section>
+</main><footer><span>Simple Crypts · show, don’t tell. <a href="./demo.json">Build details</a> · <a href="./THIRD_PARTY_NOTICES.txt">Notices</a></span><a href="./report/">Explore the cross-language test evidence →</a></footer>
+<noscript>This demo needs JavaScript and WebAssembly. The <a href="./report/">test evidence</a> is available separately.</noscript>
+</body></html>

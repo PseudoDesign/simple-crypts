@@ -4,8 +4,11 @@ A sample device/server library for encrypted state synchronization through an
 untrusted, intermittently connected relay. The device reports its temperature;
 the server requests a name. Applications work with state and opaque frames.
 
-View the [published test report](https://pseudodesign.github.io/simple-crypts/)
-for the language matrix, scenario logs, and MCU resource evidence.
+Try the [live browser demo](https://pseudodesign.github.io/simple-crypts/): follow
+the guided exchange, then drop or corrupt packets in the sandbox. The actual C
+library and NaCl box run locally through WebAssembly. View the
+[test evidence](https://pseudodesign.github.io/simple-crypts/report/) separately.
+See [web build and browser tests](web/README.md) to run the demo locally.
 
 Milestone 1 uses a bounded C99 protocol core, nanopb, and NaCl box
 (X25519/XSalsa20-Poly1305). Python uses CFFI, Rust wraps the C ABI, and Go uses
@@ -97,8 +100,8 @@ limitations for Cortex-M0/M3/M4 deployment; selecting a production backend and
 qualifying a physical board remain separate work.
 [Upstream MCU guidance](https://doc.libsodium.org/installation#cross-compiling-to-arm-microcontrollers).
 
-An interactive GitHub Pages demonstration, physical-board qualification, key
-rotation, fleet registry integration, and telemetry history are later milestones.
+Physical-board qualification, key rotation, fleet registry integration, and
+telemetry history are later milestones.
 The earlier [planning notes](PLAN.md) and [MCU feasibility discussion](MCU_FEASIBILITY.md)
 retain the alternatives considered; the implementation and protocol documents
 define this milestone's selected profile.

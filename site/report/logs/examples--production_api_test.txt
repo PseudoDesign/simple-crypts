@@ -1,0 +1,4 @@
+exec ${PAGER:-/usr/bin/less} "$0" || exit 1
+Executing tests from //examples:production_api_test
+-----------------------------------------------------------------------------
+Freezer 3: last reported temperature -18.250°C; confirmed.

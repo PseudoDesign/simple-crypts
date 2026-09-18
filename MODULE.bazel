@@ -8,3 +8,5 @@ local_repository(name = "go_sdk", path = ".toolchains/go")
 local_repository(name = "rust_sdk", path = ".toolchains/rust")
 local_repository(name = "python_packages", path = ".toolchains/python")
 local_repository(name = "protobuf_sdk", path = ".toolchains/protobuf")
+
+local_repository(name = "emscripten_sdk", path = ".toolchains/emscripten")

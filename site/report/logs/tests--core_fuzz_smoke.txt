@@ -1,0 +1,4 @@
+exec ${PAGER:-/usr/bin/less} "$0" || exit 1
+Executing tests from //tests:core_fuzz_smoke
+-----------------------------------------------------------------------------
+standalone reusable parser fuzz smoke passed

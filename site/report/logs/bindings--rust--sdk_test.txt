@@ -1,0 +1,11 @@
+exec ${PAGER:-/usr/bin/less} "$0" || exit 1
+Executing tests from //bindings/rust:sdk_test
+-----------------------------------------------------------------------------
+
+running 3 tests
+test tests::exhaustion_does_not_wrap ... ok
+test tests::exact_counters_and_errors ... ok
+test tests::owned_buffers_and_state ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+

@@ -183,7 +183,7 @@ def main():
     parser.add_argument("--resources", default="bazel-bin/platforms/cortex_m4/resource_report.json")
     parser.add_argument("--resource-markdown", default="bazel-bin/platforms/cortex_m4/resource_report.md")
     parser.add_argument("--template", default=str(Path(__file__).with_name("report_template.html")))
-    parser.add_argument("--output", default="site")
+    parser.add_argument("--output", default="site/report")
     parser.add_argument("--repository", default="PseudoDesign/simple-crypts")
     parser.add_argument("--source-commit")
     args = parser.parse_args()

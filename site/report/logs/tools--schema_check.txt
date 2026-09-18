@@ -1,0 +1,5 @@
+exec ${PAGER:-/usr/bin/less} "$0" || exit 1
+Executing tests from //tools:schema_check
+-----------------------------------------------------------------------------
+Writing to /tmp/tmp3y_j4413/sc.pb.h and /tmp/tmp3y_j4413/sc.pb.c
+Pinned protoc/nanopb regeneration matches committed C codec.

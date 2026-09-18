@@ -30,7 +30,7 @@ engines are separate development prerequisites; `bazel test //...` runs the
 protocol, relay, and site-verification checks without them. Browser tests launch a loopback-only HTTP server and need permission to bind a
 local socket. They test `/simple-crypts/` URL resolution, both browsers, the tour,
 native drag/drop, touch dragging, keyboard selection, reflected/replayed messages,
-tour recovery after unexpected actions, tampering, reordered reports, queue limits, reset during pending work, refresh,
+focused guide visibility and one-destination gating, tampering, reordered reports, queue limits, reset during pending work, refresh,
 UTF-8 validation, keyboard use, narrow layouts, and unavailable randomness.
 Screenshots are written to `/tmp/simple-crypts-{browser}-{tour,mobile}.png`.
 The Node/Bazel protocol tests additionally check native C interoperability in
@@ -61,10 +61,12 @@ users can also select a box and activate a destination. A destination inbox
 always invokes that endpoint, including attempts to reflect a message back to
 its sender. State differences and rejection reasons come from the real library.
 
-The six-step guided tour only generates messages; it never delivers or discards
-them. Each step waits for the visitor to complete its requested move. Unexpected
-attempts are allowed. “Try this message again” queues the original encrypted
-bytes without reverting endpoint state, so a wrong turn cannot strand the tour.
+The five-step guided tour shows one short instruction, one packet, and its
+intended drop target. Forms, history, protocol details, and experiment controls
+are hidden until Sandbox is opened. A successful drop shows a short result and
+Continue; the next packet is generated only when Continue is activated. Wrong
+drops leave the current packet untouched. Mouse dragging, touch dragging, and
+keyboard selection all invoke the same delivery operation.
 The latest 16 tried messages are retained for replay as independent copies.
 
 The relay holds at most 64 copied frames. Full queues block new opportunities;

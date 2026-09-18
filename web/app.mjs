@@ -5,7 +5,7 @@ let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selecte
 let expected=null,completed=false,original=null;
 const lab=new Lab(render);
 const text=(id,value)=>{$(id).textContent=value;};
-function hint(){text('move-hint',selected===null?'Drag a message box, or select one and activate a destination. Escape cancels selection.':`Message ${selected} selected. Choose Device inbox, Server inbox, Hold here, or Discard.`);}
+function hint(){if(mode==='tour'){text('move-hint',selected===null?'Drag the packet, or select it and activate the highlighted destination.':`Packet selected. Activate ${tour[step]?.target==='discard'?'Discard':`the ${tour[step]?.target??'highlighted'} inbox`}.`);return;}text('move-hint',selected===null?'Drag a message box, or select one and activate a destination. Escape cancels selection.':`Message ${selected} selected. Choose Device inbox, Server inbox, Hold here, or Discard.`);}
 function card(p){
   const article=document.createElement('article');article.className='packet'+(p.corrupted?' corrupted':'');article.dataset.packet=p.id;article.dataset.origin=p.origin;
   const handle=document.createElement('div');handle.className='drag-handle';handle.draggable=true;handle.tabIndex=0;handle.setAttribute('role','button');handle.dataset.select=p.id;
@@ -17,6 +17,15 @@ function card(p){
   article.append(handle,meta,actions,details);return article;
 }
 function render(){
+  document.body.dataset.mode=mode;
+  document.body.dataset.phase=step<0?'intro':completed?'complete':'deliver';
+  document.body.dataset.target=mode==='tour'&&step>=0?tour[step].target:'';
+  for(const role of ['device','server']){
+    document.querySelector('#'+role+'-panel h2').textContent=mode==='tour'?(role==='device'?'Device':'Server'):(role==='device'?'Temperature sensor':'Device registry');
+    const state=lab.states[role];
+    const temperature=state?.has_temperature?(state.temperature/1000).toFixed(3)+' °C':'';
+    text(role+'-summary',state?(role==='device'?[temperature,state.actual_name].filter(Boolean).join(' · '):state.registered?[temperature,state.pending?'Name pending':state.actual_name].filter(Boolean).join(' · '):'Not enrolled'):'');
+  }
   for(const role of ['device','server']){
     const s=lab.states[role];
     if(!s){text(role+'-temperature','—');text(role+'-name','Not assigned');text(role+'-details','');text(role+'-status','Starting');$(role+'-status').className='badge';continue;}
@@ -46,16 +55,18 @@ function render(){
   for(const el of document.querySelectorAll('.lanes button,.lanes input,#archive button'))el.disabled=locked;
   for(const el of document.querySelectorAll('.endpoint form button,.endpoint form input,[data-transmit],[data-reboot],#budget'))el.disabled=locked||mode!=='sandbox';
   for(const el of document.querySelectorAll('[data-transmit],[data-action="duplicate"],[data-replay]'))el.disabled=el.disabled||lab.queue.length>=64;
-  for(const el of document.querySelectorAll('[data-select]')){el.draggable=!locked;el.setAttribute('aria-disabled',String(locked));el.tabIndex=locked?-1:0;el.setAttribute('aria-pressed',String(Number(el.dataset.select)===selected));el.closest('.packet').classList.toggle('selected',Number(el.dataset.select)===selected);el.closest('.packet').classList.toggle('tour-message',mode==='tour'&&!completed&&Number(el.closest('.packet').dataset.origin)===expected);}
-  for(const zone of document.querySelectorAll('[data-destination]')){zone.classList.toggle('suggested',mode==='tour'&&step>=0&&!completed&&zone.dataset.destination===tour[step].target);zone.setAttribute('aria-describedby','move-hint');}
+  for(const el of document.querySelectorAll('[data-select]')){el.textContent=mode==='tour'?'⠿  Encrypted packet':`⠿  Message ${el.dataset.select} · ${lab.packet(Number(el.dataset.select)).from==='device'?'Device → Server':'Server → Device'}`;el.draggable=!locked;el.setAttribute('aria-disabled',String(locked));el.tabIndex=locked?-1:0;el.setAttribute('aria-pressed',String(Number(el.dataset.select)===selected));el.closest('.packet').classList.toggle('selected',Number(el.dataset.select)===selected);el.closest('.packet').classList.toggle('tour-message',mode==='tour'&&!completed&&Number(el.closest('.packet').dataset.origin)===expected);}
+  for(const zone of document.querySelectorAll('[data-destination]')){zone.disabled=locked||(mode==='tour'&&(step<0||completed||zone.dataset.destination!==tour[step].target));zone.classList.toggle('suggested',mode==='tour'&&step>=0&&!completed&&zone.dataset.destination===tour[step].target);zone.setAttribute('aria-describedby','move-hint');}
+  $('next').hidden=mode==='tour'&&step>=0&&!completed;
   $('next').disabled=locked||(mode==='tour'&&step>=0&&!completed);$('sandbox').disabled=locked||mode==='sandbox';
   $('retry').hidden=mode!=='tour'||step<0||completed||lab.queue.some(p=>p.origin===expected&&!p.corrupted);$('retry').disabled=locked||lab.queue.length>=64;
   document.body.dataset.busy=String(busy);document.body.dataset.ready=String(lab.ready);
   text('session-status',!lab.ready?'Initializing local endpoints…':busy?'Running the library…':mode==='sandbox'?'Sandbox · every message may be tried against either endpoint.':step<0?'Start the tour to generate the first message.':completed?'Action complete · continue when you are ready.':'Your turn · move the highlighted message.');
 }
-function intro(){step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','THE GUIDED EXCHANGE · 6 HANDS-ON STEPS');text('tour-title','Take a message. Choose its destination.');text('tour-text','The device and server will generate messages. You drag each box to an inbox or to Discard, then inspect what changed.');text('next','Start guided tour →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}
+function intro(){step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','5 STEPS');text('tour-title','Deliver a packet.');text('tour-text','You move each encrypted packet. We’ll guide you.');text('next','Start →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}
 async function run(fn){if(busy)return;const id=++operation;busy=true;$('error').hidden=true;render();try{await fn();}catch(error){if(id===operation&&error.name!=='AbortError'){text('error',error.message);$('error').hidden=false;}}finally{if(id===operation){busy=false;render();}}}
 async function place(id,target){
+  if(mode==='tour'&&(step<0||completed||target!==tour[step].target))return;
   const p=lab.packet(id);let result;
   if(target==='relay'){lab.move(id,'relay');}
   else if(target==='discard'){lab.drop(id);text('result-title',`Message ${id} discarded`);text('result-text','No endpoint received this message. Pending work remains pending.');$('result-changes').replaceChildren();}
@@ -67,7 +78,7 @@ async function place(id,target){
   }
   selected=null;hint();
   if(mode==='tour'&&step>=0&&!completed&&p.origin===expected&&target===tour[step].target&&(target==='discard'||result?.code===0)){
-    completed=true;text('tour-text',tour[step].success);text('next',step===tour.length-1?'Replay guided tour ↺':'Generate next message →');$('progress-fill').style.width=((step+1)/tour.length*100)+'%';
+    completed=true;text('tour-title',step===tour.length-1?'They’re in sync.':target==='discard'?'Packet discarded.':'Delivered.');text('tour-text',tour[step].success);text('next',step===tour.length-1?'Start again ↺':'Continue →');$('progress-fill').style.width=((step+1)/tour.length*100)+'%';
   }else if(mode==='tour'&&step>=0&&!completed&&target!=='relay'){
     text('tour-text',`You tried ${target==='discard'?'discarding it':`the ${target} inbox`}. The result below comes from the library. To continue this lesson, move the highlighted message to ${tour[step].target==='discard'?'Discard':`the ${tour[step].target} inbox`}. If it is gone or modified, use “Try this message again.”`);
   }
@@ -78,7 +89,7 @@ $('next').onclick=()=>run(async()=>{
   if(mode==='sandbox'||step===tour.length-1){mode='tour';intro();await lab.reset();}
   const next=step+1;const id=await tour[next].prepare(lab);if(id===null)throw new Error('No message generated. Reset the tour to start a fresh exchange.');
   step=next;completed=false;expected=lab.packet(id).origin;original={...lab.packet(id),bytes:lab.packet(id).bytes.slice()};
-  text('tour-progress',`YOUR TURN · STEP ${step+1} OF ${tour.length}`);text('tour-title',tour[step].title);text('tour-text',tour[step].text);text('step-code',tour[step].code);text('next','Move the message to continue');
+  text('tour-progress',`STEP ${step+1} OF ${tour.length}`);text('tour-title',tour[step].title);text('tour-text',tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
 });
 $('retry').onclick=()=>run(()=>lab.replay(original));
 $('temperature-form').onsubmit=e=>{e.preventDefault();run(()=>lab.update('device','report',{temperature:Math.round(Number($('temperature').value)*1000)}));};

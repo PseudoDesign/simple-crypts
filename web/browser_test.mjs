@@ -32,17 +32,22 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await page.goto(base);await ready(page);
   assert.equal(await page.locator('.packet').count(),0);
   const firstIdentity=await page.locator('#device-details').textContent();
-  const destinations=['discard','server','device','discard','server','device'];
+  const destinations=['server','device','discard','server','device'];
   for(let step=0;step<destinations.length;step++){
    await page.locator('#next').click();await ready(page);
    assert.equal(await page.locator('#error').isVisible(),false,await page.locator('#error').textContent());
-   assert.match(await page.locator('#tour-progress').textContent(),new RegExp(`STEP ${step+1} OF 6`));
+   assert.match(await page.locator('#tour-progress').textContent(),new RegExp(`STEP ${step+1} OF 5`));
    assert(await page.locator('#next').isDisabled());
+   assert(await page.locator('#next').isHidden());
+   assert.equal(await page.locator('[data-destination]:visible').count(),1);
+   for(const selector of ['.hero','.readings','.result-panel','.archive-panel','.below','.notes','.endpoint form','.packet-actions','.packet details','#budget'])assert(await page.locator(selector).first().isHidden(),selector+' should be hidden in the guide');
+   assert((await page.locator('#tour-text').textContent()).split(/\s+/).length<=12);
+
    assert.equal(await page.locator('.tour-message').count(),1);
    assert.equal(await page.locator('#archive .archive-card').count(),step);
    if(step===0)await page.screenshot({path:`/tmp/simple-crypts-${name}-messages.png`,fullPage:true});
    await drag(page,destinations[step]);assert(!(await page.locator('#next').isDisabled()));
-   if(step===2){assert.equal(await page.locator('#server-status').textContent(),'Pending');assert.equal(await page.locator('#device-name').textContent(),'Freezer 3');}
+   if(step===1){assert.equal(await page.locator('#server-status').textContent(),'Pending');assert.equal(await page.locator('#device-name').textContent(),'Freezer 3');}
   }
   assert.equal(await page.locator('#device-status').textContent(),'Confirmed');assert.equal(await page.locator('#server-status').textContent(),'Confirmed');
   assert.equal(await page.locator('.packet').count(),0);assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');
@@ -73,23 +78,26 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await context.close();
   // Hold a report command, reset, then release the stale command to a terminated worker.
   const resetContext=await browser.newContext();await resetContext.addInitScript(()=>{const Original=Worker;window.__held=[];window.Worker=class extends Original{postMessage(message,...rest){if(message.command==='report')window.__held.push(()=>super.postMessage(message,...rest));else super.postMessage(message,...rest);}};});
-  const p=await resetContext.newPage();await p.goto(base);await ready(p);await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/6 HANDS-ON STEPS/);await resetContext.close();
+  const p=await resetContext.newPage();await p.goto(base);await ready(p);await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/5 STEPS/);await resetContext.close();
   const experiment=await browser.newContext();const x=await experiment.newPage();await x.goto(base);await ready(x);await x.locator('#next').click();await ready(x);
-  await drag(x,'device');assert.match(await x.locator('#result-title').textContent(),/rejected/);assert(await x.locator('#next').isDisabled());assert(await x.locator('#retry').isVisible());
-  await x.locator('#retry').click();await ready(x);await drag(x,'relay');assert.equal(await x.locator('#queue .packet').count(),1);assert(await x.locator('#next').isDisabled());
-  await x.locator('.tour-message [data-select]').focus();await x.keyboard.press('Enter');await x.locator('[data-destination="discard"]').focus();await x.keyboard.press('Enter');await ready(x);assert(!(await x.locator('#next').isDisabled()));
-  await x.locator('#next').click();await ready(x);await x.locator('.tour-message [data-action="corrupt"]').click();await ready(x);await drag(x,'server');assert.match(await x.locator('#result-title').textContent(),/rejected/);assert(await x.locator('#next').isDisabled());await x.locator('#retry').click();await ready(x);await drag(x,'server');
-  await x.locator('#sandbox').click();await x.locator('#archive [data-replay]').first().click();await ready(x);await action(x,'deliver');assert.match(await x.locator('#result-title').textContent(),/no newer state/);
-  await x.setViewportSize({width:390,height:844});await x.locator('#archive [data-replay]').first().click();await ready(x);await x.locator('.packet [data-select]').click();await x.locator('[data-destination="device"]').click();await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);assert(await x.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  // The focused guide has only its intended destination. A wrong drop leaves the packet untouched.
+  await x.locator('.tour-message [data-select]').dragTo(x.locator('#device-panel h2'));await ready(x);assert.equal(await x.locator('.packet').count(),1);assert.equal(await x.locator('#archive .archive-card').count(),0);
+  await x.locator('.tour-message [data-select]').focus();await x.keyboard.press('Enter');await x.locator('[data-destination="server"]').focus();await x.keyboard.press('Enter');await ready(x);assert(!(await x.locator('#next').isDisabled()));
+  await x.locator('#next').click();await ready(x);await x.locator('#sandbox').click();
+  await x.locator('.packet [data-select]').click();await x.locator('[data-destination="server"]').click();await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);
+  await x.locator('#archive [data-replay]').first().click();await ready(x);await x.locator('.packet [data-action="corrupt"]').click();await ready(x);await action(x,'deliver');assert.match(await x.locator('#result-title').textContent(),/rejected/);
+  await x.locator('#archive [data-replay]').nth(1).click();await ready(x);await action(x,'deliver');assert.equal(await x.locator('#device-name').textContent(),'Freezer 3');
+  await x.locator('#archive [data-replay]').first().click();await ready(x);await action(x,'deliver');assert.match(await x.locator('#result-title').textContent(),/no newer state/);
+  await x.setViewportSize({width:390,height:844});await x.locator('#archive [data-replay]').first().click();await ready(x);await x.locator('.packet [data-select]').click();await x.locator('[data-destination="server"]').click();await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);assert(await x.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await experiment.close();
   if(name==='chromium'){
-   const touchContext=await browser.newContext({viewport:{width:1440,height:1100},hasTouch:true});const t=await touchContext.newPage();await t.goto(base);await ready(t);await t.locator('#next').click();await ready(t);
-   await t.locator('[data-destination="discard"]').scrollIntoViewIfNeeded();const from=await t.locator('.tour-message [data-select]').boundingBox(),to=await t.locator('[data-destination="discard"]').boundingBox();
+   const touchContext=await browser.newContext({viewport:{width:390,height:844},hasTouch:true});const t=await touchContext.newPage();await t.goto(base);await ready(t);await t.locator('#next').click();await ready(t);
+   const from=await t.locator('.tour-message [data-select]').boundingBox(),to=await t.locator('[data-destination="server"]').boundingBox();assert(from.y>=0&&from.y+from.height<=844&&to.y>=0&&to.y+to.height<=844);await t.screenshot({path:'/tmp/simple-crypts-touch-guide.png',fullPage:true});
    const cdp=await touchContext.newCDPSession(t);const a={x:from.x+from.width/2,y:from.y+from.height/2},b={x:to.x+to.width/2,y:to.y+to.height/2};
    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[a]});for(let i=1;i<=12;i++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:a.x+(b.x-a.x)*i/12,y:a.y+(b.y-a.y)*i/12}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await ready(t);assert(!(await t.locator('#next').isDisabled()));await touchContext.close();
   }
   const noRng=await browser.newContext();await noRng.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const r=await noRng.newPage();await r.goto(base);await r.locator('#error').waitFor({state:'visible'});assert.match(await r.locator('#error').textContent(),/randomness/);assert(await r.locator('#next').isDisabled());await noRng.close();
-  console.log(`PASS ${name}: user-delivered tour, drag/drop, reflection/replay, recovery from deviations, bounds, reset, UTF-8, keyboard/mobile, no external requests, RNG failure`);
+  console.log(`PASS ${name}: user-delivered tour, drag/drop, reflection/replay, focused instructions, bounds, reset, UTF-8, keyboard/mobile, no external requests, RNG failure`);
  }finally{await browser.close();}
 }
 }finally{await new Promise(r=>server.close(r));}

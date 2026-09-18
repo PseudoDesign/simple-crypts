@@ -2,3 +2,45 @@
 /* Messages are the primary objects; endpoint state stays visible above them. */
 .hero{padding:30px 0 24px}.hero h1{font-size:clamp(28px,3vw,42px)}.walkthrough{min-height:148px;padding:20px 25px 24px}.readings{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding-top:15px}.readings strong{font-size:25px}.readings .name{font-size:18px}.readings>div{margin-bottom:16px}.readings>div:last-child{padding-bottom:0!important}.endpoint header{padding-top:17px}.move-hint{font-size:12px;color:var(--green);margin:0 0 15px}.dropzone{display:block;width:calc(100% - 30px);margin:12px 15px;padding:16px 10px;border:2px dashed #b9cabb;background:#f4f8ef;min-height:78px;text-align:center;font-weight:400}.dropzone strong,.dropzone span{display:block}.dropzone strong{font-size:15px}.dropzone span{font-size:11px;color:var(--muted);margin-top:4px}.dropzone.discard{background:#fff3eb;border-color:#d9b599}.dropzone.hold{background:#f7f7ef}.dropzone.suggested{border-color:var(--green);box-shadow:0 0 0 3px #dcebd6}.dropzone.drag-over{background:#cee8d0;border-style:solid;transform:scale(1.02)}.outbox{padding:12px 15px 15px}.outbox>.eyebrow{margin-bottom:9px;font-size:9px}.message-tray{min-height:75px;max-height:390px;overflow:auto}.message-tray .empty{min-height:75px}.queue{min-height:100px}.packet{border:1px solid #b9cabb;box-shadow:0 3px 0 #dce3d5;margin-bottom:12px;padding:10px}.packet.selected{outline:3px solid #327cbd;outline-offset:-1px}.packet.tour-message{border-left:4px solid var(--green)}.drag-handle{font-size:12px;display:block;width:100%;padding:9px 6px;border:0;background:#eaf1e7;text-align:left;cursor:grab;touch-action:none}.drag-handle:active{cursor:grabbing}.packet-actions button:first-child{background:white;color:var(--ink);border-color:var(--line)}.packet-meta{margin:8px 0}.result-panel{padding:21px 24px;margin-top:23px;border:1px solid #c5d7c6;background:#ebf1e7;border-radius:14px}.result-panel p:last-of-type{font-size:13px;margin-bottom:0}.result-panel ul{padding-left:20px;font:12px/1.8 monospace;overflow-wrap:anywhere}.archive-panel{margin-top:25px}.archive{display:flex;gap:10px;overflow-x:auto;padding:12px 1px 8px}.archive-card{min-width:185px;max-width:240px;background:white;border:1px solid var(--line);border-radius:9px;padding:12px;flex-shrink:0}.archive-card p{font-size:11px;margin:0 0 10px}.archive-card button{font-size:11px;padding:6px 10px}.archive:empty::before{content:'Delivered and discarded boxes will appear here. Copies retain the original encrypted bytes.';color:var(--muted);font-size:12px}.session-bar{min-height:52px}.lanes{grid-template-columns:1fr 1.03fr 1fr}.endpoint-actions{padding-bottom:14px}.endpoint form{padding-top:14px}.endpoint h2,.relay h2{font-size:16px}@media(max-width:800px){.lanes{grid-template-columns:1fr}.hero h1{font-size:32px}.message-tray{max-height:350px}.walkthrough{padding:20px}.readings strong{font-size:25px}.tour-actions{flex-wrap:wrap}}
 .drag-handle{border-radius:7px;font-weight:650;user-select:none}.drag-handle:focus-visible{outline:3px solid #327cbd;outline-offset:3px}.drag-handle[aria-disabled="true"]{opacity:.48;cursor:default}
+/* Guided mode is a single task, with the full workbench available in Sandbox. */
+.guided-state{display:none}
+body[data-mode="tour"] .hero,body[data-mode="tour"] .session-label,body[data-mode="tour"] #session-status,body[data-mode="tour"] .readings,body[data-mode="tour"] .endpoint form,body[data-mode="tour"] .endpoint-actions,body[data-mode="tour"] .endpoint details,body[data-mode="tour"] .endpoint .eyebrow,body[data-mode="tour"] .badge,body[data-mode="tour"] .outbox>.eyebrow,body[data-mode="tour"] .packet-meta,body[data-mode="tour"] .packet-actions,body[data-mode="tour"] .packet details,body[data-mode="tour"] .empty,body[data-mode="tour"] .result-panel,body[data-mode="tour"] .archive-panel,body[data-mode="tour"] .below,body[data-mode="tour"] .notes,body[data-mode="tour"] .relay header,body[data-mode="tour"] .relay-copy,body[data-mode="tour"] .budget,body[data-mode="tour"] .hold,body[data-mode="tour"] #queue,body[data-mode="tour"] .relay-foot{display:none}
+body[data-mode="tour"] #move-hint{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+body[data-mode="tour"] main{max-width:1050px;padding-top:36px;padding-bottom:34px;position:relative}
+body[data-mode="tour"] .walkthrough{border:0;background:transparent;padding:0 0 26px;min-height:130px;display:block;text-align:center;overflow:visible}
+body[data-mode="tour"] .tour-copy{max-width:none}
+body[data-mode="tour"] .tour-copy h2{font-size:clamp(27px,4vw,40px);letter-spacing:-1px;line-height:1.2}
+body[data-mode="tour"] .tour-copy p:last-child{margin:12px auto 0;font-size:16px;color:var(--muted)}
+body[data-mode="tour"] .progress{position:relative;margin:23px auto 0;width:130px;height:3px;border-radius:3px;overflow:hidden}
+body[data-mode="tour"] .session-bar{min-height:0;justify-content:flex-end;margin-bottom:10px}
+body[data-mode="tour"] .session-bar button{border:0;color:var(--muted);padding:4px;font-size:11px}
+body[data-mode="tour"] .lanes{grid-template-columns:1fr 1fr;gap:70px;max-width:800px;margin:auto;align-items:stretch}
+body[data-mode="tour"] .endpoint{min-height:252px;padding:14px;background:#ffffffa8;display:flex;flex-direction:column;justify-content:flex-start}
+body[data-mode="tour"] .endpoint header{padding:9px 10px;justify-content:center}
+body[data-mode="tour"] .endpoint h2{font-size:21px}
+body[data-mode="tour"] .guided-state{display:block;text-align:center;min-height:20px;margin:0 0 10px;color:var(--muted);font-size:12px}
+body[data-mode="tour"] .node-icon{display:grid;height:32px;width:32px;font-size:20px}
+body[data-mode="tour"] .message-tray{min-height:0;overflow:visible;max-height:none}
+body[data-mode="tour"] .outbox{padding:0;margin:auto 0}
+body[data-mode="tour"] .packet{max-width:210px;margin:8px auto;padding:0;border:0;border-radius:10px;box-shadow:0 4px 0 #bccfba}
+body[data-mode="tour"] .drag-handle{font-size:15px;padding:30px 12px;text-align:center;background:#dcead4;border:1px solid #aec7a8;border-radius:10px}
+body[data-mode="tour"] .inbox{display:none}
+body[data-mode="tour"][data-target="device"][data-phase="deliver"] [data-destination="device"],body[data-mode="tour"][data-target="server"][data-phase="deliver"] [data-destination="server"]{display:block}
+body[data-mode="tour"] .dropzone{margin:auto 0;width:100%;min-height:105px;box-shadow:none;border-color:#88ac80;background:#f2f7ec;border-width:2px}
+body[data-mode="tour"] .dropzone span{display:none}
+body[data-mode="tour"] .relay{display:none}
+body[data-mode="tour"][data-target="discard"] #server-panel{display:none}
+body[data-mode="tour"][data-target="discard"] .relay{display:flex;align-items:center;padding:22px;background:transparent;border:0}
+body[data-mode="tour"] .discard{background:#fff3eb;border-color:#d0a282}
+body[data-mode="tour"][data-phase="complete"] .discard{visibility:hidden}
+body[data-mode="tour"]>.top{max-width:1050px;height:70px}
+body[data-mode="tour"]>.top nav{font-size:11px}
+body[data-mode="tour"] .tour-actions{align-items:center;margin:26px auto 0;gap:14px;min-width:0;flex-direction:column}
+body[data-mode="tour"] .tour-actions .primary{padding:12px 35px;font-size:15px;min-width:145px}
+body[data-mode="tour"] #sandbox{border:0;background:transparent;color:var(--muted);font-size:12px;font-weight:400;padding:5px}
+body[data-mode="tour"] footer{max-width:1050px;justify-content:center;font-size:10px;padding-block:18px}
+body[data-mode="tour"] footer>a{display:none}
+body[data-mode="sandbox"] .tour-actions{flex-direction:row;justify-content:flex-end;margin:18px 0}
+body[data-mode="tour"][data-phase="intro"] .lanes{opacity:.6}
+@media(max-width:800px){body[data-mode="tour"] main{padding:26px 16px}body[data-mode="tour"] .lanes{gap:14px}body[data-mode="tour"] .endpoint{padding:10px 7px;min-height:220px}body[data-mode="tour"] .endpoint header{padding:5px;gap:5px}body[data-mode="tour"] .endpoint h2{font-size:17px}body[data-mode="tour"] .node-icon{width:26px;height:26px;font-size:17px}body[data-mode="tour"] .guided-state{font-size:10px;min-height:30px}body[data-mode="tour"] .drag-handle{font-size:12px;padding:26px 4px}body[data-mode="tour"] .dropzone{padding:12px 4px;min-height:92px}body[data-mode="tour"] .dropzone strong{font-size:13px}body[data-mode="tour"] .relay{padding:10px 0}body[data-mode="tour"] .tour-copy p:last-child{font-size:14px}body[data-mode="tour"] .tour-copy h2{font-size:27px}body[data-mode="tour"] .tour-actions{width:auto}body[data-mode="tour"] footer{flex-direction:row}body[data-mode="tour"] .walkthrough{min-height:135px}}
+body[data-mode="tour"] footer{display:none}body[data-mode="tour"] main{padding-top:26px;padding-bottom:24px}body[data-mode="tour"] .walkthrough{padding-bottom:20px}

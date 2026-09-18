@@ -83,8 +83,8 @@ async function place(id,target){
     text('tour-text',`You tried ${target==='discard'?'discarding it':`the ${target} inbox`}. The result below comes from the library. To continue this lesson, move the highlighted message to ${tour[step].target==='discard'?'Discard':`the ${tour[step].target} inbox`}. If it is gone or modified, use “Try this message again.”`);
   }
 }
-$('reset').onclick=()=>{operation++;busy=false;intro();mode='tour';run(()=>lab.reset());};
-$('sandbox').onclick=()=>{mode='sandbox';text('tour-progress','SANDBOX · YOU ARE THE INTERMEDIARY');text('tour-title','Try any message against either endpoint.');text('tour-text','Generate messages, deliver older ones first, reflect them back to their sender, or replay a box from the history. Leave a box in Hold to delay it.');text('next','Restart guided tour →');render();};
+$('reset').onclick=()=>{cancelTouch();operation++;busy=false;intro();mode='tour';run(()=>lab.reset());};
+$('sandbox').onclick=()=>{cancelTouch();mode='sandbox';text('tour-progress','SANDBOX · YOU ARE THE INTERMEDIARY');text('tour-title','Try any message against either endpoint.');text('tour-text','Generate messages, deliver older ones first, reflect them back to their sender, or replay a box from the history. Leave a box in Hold to delay it.');text('next','Restart guided tour →');render();};
 $('next').onclick=()=>run(async()=>{
   if(mode==='sandbox'||step===tour.length-1){mode='tour';intro();await lab.reset();}
   const next=step+1;const id=await tour[next].prepare(lab);if(id===null)throw new Error('No message generated. Reset the tour to start a fresh exchange.');
@@ -105,17 +105,64 @@ document.addEventListener('click',e=>{
   if(b.dataset.action)run(()=>lab[b.dataset.action](Number(b.dataset.packet)));
   if(b.dataset.replay)run(()=>lab.replay(lab.archive.find(p=>p.id===Number(b.dataset.replay))));
 });
-document.addEventListener('keydown',e=>{const handle=e.target.closest('[data-select]');if(handle&&(e.key==='Enter'||e.key===' ')){e.preventDefault();handle.click();return;}if(e.key==='Escape'){selected=null;dragged=null;clearHighlights();hint();render();}});
+document.addEventListener('keydown',e=>{const handle=e.target.closest('[data-select]');if(handle&&(e.key==='Enter'||e.key===' ')){e.preventDefault();handle.click();return;}if(e.key==='Escape'){cancelTouch();selected=null;dragged=null;clearHighlights();hint();render();}});
 function clearHighlights(){for(const z of document.querySelectorAll('.drag-over'))z.classList.remove('drag-over');}
-document.addEventListener('dragstart',e=>{const handle=e.target.closest('[data-select]');if(!handle||busy){e.preventDefault();return;}dragged={id:Number(handle.dataset.select),epoch:lab.epoch};e.dataTransfer.setData('text/plain',String(dragged.id));e.dataTransfer.effectAllowed='move';});
+document.addEventListener('dragstart',e=>{const handle=e.target.closest('[data-select]');if(!handle||busy||touch){e.preventDefault();return;}dragged={id:Number(handle.dataset.select),epoch:lab.epoch};e.dataTransfer.setData('text/plain',String(dragged.id));e.dataTransfer.effectAllowed='move';});
 document.addEventListener('dragover',e=>{const zone=e.target.closest('[data-destination]');if(zone&&dragged&&!busy&&!zone.disabled){e.preventDefault();e.dataTransfer.dropEffect='move';clearHighlights();zone.classList.add('drag-over');}});
 document.addEventListener('drop',e=>{const zone=e.target.closest('[data-destination]');e.preventDefault();clearHighlights();const item=dragged;dragged=null;if(zone&&item&&item.epoch===lab.epoch&&!busy&&!zone.disabled)run(()=>place(item.id,zone.dataset.destination));});
 document.addEventListener('dragend',()=>{dragged=null;clearHighlights();});
-// Touch drag uses the same destination operation; tap-select is also available.
+// Keep touch/pen dragging independent of native HTML dragging (including long presses).
+// The floating preview never intercepts hit testing; only the owning pointer can deliver.
 let touch=null;
-document.addEventListener('pointerdown',e=>{suppressClick=false;const handle=e.target.closest('[data-select]');if(e.pointerType==='mouse'||!handle||handle.disabled||busy)return;touch={id:Number(handle.dataset.select),epoch:lab.epoch,x:e.clientX,y:e.clientY,active:false};handle.setPointerCapture(e.pointerId);});
-document.addEventListener('pointermove',e=>{if(!touch)return;if(Math.hypot(e.clientX-touch.x,e.clientY-touch.y)>8)touch.active=true;if(!touch.active)return;e.preventDefault();clearHighlights();document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-destination]')?.classList.add('drag-over');});
-document.addEventListener('pointerup',e=>{const t=touch;touch=null;clearHighlights();if(!t?.active)return;suppressClick=true;const zone=document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-destination]');if(zone&&t.epoch===lab.epoch&&!busy&&!zone.disabled)run(()=>place(t.id,zone.dataset.destination));});
-document.addEventListener('pointercancel',()=>{touch=null;clearHighlights();});
-window.addEventListener('pagehide',()=>lab.stop());
+function touchZone(x,y){
+  const hit=document.elementFromPoint(x,y);
+  let zone=hit?.closest('[data-destination]');
+  if(!zone){
+    const panel=hit?.closest('.endpoint');
+    zone=panel?.querySelector('[data-destination]');
+    if(!zone&&mode==='tour')zone=hit?.closest('.relay')?.querySelector('[data-destination="discard"]');
+  }
+  return zone&&!zone.disabled&&zone.getClientRects().length?zone:null;
+}
+function cancelTouch(){
+  const t=touch;touch=null;
+  if(t){
+    t.preview?.remove();t.handle.classList.remove('touch-source');
+    t.handle.draggable=lab.ready&&!busy;
+    if(t.handle.hasPointerCapture(t.pointer))t.handle.releasePointerCapture(t.pointer);
+  }
+  clearHighlights();
+}
+document.addEventListener('pointerdown',e=>{
+  suppressClick=false;
+  const handle=e.target.closest('[data-select]');
+  if(touch||e.pointerType==='mouse'||!e.isPrimary||!handle||handle.getAttribute('aria-disabled')==='true'||busy)return;
+  touch={id:Number(handle.dataset.select),epoch:lab.epoch,pointer:e.pointerId,handle,x:e.clientX,y:e.clientY,active:false};
+  handle.draggable=false;handle.setPointerCapture(e.pointerId);
+});
+document.addEventListener('pointermove',e=>{
+  const t=touch;if(!t||e.pointerId!==t.pointer)return;
+  if(!t.active&&Math.hypot(e.clientX-t.x,e.clientY-t.y)<=8)return;
+  e.preventDefault();
+  if(!t.active){
+    t.active=true;
+    t.preview=document.createElement('div');t.preview.className='touch-packet';
+    t.preview.textContent=t.handle.textContent;t.preview.setAttribute('aria-hidden','true');
+    document.body.append(t.preview);t.handle.classList.add('touch-source');
+  }
+  // Offset above the finger so the moving packet and destination remain visible.
+  t.preview.style.left=e.clientX+'px';t.preview.style.top=(e.clientY-24)+'px';
+  clearHighlights();touchZone(e.clientX,e.clientY)?.classList.add('drag-over');
+},{passive:false});
+document.addEventListener('pointerup',e=>{
+  const t=touch;if(!t||e.pointerId!==t.pointer)return;
+  const zone=touchZone(e.clientX,e.clientY);cancelTouch();
+  if(!t.active)return;
+  suppressClick=true;
+  if(zone&&t.epoch===lab.epoch&&!busy)run(()=>place(t.id,zone.dataset.destination));
+});
+for(const event of ['pointercancel','lostpointercapture'])document.addEventListener(event,e=>{if(e.pointerId===touch?.pointer)cancelTouch();});
+document.addEventListener('contextmenu',e=>{if(e.target.closest('[data-select]'))e.preventDefault();});
+window.addEventListener('blur',cancelTouch);
+window.addEventListener('pagehide',()=>{cancelTouch();lab.stop();});
 run(()=>lab.reset());

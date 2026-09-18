@@ -92,9 +92,37 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await experiment.close();
   if(name==='chromium'){
    const touchContext=await browser.newContext({viewport:{width:390,height:844},hasTouch:true});const t=await touchContext.newPage();await t.goto(base);await ready(t);await t.locator('#next').click();await ready(t);
-   const from=await t.locator('.tour-message [data-select]').boundingBox(),to=await t.locator('[data-destination="server"]').boundingBox();assert(from.y>=0&&from.y+from.height<=844&&to.y>=0&&to.y+to.height<=844);await t.screenshot({path:'/tmp/simple-crypts-touch-guide.png',fullPage:true});
-   const cdp=await touchContext.newCDPSession(t);const a={x:from.x+from.width/2,y:from.y+from.height/2},b={x:to.x+to.width/2,y:to.y+to.height/2};
-   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[a]});for(let i=1;i<=12;i++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:a.x+(b.x-a.x)*i/12,y:a.y+(b.y-a.y)*i/12}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await ready(t);assert(!(await t.locator('#next').isDisabled()));await touchContext.close();
+   const cdp=await touchContext.newCDPSession(t);
+   const center=box=>({x:box.x+box.width/2,y:box.y+box.height/2});
+   async function touchMove(target,end='touchEnd'){
+    const handle=t.locator('.tour-message [data-select]');
+    const from=await handle.boundingBox(),to=await t.locator(target).boundingBox();
+    assert(from.y>=0&&from.y+from.height<=844&&to.y>=0&&to.y+to.height<=844);
+    const a=center(from),b=center(to),scroll=await t.evaluate(()=>scrollY);
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[a]});
+    for(let i=1;i<=12;i++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:a.x+(b.x-a.x)*i/12,y:a.y+(b.y-a.y)*i/12}]});
+    assert(await t.locator('.touch-packet').isVisible(),'The packet must follow the finger');
+    assert.equal(await t.evaluate(()=>scrollY),scroll,'Dragging a packet must not scroll the page');
+    if(end==='touchEnd'&&target!=='#tour-title')assert.equal(await t.locator('.drag-over').count(),1);
+    await t.screenshot({path:'/tmp/simple-crypts-touch-drag.png'});
+    await cdp.send('Input.dispatchTouchEvent',{type:end,touchPoints:[]});await ready(t);
+    assert.equal(await t.locator('.touch-packet,.touch-source,.drag-over').count(),0,'Gesture cleanup');
+   }
+   // Invalid drops and OS-cancelled gestures must retain the packet and allow retry.
+   await touchMove('#tour-title');assert(await t.locator('#next').isDisabled());
+   await touchMove('#server-panel h2','touchCancel');assert(await t.locator('#next').isDisabled());
+   assert.equal(await t.locator('.packet').count(),1);assert.equal(await t.locator('#archive .archive-card').count(),0);
+   // All five steps: deliberately drop on entity headers, outside the inbox buttons.
+   for(const [index,target]of ['#server-panel h2','#device-panel h2','[data-destination="discard"]','#server-panel h2','#device-panel h2'].entries()){
+    if(index){await t.locator('#next').tap();await ready(t);}
+    await touchMove(target);assert(!(await t.locator('#next').isDisabled()));
+    assert.equal(await t.locator('#archive .archive-card').count(),index+1);
+   }
+   // Tap/select remains a no-drag alternative and does not accidentally deliver on selection.
+   await t.locator('#reset').tap();await ready(t);await t.locator('#next').tap();await ready(t);
+   await t.locator('.tour-message [data-select]').tap();assert.equal(await t.locator('.selected').count(),1);
+   assert(await t.locator('#next').isDisabled());await t.locator('[data-destination="server"]').tap();await ready(t);assert(!(await t.locator('#next').isDisabled()));
+   await touchContext.close();
   }
   const noRng=await browser.newContext();await noRng.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const r=await noRng.newPage();await r.goto(base);await r.locator('#error').waitFor({state:'visible'});assert.match(await r.locator('#error').textContent(),/randomness/);assert(await r.locator('#next').isDisabled());await noRng.close();
   console.log(`PASS ${name}: user-delivered tour, drag/drop, reflection/replay, focused instructions, bounds, reset, UTF-8, keyboard/mobile, no external requests, RNG failure`);

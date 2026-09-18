@@ -66,7 +66,10 @@ intended drop target. Forms, history, protocol details, and experiment controls
 are hidden until Sandbox is opened. A successful drop shows a short result and
 Continue; the next packet is generated only when Continue is activated. Wrong
 drops leave the current packet untouched. Mouse dragging, touch dragging, and
-keyboard selection all invoke the same delivery operation.
+keyboard selection all invoke the same delivery operation. On touchscreens, a
+floating packet follows the finger and the entire destination entity accepts
+the drop. Interrupted gestures leave the packet queued; tapping a packet and
+then its inbox is also supported.
 The latest 16 tried messages are retained for replay as independent copies.
 
 The relay holds at most 64 copied frames. Full queues block new opportunities;

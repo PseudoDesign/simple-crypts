@@ -3,7 +3,7 @@ export const MAX_QUEUE=64, MAX_EVENTS=200;
 export class Lab {
   constructor(onChange=()=>{},workerFactory=url=>new Worker(url,{type:'module'})) {
     this.onChange=onChange;this.workerFactory=workerFactory;this.epoch=0;this.workers={};this.pending=new Map();this.sequence=0;
-    this.queue=[];this.events=[];this.states={};this.nextPacket=1;this.ready=false;
+    this.queue=[];this.archive=[];this.events=[];this.states={};this.nextPacket=1;this.ready=false;
   }
   notify(){this.onChange(this);}
   event(message,kind='info'){this.events.push({message,kind});if(this.events.length>MAX_EVENTS)this.events.shift();this.notify();}
@@ -14,7 +14,7 @@ export class Lab {
     this.pending.clear();
   }
   async reset(){
-    this.stop();const epoch=this.epoch;this.queue=[];this.events=[];this.states={};this.nextPacket=1;this.notify();
+    this.stop();const epoch=this.epoch;this.queue=[];this.archive=[];this.events=[];this.states={};this.nextPacket=1;this.notify();
     try{
       if(!globalThis.crypto?.getRandomValues)throw new Error('Secure browser randomness is unavailable. Open this demo over HTTPS or localhost.');
       const secretBytes=crypto.getRandomValues(new Uint8Array(32));const secret=hex(secretBytes);secretBytes.fill(0);
@@ -58,31 +58,38 @@ export class Lab {
     if(r.code<0)throw new Error(`${role}: ${r.status}; no frame queued.`);
     // UI serializes opportunities. Reserve capacity defensively for callers too.
     if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue filled during transmission; latest endpoint state remains pending.');
-    const packet={id:this.nextPacket++,from:role,to:role==='device'?'server':'device',bytes:r.frame.slice(),corrupted:false};
+    const packet={id:this.nextPacket++,from:role,to:role==='device'?'server':'device',bytes:r.frame.slice(),corrupted:false,location:role+'-outbox',origin:this.nextPacket-1};
     this.queue.push(packet);this.event(`Frame ${packet.id}: ${role} → ${packet.to}, ${packet.bytes.length} opaque bytes queued.`);return packet.id;
   }
   packet(id){const p=this.queue.find(p=>p.id===id);if(!p)throw new Error('Frame is no longer queued');return p;}
-  drop(id){this.packet(id);this.queue=this.queue.filter(p=>p.id!==id);this.event(`Host dropped frame ${id}.`);}
+  remember(packet,outcome){this.archive.unshift({...packet,bytes:packet.bytes.slice(),outcome});if(this.archive.length>16)this.archive.pop();}
+  move(id,location){if(!['relay','device-outbox','server-outbox'].includes(location))throw new Error('Unknown holding area');this.packet(id).location=location;this.event(`Message ${id} held; no endpoint has received it.`);}
+  drop(id){const p=this.packet(id);this.remember(p,'discarded');this.queue=this.queue.filter(p=>p.id!==id);this.event(`Host discarded message ${id}.`);}
+  replay(packet){if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue is full (64 messages).');const copy={...packet,id:this.nextPacket++,bytes:packet.bytes.slice(),location:'relay'};delete copy.outcome;this.queue.push(copy);this.event(`An identical copy of message ${packet.id} is queued as message ${copy.id}.`);return copy.id;}
   duplicate(id){
     if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue is full (64 frames).');
     const p=this.packet(id);const copy={...p,id:this.nextPacket++,bytes:p.bytes.slice()};this.queue.push(copy);this.event(`Host duplicated frame ${id} as frame ${copy.id}.`);return copy.id;
   }
   corrupt(id){const p=this.packet(id);p.bytes[p.bytes.length-1]^=1;p.corrupted=!p.corrupted;this.event(`Host flipped the final ciphertext byte of frame ${id}.`);}
-  async deliver(id){
-    const p=this.packet(id);const epoch=this.epoch;
-    const result=await this.command(p.to,'rx',{frame:p.bytes.slice()});
+  async deliver(id,target){
+    const p=this.packet(id);target=target??p.to;if(!['device','server'].includes(target))throw new Error('Unknown recipient');const epoch=this.epoch;
+    const before={...this.states[target]};
+    const result=await this.command(target,'rx',{frame:p.bytes.slice()});
     if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
     this.queue=this.queue.filter(p=>p.id!==id);
-    this.event(`Frame ${id} delivered to ${p.to}: ${result.code<0?'rejected — '+result.status:'authenticated and processed'}.`,result.code<0?'rejected':'success');
+    const fields=['registered','temperature','actual_name','desired_name','reported_revision','desired_revision','processed_desired_revision','acked_reported_revision','pending'];
+    const changes=fields.filter(k=>before[k]!==result.state[k]).map(k=>({field:k,before:before[k],after:result.state[k]}));
+    result.changes=changes;
+    this.remember(p,result.code<0?'rejected by '+target:changes.length?'accepted by '+target:'accepted; no newer state');
+    this.event(`Frame ${id} delivered to ${target}: ${result.code<0?'rejected — '+result.status:'authenticated and processed'}.`,result.code<0?'rejected':'success');
     return result;
   }
 }
 export const tour=[
-  {title:'Useful data, before any reply',text:'The device measures −18.250 °C. Its first encrypted frame carries both enrollment and the temperature. There is no preliminary round trip.',code:'sc_report_temperature(&device, -18250);\nsc_outbound(&device, 512, frame, sizeof frame, &length);',run:async l=>{await l.update('device','report',{temperature:-18250});await l.transmit('device');}},
-  {title:'The host drops the first frame',text:'Delivery is outside our control. Dropping a frame cannot make either endpoint believe it was received. The device keeps its latest state pending.',code:'// The host discards the opaque frame.\n// Neither endpoint needs a ping.',run:async l=>l.drop(l.queue[0].id)},
-  {title:'A later report enrolls the device',text:'At the next explicit transmission opportunity, a fresh self-contained report reaches the server. It authorizes enrollment and accepts −18.125 °C together.',code:'sc_report_temperature(&device, -18125);\n// Forward the next opaque frame.\nsc_receive(&server, frame, length);',run:async l=>{await l.update('device','report',{temperature:-18125});await l.deliver(await l.transmit('device'));}},
-  {title:'The server sets a name',text:'The server requests “Freezer 3.” The device authenticates and applies it. The server still shows pending: sending a request does not prove it was applied.',code:'sc_set_name(&server, "Freezer 3");\n// Forward the server frame to the device.\nsc_receive(&device, frame, length);',run:async l=>{await l.update('server','name',{name:'Freezer 3'});await l.deliver(await l.transmit('server'));}},
-  {title:'The application report is lost',text:'The device reports that it applied the name, but the host drops that frame. The server correctly keeps the change pending.',code:'// Device reports its applied name revision.\n// The host drops this report.',run:async l=>l.drop(await l.transmit('device'))},
-  {title:'Reboot without forgetting',text:'The demo recreates the device’s protocol context while retaining its simulated durable storage. Its identity and state survive; unused reserved nonces are skipped.',code:'sc_init(&device, &config, &provider);\n// Provider restores stored state and reserves fresh nonce ranges.',run:async l=>l.update('device','reboot',{})},
-  {title:'Both endpoints agree',text:'Two explicit opportunities deliver the latest device report and server receipt. Both sides now show confirmed. No preliminary handshake, ping, or keepalive was required.',code:'// Forward device report, then server receipt.\nsc_receive(&server, device_frame, device_length);\nsc_receive(&device, server_frame, server_length);',run:async l=>{await l.deliver(await l.transmit('device'));await l.deliver(await l.transmit('server'));if(l.states.device.pending||l.states.server.pending)throw new Error('Expected both endpoints to confirm');}}
+  {title:'The device creates its first message',text:'Enrollment and −18.250 °C travel together in this sealed box. You are the intermediary: drag it to Discard to simulate losing the first transmission.',target:'discard',success:'Message lost. Neither endpoint mistakes transmission for delivery; the device is still pending.',code:'sc_report_temperature(&device, -18250);\nsc_outbound(&device, 512, frame, sizeof frame, &length);',prepare:async l=>{await l.update('device','report',{temperature:-18250});return l.transmit('device');}},
+  {title:'Try the next self-contained report',text:'The device has a newer temperature. Drag its new message to the Server inbox. It can enroll and report useful data without having received a reply.',target:'server',success:'The server authenticated the message, enrolled the device, and accepted −18.125 °C.',code:'sc_report_temperature(&device, -18125);\nsc_receive(&server, frame, length);',prepare:async l=>{await l.update('device','report',{temperature:-18125});return l.transmit('device');}},
+  {title:'The server creates a desired-state message',text:'The server requests “Freezer 3.” Drag the server’s message to the Device inbox. Watch which side knows the name was applied.',target:'device',success:'The device applied the name. The server is still pending because it has not received an application report.',code:'sc_set_name(&server, "Freezer 3");\nsc_receive(&device, frame, length);',prepare:async l=>{await l.update('server','name',{name:'Freezer 3'});return l.transmit('server');}},
+  {title:'Lose the application report',text:'The device generated a report confirming the name it applied. Drag this message to Discard. Sending an acknowledgment does not guarantee it arrives.',target:'discard',success:'The application report was lost. The server correctly keeps the name change pending.',code:'sc_outbound(&device, 512, frame, sizeof frame, &length);\n// The intermediary discards the report.',prepare:l=>l.transmit('device')},
+  {title:'A reboot, then another opportunity',text:'The device rebooted with its simulated storage intact and generated a fresh report. Drag it to the Server inbox to close the information gap.',target:'server',success:'The server now knows the name was applied. The device still needs a receipt for its report.',code:'sc_init(&device, &config, &provider);\nsc_receive(&server, frame, length);',prepare:async l=>{await l.update('device','reboot',{});return l.transmit('device');}},
+  {title:'Deliver the final receipt',text:'The server generated its receipt. Drag this last message to the Device inbox. No messages move unless you move them.',target:'device',success:'Both endpoints are confirmed. Try the sandbox: duplicate a message, tamper with it, replay an older one, or send it back to its source.',code:'sc_receive(&device, frame, length);\n// Both endpoint states are now confirmed.',prepare:l=>l.transmit('server')}
 ];

@@ -5,7 +5,8 @@ untrusted, intermittently connected relay. The device reports its temperature;
 the server requests a name. Applications work with state and opaque frames.
 
 Try the [live browser demo](https://pseudodesign.github.io/simple-crypts/): follow
-the guided exchange, then drop or corrupt packets in the sandbox. The actual C
+the guided exchange by dragging message boxes yourself, then try reflected,
+reordered, replayed, or corrupted messages in the sandbox. The actual C
 library and NaCl box run locally through WebAssembly. View the
 [test evidence](https://pseudodesign.github.io/simple-crypts/report/) separately.
 See [web build and browser tests](web/README.md) to run the demo locally.

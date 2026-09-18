@@ -13,10 +13,16 @@ const server=createServer(async(req,res)=>{try{
  res.setHeader('Content-Type',mime[extname(file)]||'text/plain');res.end(await readFile(file));
 }catch{res.writeHead(404);res.end('Not found');}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}/simple-crypts/`;
-async function ready(page){await page.waitForFunction(()=>!document.querySelector('#next').disabled);}
+async function ready(page){await page.waitForFunction(()=>document.body.dataset.ready==='true'&&document.body.dataset.busy==='false');}
 async function update(page,form,input,value){await page.locator(input).fill(value);await page.locator(form+' button').click();await ready(page);}
 async function send(page,role){await page.locator(`[data-transmit="${role}"]`).click();await ready(page);}
-async function action(page,action,index=0){await page.locator(`[data-action="${action}"]`).nth(index).click();await ready(page);}
+async function action(page,action,index=0){
+ if(action==='deliver'||action==='drop'){const card=page.locator('.packet').nth(index);await card.locator('[data-select]').click();await page.locator(`[data-destination="${action==='drop'?'discard':(await card.locator('[data-select]').textContent()).includes('Device →')?'server':'device'}"]`).click();}
+ else await page.locator(`[data-action="${action}"]`).nth(index).click();
+ await ready(page);
+}
+async function drag(page,target){await page.locator('.tour-message [data-select]').dragTo(page.locator(`[data-destination="${target}"]`));await ready(page);}
+
 try{
 for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
  const browser=await browserType.launch({headless:true});
@@ -26,11 +32,17 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await page.goto(base);await ready(page);
   assert.equal(await page.locator('.packet').count(),0);
   const firstIdentity=await page.locator('#device-details').textContent();
-  for(let step=0;step<7;step++){
+  const destinations=['discard','server','device','discard','server','device'];
+  for(let step=0;step<destinations.length;step++){
    await page.locator('#next').click();await ready(page);
    assert.equal(await page.locator('#error').isVisible(),false,await page.locator('#error').textContent());
-   assert.match(await page.locator('#tour-progress').textContent(),new RegExp(`STEP ${step+1} OF 7`));
-   if(step===3){assert.equal(await page.locator('#server-status').textContent(),'Pending');assert.equal(await page.locator('#device-name').textContent(),'Freezer 3');}
+   assert.match(await page.locator('#tour-progress').textContent(),new RegExp(`STEP ${step+1} OF 6`));
+   assert(await page.locator('#next').isDisabled());
+   assert.equal(await page.locator('.tour-message').count(),1);
+   assert.equal(await page.locator('#archive .archive-card').count(),step);
+   if(step===0)await page.screenshot({path:`/tmp/simple-crypts-${name}-messages.png`,fullPage:true});
+   await drag(page,destinations[step]);assert(!(await page.locator('#next').isDisabled()));
+   if(step===2){assert.equal(await page.locator('#server-status').textContent(),'Pending');assert.equal(await page.locator('#device-name').textContent(),'Freezer 3');}
   }
   assert.equal(await page.locator('#device-status').textContent(),'Confirmed');assert.equal(await page.locator('#server-status').textContent(),'Confirmed');
   assert.equal(await page.locator('.packet').count(),0);assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');
@@ -61,9 +73,23 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await context.close();
   // Hold a report command, reset, then release the stale command to a terminated worker.
   const resetContext=await browser.newContext();await resetContext.addInitScript(()=>{const Original=Worker;window.__held=[];window.Worker=class extends Original{postMessage(message,...rest){if(message.command==='report')window.__held.push(()=>super.postMessage(message,...rest));else super.postMessage(message,...rest);}};});
-  const p=await resetContext.newPage();await p.goto(base);await ready(p);await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/7 STEPS/);await resetContext.close();
+  const p=await resetContext.newPage();await p.goto(base);await ready(p);await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/6 HANDS-ON STEPS/);await resetContext.close();
+  const experiment=await browser.newContext();const x=await experiment.newPage();await x.goto(base);await ready(x);await x.locator('#next').click();await ready(x);
+  await drag(x,'device');assert.match(await x.locator('#result-title').textContent(),/rejected/);assert(await x.locator('#next').isDisabled());assert(await x.locator('#retry').isVisible());
+  await x.locator('#retry').click();await ready(x);await drag(x,'relay');assert.equal(await x.locator('#queue .packet').count(),1);assert(await x.locator('#next').isDisabled());
+  await x.locator('.tour-message [data-select]').focus();await x.keyboard.press('Enter');await x.locator('[data-destination="discard"]').focus();await x.keyboard.press('Enter');await ready(x);assert(!(await x.locator('#next').isDisabled()));
+  await x.locator('#next').click();await ready(x);await x.locator('.tour-message [data-action="corrupt"]').click();await ready(x);await drag(x,'server');assert.match(await x.locator('#result-title').textContent(),/rejected/);assert(await x.locator('#next').isDisabled());await x.locator('#retry').click();await ready(x);await drag(x,'server');
+  await x.locator('#sandbox').click();await x.locator('#archive [data-replay]').first().click();await ready(x);await action(x,'deliver');assert.match(await x.locator('#result-title').textContent(),/no newer state/);
+  await x.setViewportSize({width:390,height:844});await x.locator('#archive [data-replay]').first().click();await ready(x);await x.locator('.packet [data-select]').click();await x.locator('[data-destination="device"]').click();await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);assert(await x.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await experiment.close();
+  if(name==='chromium'){
+   const touchContext=await browser.newContext({viewport:{width:1440,height:1100},hasTouch:true});const t=await touchContext.newPage();await t.goto(base);await ready(t);await t.locator('#next').click();await ready(t);
+   await t.locator('[data-destination="discard"]').scrollIntoViewIfNeeded();const from=await t.locator('.tour-message [data-select]').boundingBox(),to=await t.locator('[data-destination="discard"]').boundingBox();
+   const cdp=await touchContext.newCDPSession(t);const a={x:from.x+from.width/2,y:from.y+from.height/2},b={x:to.x+to.width/2,y:to.y+to.height/2};
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[a]});for(let i=1;i<=12;i++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:a.x+(b.x-a.x)*i/12,y:a.y+(b.y-a.y)*i/12}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await ready(t);assert(!(await t.locator('#next').isDisabled()));await touchContext.close();
+  }
   const noRng=await browser.newContext();await noRng.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const r=await noRng.newPage();await r.goto(base);await r.locator('#error').waitFor({state:'visible'});assert.match(await r.locator('#error').textContent(),/randomness/);assert(await r.locator('#next').isDisabled());await noRng.close();
-  console.log(`PASS ${name}: live tour, hostile relay, bounds, reset, UTF-8, keyboard/mobile, no external requests, RNG failure`);
+  console.log(`PASS ${name}: user-delivered tour, drag/drop, reflection/replay, recovery from deviations, bounds, reset, UTF-8, keyboard/mobile, no external requests, RNG failure`);
  }finally{await browser.close();}
 }
 }finally{await new Promise(r=>server.close(r));}

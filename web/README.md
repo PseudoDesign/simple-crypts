@@ -29,7 +29,8 @@ The explicit `//web:browser_test` target is marked manual because browser
 engines are separate development prerequisites; `bazel test //...` runs the
 protocol, relay, and site-verification checks without them. Browser tests launch a loopback-only HTTP server and need permission to bind a
 local socket. They test `/simple-crypts/` URL resolution, both browsers, the tour,
-tampering, reordered reports, queue limits, reset during pending work, refresh,
+native drag/drop, touch dragging, keyboard selection, reflected/replayed messages,
+tour recovery after unexpected actions, tampering, reordered reports, queue limits, reset during pending work, refresh,
 UTF-8 validation, keyboard use, narrow layouts, and unavailable randomness.
 Screenshots are written to `/tmp/simple-crypts-{browser}-{tour,mobile}.png`.
 The Node/Bazel protocol tests additionally check native C interoperability in
@@ -53,6 +54,18 @@ separate. Reboot reinitializes the protocol context, preserving this storage.
 Refresh/Reset destroys the session and generates new keys. Nothing is saved to
 localStorage or IndexedDB. Wasm memory sizing is a browser build setting, not an
 MCU resource estimate.
+
+The message board shows each encrypted frame as a box in its source outbox.
+Drag its handle to either endpoint inbox, Hold, or Discard. Keyboard and touch
+users can also select a box and activate a destination. A destination inbox
+always invokes that endpoint, including attempts to reflect a message back to
+its sender. State differences and rejection reasons come from the real library.
+
+The six-step guided tour only generates messages; it never delivers or discards
+them. Each step waits for the visitor to complete its requested move. Unexpected
+attempts are allowed. “Try this message again” queues the original encrypted
+bytes without reverting endpoint state, so a wrong turn cannot strand the tour.
+The latest 16 tried messages are retained for replay as independent copies.
 
 The relay holds at most 64 copied frames. Full queues block new opportunities;
 endpoints retain their latest pending state. The history retains the latest 200

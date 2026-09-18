@@ -1,0 +1,16 @@
+{
+  "source_commit": "a1a52644b9770056a7933788acf738b7f67ad150",
+  "runtime": "C core + nanopb + libsodium 1.0.20 / Emscripten 4.0.10",
+  "storage": "temporary; simulated durable storage across reboot control only",
+  "assets": {
+    "index.html": "4541f6570e4c5b64f9eba6d8da14834139b691748af0067cdedd6184e7652c92",
+    "style.css": "84e9f2b7536d946aa03d42e3f729a32ce702a4fbfcbb25ec30f7960ccee28699",
+    "app.mjs": "b8816cccc2a0f0a4309485bd3c1046a3c380516171f4b3d2119384cd87f8b7c2",
+    "lab.mjs": "86ea5129b9bc0e44f33873da6316e985cd5fd388189a1fbac53e2b90abb509d1",
+    "endpoint.mjs": "58605e38250cf3100f06a001e4ba288f70cb7d3da952b6a4fdce3c61c1249dec",
+    "worker.mjs": "f95bd6206bed35ceca2fc99e9a424d03b9155cc0e6efafbb416320a68ff02d8e",
+    "THIRD_PARTY_NOTICES.txt": "a307460e32a98ea7fb9594fb280f80b5c06e819ab1e49503231d9141eddc8598",
+    "endpoint.wasm.mjs": "1f490a803b2f9ee8f7e285080a4fb8ef2767e303c1c14c7cbbf365e798ecc10d",
+    "endpoint.wasm.wasm": "a6c476989ada7119796974bfe4a30670144890d380aa43ed70ae636762180763"
+  }
+}

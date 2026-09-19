@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="Run a real encrypted device/server exchange. Drop packets, change state, and watch the endpoints recover.">
 <meta name="color-scheme" content="light"><title>Simple Crypts · See the exchange</title>
-<link rel="stylesheet" href="./style.css?v=f2d92df3ebf0dab01dd3"><script type="module" src="./app.mjs?v=f2d92df3ebf0dab01dd3"></script>
+<link rel="stylesheet" href="./style.css?v=b07f66e441ae39c1c29a"><script type="module" src="./app.mjs?v=b07f66e441ae39c1c29a"></script>
 </head>
 <body data-mode="tour" data-phase="intro">
 <a class="skip" href="#walkthrough">Skip to demo</a>
@@ -60,6 +60,6 @@
 sc_set_name(&amp;server, "Freezer 3");
 // Forward opaque frames when a link is available.</code></pre><p>The same C core powers the language bindings and this demo. Encryption, enrollment, revisions, and receipts run inside the library.</p><div class="code-links"><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/core/sc.h">C API ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/examples/python_api.py">Python example ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/bindings/rust/src/lib.rs">Rust ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/bindings/go/simplecrypts.go">Go ↗</a></div></article></section>
 <section class="notes"><h2>What this demonstrates</h2><div><p><strong>Private contents. Visible delivery.</strong> The host can read signed challenges and public routing information. Device responses and confirmations are encrypted. Endpoint panels show each endpoint’s own knowledge; they are not a host decryption view.</p><p><strong>Agreement needs delivery.</strong> Cryptography detects tampering; it cannot make the host forward a message. Updates stay pending until the required authenticated report or receipt arrives.</p><p><strong>A local simulation with real code.</strong> Both endpoints run in this tab, each in its own worker. Reboot preserves simulated storage; refresh or Reset starts fresh. This is not a hardware keystore or a production server.</p></div></section>
-</main><footer><span>Simple Crypts · show, don’t tell. <a href="./demo.json">Build details</a> · <a href="./THIRD_PARTY_NOTICES.txt?v=f2d92df3ebf0dab01dd3">Notices</a></span><a href="./report/">Explore the cross-language test evidence →</a></footer>
+</main><footer><span>Simple Crypts · show, don’t tell. <a href="./demo.json">Build details</a> · <a href="./THIRD_PARTY_NOTICES.txt?v=b07f66e441ae39c1c29a">Notices</a></span><a href="./report/">Explore the cross-language test evidence →</a></footer>
 <noscript>This demo needs JavaScript and WebAssembly. The <a href="./report/">test evidence</a> is available separately.</noscript>
 </body></html>

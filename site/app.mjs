@@ -1,5 +1,5 @@
-import {Lab,tour} from './lab.mjs?v=f2d92df3ebf0dab01dd3';
-import {hex} from './endpoint.mjs?v=f2d92df3ebf0dab01dd3';
+import {Lab,tour} from './lab.mjs?v=b07f66e441ae39c1c29a';
+import {hex} from './endpoint.mjs?v=b07f66e441ae39c1c29a';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0;
@@ -15,17 +15,38 @@ function card(p){
   const handle=document.createElement('div');handle.className='drag-handle';handle.draggable=true;handle.tabIndex=0;handle.setAttribute('role','button');handle.dataset.select=p.id;
   handle.setAttribute('aria-label',`Move message ${p.id} from ${p.from}`);
   const title=document.createElement('span');title.className='packet-title';handle.append(title);
+  const fields=[];
   if(p.signed&&p.bytes.length===172){
-    handle.classList.add('has-summary');
-    const summary=document.createElement('span');summary.className='packet-summary';
     const serial=new TextDecoder().decode(p.bytes.slice(36,68)).replace(/\0+$/,'');
     const challenge=hex(p.bytes.slice(68,100));
     const expires=new DataView(p.bytes.buffer,p.bytes.byteOffset,p.bytes.byteLength).getBigUint64(100).toString();
-    for(const [key,value] of [['Serial',serial],['Challenge',`${challenge.slice(0,8)}…`],['Expires',datetime(expires)],['Signature','Ed25519'],['Visibility','Public']]){
+    fields.push(['Serial',serial],['Challenge',`${challenge.slice(0,8)}…`],['Expires',datetime(expires)],['Signature','Ed25519'],['Visibility','Public']);
+  }else if(!p.signed&&p.senderState){
+    const s=p.senderState;
+    fields.push(['Serial',s.serial],['Challenge',`${s.challenge.slice(0,8)}…`]);
+    if(p.from==='device'){
+      if(s.has_temperature)fields.push(['Temperature',`${s.temperature} m°C`]);
+      fields.push(['Report revision',s.reported_revision],['Name',s.actual_name||'(empty)']);
+    }else{
+      fields.push(['Confirmed','true'],['Report acknowledged',s.reported_revision],['Name',s.desired_name||'(empty)'],['Name revision',s.desired_revision]);
+    }
+  }
+  if(fields.length){
+    handle.classList.add('has-summary');
+    const summary=document.createElement('span');summary.className='packet-summary';
+    if(!p.signed){const note=document.createElement('span');note.className='packet-perspective-note';note.textContent='Sender’s view · before encryption';summary.append(note);}
+    for(const [key,value] of fields){
       const line=document.createElement('span');
       const label=document.createElement('strong');label.textContent=key+': ';
       const content=document.createElement('span');content.textContent=value;
       line.append(label,content);summary.append(line);
+    }
+    if(!p.signed){
+      const cipher=document.createElement('span');cipher.className='packet-ciphertext';
+      // The first 62 bytes are routing/nonce metadata; NaCl box output follows.
+      const bytes=p.bytes.slice(62);
+      cipher.textContent=`Ciphertext + tag: ${bytes.length} bytes\n${hex(bytes).slice(0,24)}…`;
+      summary.append(cipher);
     }
     handle.append(summary);
   }

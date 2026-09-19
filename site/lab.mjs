@@ -1,4 +1,4 @@
-import {hex} from './endpoint.mjs?v=f2d92df3ebf0dab01dd3';
+import {hex} from './endpoint.mjs?v=b07f66e441ae39c1c29a';
 export const MAX_QUEUE=64, MAX_EVENTS=200;
 export class Lab {
   constructor(onChange=()=>{},workerFactory=url=>new Worker(url,{type:'module'})) {
@@ -21,7 +21,7 @@ export class Lab {
       // Compatibility slot only: signed enrollment uses no shared enrollment secret.
       const secret='00'.repeat(32);
       for(const role of ['device','server']){
-        const worker=this.workerFactory(new URL('./worker.mjs?v=f2d92df3ebf0dab01dd3',import.meta.url));this.workers[role]=worker;
+        const worker=this.workerFactory(new URL('./worker.mjs?v=b07f66e441ae39c1c29a',import.meta.url));this.workers[role]=worker;
         worker.onmessage=({data})=>{const p=this.pending.get(data.id);if(!p)return;this.pending.delete(data.id);data.error?p.reject(new Error(data.error)):p.resolve(data.result);};
         worker.onerror=()=>{for(const [id,p]of this.pending){if(p.role===role){this.pending.delete(id);p.reject(new Error(`${role} runtime failed to load or execute`));}}};
       }
@@ -88,7 +88,7 @@ export class Lab {
     if(r.code<0)throw new Error(`${role}: ${r.status}; no frame queued.`);
     // UI serializes opportunities. Reserve capacity defensively for callers too.
     if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue filled during transmission; latest endpoint state remains pending.');
-    const packet={id:this.nextPacket++,from:role,to:role==='device'?'server':'device',signed:r.frame[2]===69,bytes:r.frame.slice(),corrupted:false,location:role+'-outbox',origin:this.nextPacket-1};
+    const packet={id:this.nextPacket++,from:role,to:role==='device'?'server':'device',signed:r.frame[2]===69,senderState:Object.freeze({...this.states[role]}),bytes:r.frame.slice(),corrupted:false,location:role+'-outbox',origin:this.nextPacket-1};
     this.queue.push(packet);this.event(`Frame ${packet.id}: ${role} → ${packet.to}, ${packet.bytes.length} ${packet.signed?'public signed':'encrypted'} bytes queued.`);return packet.id;
   }
   packet(id){const p=this.queue.find(p=>p.id===id);if(!p)throw new Error('Frame is no longer queued');return p;}

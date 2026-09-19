@@ -1,5 +1,5 @@
-import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=650aa0cb1fc8231e06ae';
-import {hex} from './endpoint.mjs?v=650aa0cb1fc8231e06ae';
+import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=4cc1547acad2c9ec5270';
+import {hex} from './endpoint.mjs?v=4cc1547acad2c9ec5270';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0;
@@ -21,16 +21,15 @@ function showTip(){ $('guide-popup').hidden=false;positionTip(); }
 window.addEventListener('resize',positionTip);
 $('hide-tip').onclick=()=>{const role=guideRole();$('guide-popup').hidden=true;positionTip();$(role+'-panel').querySelector('.show-tip').focus();};
 for(const button of document.querySelectorAll('.show-tip'))button.onclick=()=>{sandboxRole=button.closest('.endpoint').id==='device-panel'?'device':'server';showTip();};
-$('deliver').onclick=()=>run(async()=>{const packet=lab.queue.find(p=>p.origin===expected&&!p.corrupted);if(packet)await place(packet.id,tour[step].target);});
 const text=(id,value)=>{$(id).textContent=value;};
 function datetime(seconds){
   const value=BigInt(seconds);
   return value<=8640000000000n?new Date(Number(value)*1000).toISOString().replace('T',' ').replace('.000Z',' UTC'):'Outside date range';
 }
-function hint(){if(mode==='tour'){text('move-hint',selected===null?'Drag the packet, or select it and activate the highlighted destination.':`Packet selected. Activate ${tour[step]?.target==='discard'?'Discard':`the ${tour[step]?.target??'highlighted'} inbox`}.`);return;}text('move-hint',selected===null?'Drag a message box, or select one and activate a destination. Escape cancels selection.':`Message ${selected} selected. Choose Device inbox, Server inbox, Hold here, or Discard.`);}
+function hint(){text('move-hint',mode==='tour'?'Drag the packet to the highlighted inbox.':'Drag a message to an inbox, Hold here, or Discard.');}
 function card(p){
   const article=document.createElement('article');article.className='packet'+(p.corrupted?' corrupted':'');article.dataset.packet=p.id;article.dataset.origin=p.origin;
-  const handle=document.createElement('div');handle.className='drag-handle';handle.draggable=true;handle.tabIndex=0;handle.setAttribute('role','button');handle.dataset.select=p.id;
+  const handle=document.createElement('div');handle.className='drag-handle';handle.draggable=true;handle.tabIndex=0;handle.setAttribute('role','group');handle.dataset.select=p.id;
   handle.setAttribute('aria-label',`Move message ${p.id} from ${p.from}`);
   const title=document.createElement('span');title.className='packet-title';handle.append(title);
   const fields=[];
@@ -127,14 +126,12 @@ function render(){
   for(const el of document.querySelectorAll('.lanes button,.lanes input,#archive button'))el.disabled=locked;
   for(const el of document.querySelectorAll('.endpoint form button,.endpoint form input,[data-transmit],[data-reboot],#budget'))el.disabled=locked||mode!=='sandbox';
   for(const el of document.querySelectorAll('[data-transmit],[data-action="duplicate"],[data-replay]'))el.disabled=el.disabled||lab.queue.length>=64;
-  for(const el of document.querySelectorAll('[data-select]')){el.querySelector('.packet-title').textContent=mode==='tour'?(lab.packet(Number(el.dataset.select)).signed?'⠿  Signed challenge':'⠿  Encrypted packet'):`⠿  Message ${el.dataset.select} · ${lab.packet(Number(el.dataset.select)).from==='device'?'Device → Server':'Server → Device'}`;el.draggable=!locked;el.setAttribute('aria-disabled',String(locked));el.tabIndex=locked?-1:0;el.setAttribute('aria-pressed',String(Number(el.dataset.select)===selected));el.closest('.packet').classList.toggle('selected',Number(el.dataset.select)===selected);el.closest('.packet').classList.toggle('tour-message',mode==='tour'&&!completed&&Number(el.closest('.packet').dataset.origin)===expected);}
+  for(const el of document.querySelectorAll('[data-select]')){el.querySelector('.packet-title').textContent=mode==='tour'?(lab.packet(Number(el.dataset.select)).signed?'⠿  Signed challenge':'⠿  Encrypted packet'):`⠿  Message ${el.dataset.select} · ${lab.packet(Number(el.dataset.select)).from==='device'?'Device → Server':'Server → Device'}`;el.draggable=!locked;el.setAttribute('aria-disabled',String(locked));el.tabIndex=locked?-1:0;el.closest('.packet').classList.toggle('selected',Number(el.dataset.select)===selected);el.closest('.packet').classList.toggle('tour-message',mode==='tour'&&!completed&&Number(el.closest('.packet').dataset.origin)===expected);}
   for(const zone of document.querySelectorAll('[data-destination]')){zone.disabled=locked||(mode==='tour'&&(step<0||completed||zone.dataset.destination!==tour[step].target));zone.classList.toggle('suggested',mode==='tour'&&step>=0&&!completed&&zone.dataset.destination===tour[step].target);zone.setAttribute('aria-describedby','move-hint');}
   $('begin-enrollment').disabled=locked||mode!=='sandbox'||!!lab.states.server?.registered;
   $('approve-enrollment').disabled=locked||mode!=='sandbox'||!lab.states.server||lab.states.server.candidate_revision==='0';
   $('packet-inspector').hidden=mode!=='tour'||step<0;
   $('experiment-tools').hidden=mode!=='sandbox';
-  $('deliver').hidden=mode!=='tour'||step<0||completed;
-  $('deliver').disabled=locked||!lab.queue.some(p=>p.origin===expected&&!p.corrupted);
   $('next').hidden=mode==='tour'&&step>=0&&!completed;
   $('next').disabled=locked||(mode==='tour'&&step>=0&&!completed);$('sandbox').disabled=locked||mode==='sandbox';
   $('retry').hidden=mode!=='tour'||step<0||completed||lab.queue.some(p=>p.origin===expected&&!p.corrupted);$('retry').disabled=locked||lab.queue.length>=64;
@@ -192,12 +189,10 @@ let suppressClick=false;
 document.addEventListener('click',e=>{
   if(suppressClick){suppressClick=false;e.preventDefault();return;}
   const b=e.target.closest('button,[data-select]');if(!b||b.disabled||b.getAttribute('aria-disabled')==='true'||busy)return;
-  if(b.dataset.select){selected=selected===Number(b.dataset.select)?null:Number(b.dataset.select);hint();render();}
-  if(b.dataset.destination){if(selected===null){text('move-hint','Select or drag a message first.');return;}run(()=>place(selected,b.dataset.destination));}
   if(b.dataset.action)run(()=>lab[b.dataset.action](Number(b.dataset.packet)));
   if(b.dataset.replay)run(()=>{const packet=lab.archive.find(p=>p.id===Number(b.dataset.replay));const id=lab.replay(packet);lab.move(id,packet.from+'-outbox');$('experiment-tools').open=false;});
 });
-document.addEventListener('keydown',e=>{const handle=e.target.closest('[data-select]');if(handle&&(e.key==='Enter'||e.key===' ')){e.preventDefault();handle.click();return;}if(e.key==='Escape'){cancelTouch();selected=null;dragged=null;clearHighlights();hint();render();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){cancelTouch();selected=null;dragged=null;clearHighlights();hint();render();}});
 function clearHighlights(){for(const z of document.querySelectorAll('.drag-over'))z.classList.remove('drag-over');}
 document.addEventListener('dragstart',e=>{const handle=e.target.closest('[data-select]');if(!handle||busy||touch){e.preventDefault();return;}dragged={id:Number(handle.dataset.select),epoch:lab.epoch};e.dataTransfer.setData('text/plain',String(dragged.id));e.dataTransfer.effectAllowed='move';});
 document.addEventListener('dragover',e=>{const zone=e.target.closest('[data-destination]');if(zone&&dragged&&!busy&&!zone.disabled){e.preventDefault();e.dataTransfer.dropEffect='move';clearHighlights();zone.classList.add('drag-over');}});

@@ -150,3 +150,6 @@ body[data-mode="sandbox"] .guide-popup{max-height:210px}
 .guide-popup{top:56px;max-height:calc(100dvh - 72px)}
 main,body[data-mode="tour"] main{padding-top:280px}
 @media(max-width:800px){.chapter-banner{gap:6px;font-size:11px}.chapter-label{display:none}.guide-popup{top:48px}main,body[data-mode="tour"] main{padding-top:280px}}
+
+.identity-card .public-key{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;min-width:0}
+.identity-card{min-width:0}

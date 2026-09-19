@@ -54,7 +54,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   let staleStyleRequests=0;
   await page.route('**/style.css',route=>{staleStyleRequests++;return route.fulfill({contentType:'text/css',body:'body[data-phase="intro"] .lanes{display:none!important}'});});
   await page.goto(base);await ready(page);
-  assert.equal(staleStyleRequests,0);assert.equal(await page.locator('#deliver').count(),0);
+  assert.equal(staleStyleRequests,0);assert.equal(await page.locator('#chapter-trust').getAttribute('aria-current'),'step');assert.equal(await page.locator('#chapter-state').getAttribute('aria-disabled'),'true');assert.equal(await page.locator('#deliver').count(),0);
   assert.equal(await page.locator('#guide-popup').getAttribute('data-role'),'device');
   assert.equal(await page.locator('.lanes>article:visible').count(),2);
   assert(await page.locator('.top').isHidden());assert(await page.locator('#guide-popup').isVisible());
@@ -111,7 +111,10 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   assert.equal(await page.locator('#device-status').textContent(),'Confirmed');assert.equal(await page.locator('#server-status').textContent(),'Confirmed');
   assert.equal(await page.locator('.packet').count(),0);assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');
   await page.screenshot({path:`/tmp/simple-crypts-${name}-tour.png`,fullPage:true});
-  await page.locator('#sandbox').click();
+  assert.equal(await page.locator('#chapter-state').getAttribute('aria-disabled'),'false');
+  const enrolledKey=await page.locator('#device-public-key').textContent();
+  await page.locator('#chapter-state').click();await ready(page);
+  assert.equal(await page.locator('#chapter-state').getAttribute('aria-current'),'step');assert.equal(await page.locator('#device-public-key').textContent(),enrolledKey);
   await update(page,'#temperature-form','#temperature','12.345');await send(page,'device');
   await action(page,'duplicate');await action(page,'corrupt');await action(page,'deliver');
   assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');assert.match(await page.locator('#events').textContent(),/rejected/);

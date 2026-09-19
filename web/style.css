@@ -141,3 +141,12 @@ body[data-mode="sandbox"] .move-hint{display:none}
 .identity-card .device-unique-id{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:10px}
 /* Expanded relay tools must leave endpoint packets available for dragging. */
 body[data-mode="sandbox"] .guide-popup{max-height:210px}
+
+.chapter-banner{position:fixed;inset:0 0 auto;z-index:30;height:40px;display:flex;justify-content:center;align-items:center;gap:20px;border-bottom:1px solid var(--line);background:var(--paper);font-size:12px}
+.chapter-label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px}
+.chapter-banner a{text-decoration:none;padding:5px 8px;border-radius:5px;color:var(--muted)}
+.chapter-banner a[aria-current]{background:var(--mint);color:var(--green);font-weight:700}
+.chapter-banner a[aria-disabled="true"]{opacity:.5}
+.guide-popup{top:56px;max-height:calc(100dvh - 72px)}
+main,body[data-mode="tour"] main{padding-top:280px}
+@media(max-width:800px){.chapter-banner{gap:6px;font-size:11px}.chapter-label{display:none}.guide-popup{top:48px}main,body[data-mode="tour"] main{padding-top:280px}}

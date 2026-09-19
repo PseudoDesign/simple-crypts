@@ -225,13 +225,13 @@ body[data-mode="tour"] .outbox{display:none}
 .message-outcome{font-size:10px;margin:4px 0 0;color:var(--muted);overflow-wrap:anywhere}
 .message-outcome[data-error="true"]{color:var(--red)}
 .log-empty{font-size:12px;color:var(--muted);margin:8px}
-.drop-panel{padding:8px;border:1px dashed #bc957a;border-radius:10px;background:#fff8ef;min-width:0}
+.clock-panel{padding:8px;border:1px dashed #bc957a;border-radius:10px;background:#fff8ef;min-width:0}
 body[data-mode="tour"] #drop-target{display:flex;flex-direction:column;justify-content:center;min-height:65px;margin:0;padding:8px;border:1px dashed #bc957a;background:transparent;visibility:visible}
 body[data-mode="tour"] #drop-target span{display:block;font-size:10px;font-weight:400}
-.drop-panel p{font-size:10px;line-height:1.4;margin:6px 0}
-.drop-panel button{font-size:10px;padding:5px;width:100%}
-.drop-panel small{display:block;font-size:9px;line-height:1.4;margin-top:4px;color:var(--muted)}
-@media(max-width:800px){.message-area{grid-template-columns:minmax(0,1fr) 115px;gap:6px;margin-top:6px}.message-log>header{display:block}.message-log header>span{display:none}#message-log{max-height:185px}#message-log .packet{flex-basis:180px;width:180px}.drop-panel{padding:5px}body[data-mode="tour"] #drop-target{padding:5px;min-height:55px}.drop-panel strong{font-size:12px}}
+.clock-panel p{font-size:10px;line-height:1.4;margin:6px 0}
+.clock-panel button{font-size:10px;padding:5px;width:100%}
+.clock-panel small{display:block;font-size:9px;line-height:1.4;margin-top:4px;color:var(--muted)}
+@media(max-width:800px){.message-area{grid-template-columns:minmax(0,1fr) 115px;gap:6px;margin-top:6px}.message-log>header{display:block}.message-log header>span{display:none}#message-log{max-height:185px}#message-log .packet{flex-basis:180px;width:180px}.clock-panel{padding:5px}body[data-mode="tour"] #drop-target{padding:5px;min-height:55px}.clock-panel strong{font-size:12px}}
 
 /* Keep the common log within the compact stage by laying out identity fields as rows. */
 body[data-mode="tour"] .identity-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 8px;align-items:center}
@@ -241,4 +241,6 @@ body[data-mode="tour"] .identity-card .public-key{font-size:9px}
 #message-log .message-outcome{margin:0 0 4px;font-size:10px;min-height:28px}
 #message-log .packet-actions{padding:0 0 5px}
 #message-log .drag-handle{cursor:grab}
-@media(max-width:800px){body[data-mode="tour"] .identity-card{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:3px 4px}.drop-panel small{font-size:9px}}
+@media(max-width:800px){body[data-mode="tour"] .identity-card{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:3px 4px}.clock-panel small{font-size:9px}}
+
+.clock-panel{align-self:start;border-style:solid}

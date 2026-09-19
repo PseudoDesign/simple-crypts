@@ -1,5 +1,5 @@
-import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=f87f636ec18202bdb47a';
-import {hex} from './endpoint.mjs?v=f87f636ec18202bdb47a';
+import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=4f10519cfc0138fce0a8';
+import {hex} from './endpoint.mjs?v=4f10519cfc0138fce0a8';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0;
@@ -19,8 +19,7 @@ function positionTip(){
 }
 function showTip(){ $('guide-popup').hidden=false;positionTip(); }
 window.addEventListener('resize',positionTip);
-$('hide-tip').onclick=()=>{const role=guideRole();$('guide-popup').hidden=true;positionTip();$(role+'-panel').querySelector('.show-tip').focus();};
-for(const button of document.querySelectorAll('.show-tip'))button.onclick=()=>{sandboxRole=button.closest('.endpoint').id==='device-panel'?'device':'server';showTip();};
+$('hide-tip').onclick=()=>{$('guide-popup').hidden=true;positionTip();document.querySelector('.chapter-banner [aria-current]').focus();};
 const text=(id,value)=>{$(id).textContent=value;};
 function datetime(seconds){
   const value=BigInt(seconds);

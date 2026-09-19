@@ -16,3 +16,13 @@ const replay=r.replay(r.archive[0]);r.corrupt(replay);assert.deepEqual([...r.arc
 for(let i=0;i<30;i++){const id=r.replay(r.archive[0]);r.drop(id);}assert.equal(r.archive.length,16);
 assert.throws(()=>r.move(999,'relay'),/no longer/);
 console.log('PASS message board: holding, explicit recipients, rejection without changes, independent replay copies, bounded archive');
+
+const snapshot=new Lab();snapshot.states.device={serial:'serial',temperature:12500,reported_revision:'9007199254740993'};
+snapshot.command=async()=>({code:0,frame:new Uint8Array(90)});
+const packetId=await snapshot.transmit('device');
+snapshot.states.device.temperature=25000;snapshot.states.device.reported_revision='9007199254740994';
+assert.equal(snapshot.packet(packetId).senderState.temperature,12500);
+assert.equal(snapshot.packet(packetId).senderState.reported_revision,'9007199254740993');
+assert(Object.isFrozen(snapshot.packet(packetId).senderState));
+assert.deepEqual(snapshot.packet(snapshot.duplicate(packetId)).senderState,snapshot.packet(packetId).senderState);
+console.log('PASS packet summaries retain the original sender snapshot and exact revisions');

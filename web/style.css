@@ -73,3 +73,6 @@ body[data-mode="tour"] .endpoint{min-height:440px}
 .packet-summary strong{font-weight:600}
 body[data-mode="tour"] .drag-handle.has-summary{padding:14px 10px}
 @media(max-width:800px){body[data-mode="tour"] .drag-handle.has-summary{padding:11px 5px}.packet-summary{font-size:9px;margin-top:7px}}
+
+.packet-perspective-note{font-style:italic;margin-bottom:5px}
+.packet-ciphertext{border-top:1px solid #b5c9ac;margin-top:6px;padding-top:5px;white-space:pre-line;font-family:ui-monospace,monospace}

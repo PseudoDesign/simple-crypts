@@ -71,6 +71,12 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
 
    assert.equal(await page.locator('.tour-message').count(),1);
    if(step===0){assert(await page.locator('.tour-message .packet-summary').isVisible());assert.match(await page.locator('.tour-message .packet-summary').textContent(),/Serial: mcu-0001Challenge: [0-9a-f]{8}…Expires: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTCSignature: Ed25519Visibility: Public/);}
+   if(step>0){
+    const summary=page.locator('.tour-message .packet-summary');assert(await summary.isVisible());
+    assert.match(await summary.textContent(),step===1?/Sender’s view · before encryptionSerial: mcu-0001Challenge: [0-9a-f]{8}…Temperature: -18125 m°CReport revision: 1/:/Confirmed: trueReport acknowledged: 1/);
+    assert.match(await page.locator('.tour-message .packet-ciphertext').textContent(),/Ciphertext \+ tag: \d+ bytes\n[0-9a-f]{24}…/);
+    await page.screenshot({path:`/tmp/simple-crypts-${name}-packet-${step}.png`,fullPage:true});
+   }
    for(const role of ['device','server']){assert(await page.locator('#'+role+'-public-key').isVisible());assert(await page.locator('#'+role+'-private-key').isVisible());}
 
    assert(await page.locator('#enrollment-packet').isVisible());

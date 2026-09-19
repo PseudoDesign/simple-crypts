@@ -88,7 +88,7 @@ export class Lab {
     if(r.code<0)throw new Error(`${role}: ${r.status}; no frame queued.`);
     // UI serializes opportunities. Reserve capacity defensively for callers too.
     if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue filled during transmission; latest endpoint state remains pending.');
-    const packet={id:this.nextPacket++,from:role,to:role==='device'?'server':'device',signed:r.frame[2]===69,bytes:r.frame.slice(),corrupted:false,location:role+'-outbox',origin:this.nextPacket-1};
+    const packet={id:this.nextPacket++,from:role,to:role==='device'?'server':'device',signed:r.frame[2]===69,senderState:Object.freeze({...this.states[role]}),bytes:r.frame.slice(),corrupted:false,location:role+'-outbox',origin:this.nextPacket-1};
     this.queue.push(packet);this.event(`Frame ${packet.id}: ${role} → ${packet.to}, ${packet.bytes.length} ${packet.signed?'public signed':'encrypted'} bytes queued.`);return packet.id;
   }
   packet(id){const p=this.queue.find(p=>p.id===id);if(!p)throw new Error('Frame is no longer queued');return p;}

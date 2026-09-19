@@ -54,6 +54,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await page.route('**/style.css',route=>{staleStyleRequests++;return route.fulfill({contentType:'text/css',body:'body[data-phase="intro"] .lanes{display:none!important}'});});
   await page.goto(base);await ready(page);
   assert.equal(staleStyleRequests,0);
+  assert.equal(await page.locator('#guide-popup').getAttribute('data-role'),'device');
   assert.equal(await page.locator('.lanes>article:visible').count(),2);
   assert(await page.locator('.top').isHidden());assert(await page.locator('#guide-popup').isVisible());
   await page.locator('#hide-tip').click();assert(await page.locator('#guide-popup').isHidden());
@@ -77,6 +78,11 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    assert((await page.locator('#tour-text').textContent()).split(/\s+/).length<=14);
 
    assert.equal(await page.locator('.tour-message').count(),1);
+   const speaker=step===1?'device':'server';
+   assert.equal(await page.locator('#guide-popup').getAttribute('data-role'),speaker);
+   const popupBox=await page.locator('#guide-popup').boundingBox(),roleBox=await page.locator('#'+speaker+'-panel').boundingBox();
+   assert(Math.abs(popupBox.x+popupBox.width/2-roleBox.x-roleBox.width/2)<2);
+
    if(step===0){assert(await page.locator('.tour-message .packet-summary').isVisible());assert.match(await page.locator('.tour-message .packet-summary').textContent(),/Serial: mcu-0001Challenge: [0-9a-f]{8}…Expires: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTCSignature: Ed25519Visibility: Public/);}
    if(step>0){
     const summary=page.locator('.tour-message .packet-summary');assert(await summary.isVisible());
@@ -96,7 +102,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    for(const role of ['device','server']){assert(await page.locator('#'+role+'-temperature').isVisible());assert.equal(await page.locator('#'+role+'-name').textContent(),'Not assigned');}
    assert.equal(await page.locator('#device-temperature').textContent(),step===0?'—':'-18.125 °C');
    assert.equal(await page.locator('#server-temperature').textContent(),step<2?'—':'-18.125 °C');
-   await drag(page,destinations[step]);assert(!(await page.locator('#next').isDisabled()));
+   await drag(page,destinations[step]);assert.equal(await page.locator('#guide-popup').getAttribute('data-role'),destinations[step]);assert(!(await page.locator('#next').isDisabled()));
    if(step===1){assert.equal(await page.locator('#server-temperature').textContent(),'—');assert.equal(await page.locator('#server-temperature-state').textContent(),'Report received · awaiting approval');assert.match(await page.locator('#server-summary').textContent(),/Awaiting approval/);assert.equal(await page.locator('#registered-device-key').textContent(),await page.locator('#device-public-key').textContent());}
   }
   assert.equal(await page.locator('#device-temperature-state').textContent(),'Receipt confirmed');

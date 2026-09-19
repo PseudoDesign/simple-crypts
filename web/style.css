@@ -126,3 +126,14 @@ body[data-mode="sandbox"] .move-hint{display:none}
  body[data-mode="sandbox"] .input-row{flex-direction:column}
  body[data-mode="sandbox"] .readings{display:block}
 }
+
+/* Align guidance with the endpoint performing the current action. */
+.guide-popup{transform:none;width:min(440px,calc(100% - 48px));border-top:3px solid var(--green);padding-top:32px}
+.guide-role{position:absolute;top:8px;left:24px;margin:0;color:var(--green);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.guide-popup::after{content:"";position:absolute;bottom:0;left:var(--pointer-x,50%);transform:translateX(-50%);border-left:9px solid transparent;border-right:9px solid transparent;border-top:8px solid var(--green);pointer-events:none}
+.endpoint.guidance-target{border-color:#88ac80;box-shadow:0 0 0 2px #22684e12}
+@media(max-width:800px){
+ main,body[data-mode="tour"] main{padding-top:250px}
+ .guide-popup{padding-top:31px}
+ .guide-role{left:16px}
+}

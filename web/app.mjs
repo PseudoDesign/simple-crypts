@@ -4,9 +4,23 @@ const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0;
 const lab=new Lab(render);
-function showTip(){ $('guide-popup').hidden=false; }
-$('hide-tip').onclick=()=>{$('guide-popup').hidden=true;document.querySelector('.show-tip').focus();};
-for(const button of document.querySelectorAll('.show-tip'))button.onclick=showTip;
+let sandboxRole='device';
+function guideRole(){return mode==='sandbox'?sandboxRole:step<0?(setup<2?'device':'server'):completed?tour[step].target:original?.from??'server';}
+function positionTip(){
+  const role=guideRole(),popup=$('guide-popup'),panel=$(role+'-panel');
+  popup.dataset.role=role;
+  $('guide-role').textContent=role==='device'?'Device':'Server';
+  popup.setAttribute('aria-label',`${role==='device'?'Device':'Server'} step guidance`);
+  for(const endpoint of document.querySelectorAll('.endpoint'))endpoint.classList.toggle('guidance-target',!popup.hidden&&endpoint===panel);
+  const box=panel.getBoundingClientRect(),width=popup.getBoundingClientRect().width;
+  const left=Math.max(12,Math.min(innerWidth-width-12,box.x+(box.width-width)/2));
+  popup.style.left=left+'px';
+  popup.style.setProperty('--pointer-x',(box.x+box.width/2-left)+'px');
+}
+function showTip(){ $('guide-popup').hidden=false;positionTip(); }
+window.addEventListener('resize',positionTip);
+$('hide-tip').onclick=()=>{const role=guideRole();$('guide-popup').hidden=true;positionTip();$(role+'-panel').querySelector('.show-tip').focus();};
+for(const button of document.querySelectorAll('.show-tip'))button.onclick=()=>{sandboxRole=button.closest('.endpoint').id==='device-panel'?'device':'server';showTip();};
 $('deliver').onclick=()=>run(async()=>{const packet=lab.queue.find(p=>p.origin===expected&&!p.corrupted);if(packet)await place(packet.id,tour[step].target);});
 const text=(id,value)=>{$(id).textContent=value;};
 function datetime(seconds){
@@ -124,6 +138,7 @@ function render(){
   $('next').disabled=locked||(mode==='tour'&&step>=0&&!completed);$('sandbox').disabled=locked||mode==='sandbox';
   $('retry').hidden=mode!=='tour'||step<0||completed||lab.queue.some(p=>p.origin===expected&&!p.corrupted);$('retry').disabled=locked||lab.queue.length>=64;
   document.body.dataset.busy=String(busy);document.body.dataset.ready=String(lab.ready);
+  positionTip();
   text('session-status',!lab.ready?'Initializing local endpoints…':busy?'Running the library…':mode==='sandbox'?'Sandbox · every message may be tried against either endpoint.':step<0?'Start the tour to generate the first message.':completed?'Action complete · continue when you are ready.':'Your turn · move the highlighted message.');
 }
 function intro(){showTip();$('packet-inspector').open=false;$('experiment-tools').open=false;setup=0;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','STEP 1 OF 6');text('tour-title','Generate the device’s key pair.');text('tour-text','Create a public identity and a private key inside the device.');text('next','Generate key pair →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}

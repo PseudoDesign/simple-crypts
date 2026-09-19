@@ -102,14 +102,14 @@ export class Lab {
     if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue is full (64 frames).');
     const p=this.packet(id);const copy={...p,id:this.nextPacket++,bytes:p.bytes.slice()};this.queue.push(copy);this.event(`Host duplicated frame ${id} as frame ${copy.id}.`);return copy.id;
   }
-  corrupt(id){const p=this.packet(id);p.bytes[p.bytes.length-1]^=1;p.corrupted=!p.corrupted;this.event(`Host flipped the final ciphertext byte of frame ${id}.`);}
+  corrupt(id){const p=this.packet(id);p.bytes[p.bytes.length-1]^=1;p.corrupted=!p.corrupted;this.event(`Host flipped the final wire byte of frame ${id}.`);}
   async deliver(id,target){
     const p=this.packet(id);target=target??p.to;if(!['device','server'].includes(target))throw new Error('Unknown recipient');const epoch=this.epoch;
     const before={...this.states[target]};
     const result=await this.command(target,'rx',{frame:p.bytes.slice(),now:this.time});
     if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
     this.queue=this.queue.filter(p=>p.id!==id);
-    const fields=['registered','temperature','actual_name','desired_name','reported_revision','desired_revision','processed_desired_revision','acked_reported_revision','pending'];
+    const fields=['registered','temperature','actual_name','desired_name','reported_revision','desired_revision','processed_desired_revision','acked_reported_revision','pending','challenge','candidate_key','candidate_revision'];
     const changes=fields.filter(k=>before[k]!==result.state[k]).map(k=>({field:k,before:before[k],after:result.state[k]}));
     result.changes=changes;
     this.remember(p,result.code<0?'rejected by '+target:changes.length?'accepted by '+target:'accepted; no newer state');

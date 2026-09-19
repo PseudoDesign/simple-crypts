@@ -50,9 +50,13 @@ async function dragRecipient(source,target){
  await page.mouse.move(destination.x+1,destination.y);await page.mouse.up();
 }
 async function action(page,action,index=0){
- if(action==='deliver'||action==='drop'){const count=await page.locator('.packet').count();const card=page.locator('.packet').nth(index);if(action==='drop')await toolsOpen(page);await dragRecipient(card.locator('[data-select]'),page.locator(`[data-destination="${action==='drop'?'discard':(await card.locator('[data-select]').textContent()).includes('Device →')?'server':'device'}"]`));await page.waitForFunction(n=>document.querySelectorAll('.packet').length===n,count-1);}
- else await page.locator(`[data-action="${action}"]`).nth(index).click();
- await ready(page);await toolsClose(page);
+ const card=page.locator('.packet').nth(index);
+ if(action==='deliver'){
+  const count=await page.locator('.packet').count(),target=(await card.getAttribute('data-from'))==='device'?'server':'device';
+  await dragRecipient(card.locator('[data-select]'),page.locator(`[data-destination="${target}"]`));
+  await page.waitForFunction(n=>document.querySelectorAll('.packet').length===n,count-1);
+ }else await card.locator(`[data-action="${action}"]`).click();
+ await ready(page);
 }
 async function drag(page,target){await page.locator('.tour-message [data-select]').dragTo(page.locator(`[data-destination="${target}"]`));await ready(page);}
 
@@ -67,7 +71,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   let staleStyleRequests=0;
   await page.route('**/style.css',route=>{staleStyleRequests++;return route.fulfill({contentType:'text/css',body:'body[data-phase="intro"] .lanes{display:none!important}'});});
   await page.goto(base);await ready(page);
-  assert.equal(staleStyleRequests,0);assert.equal(await page.locator('#chapter-trust').getAttribute('aria-current'),'step');assert.equal(await page.locator('#chapter-state').getAttribute('aria-disabled'),'true');assert.equal(await page.locator('#deliver').count(),0);assert.equal(await page.locator('.inbox').count(),0);
+  assert.equal(staleStyleRequests,0);assert.equal(await page.locator('#chapter-trust').getAttribute('aria-current'),'step');assert.equal(await page.locator('#chapter-attack').getAttribute('aria-disabled'),null);assert.equal(await page.locator('#deliver').count(),0);assert.equal(await page.locator('.inbox').count(),0);
   assert.equal(await page.locator('#guide-popup').getAttribute('data-role'),'device');
   assert.equal(await page.locator('.lanes>article:visible').count(),2);
   assert(await page.locator('.top').isHidden());assert(await page.locator('#guide-popup').isVisible());
@@ -125,24 +129,46 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   assert.equal(await page.locator('#device-status').textContent(),'Confirmed');assert.equal(await page.locator('#server-status').textContent(),'Confirmed');
   assert.equal(await page.locator('.packet').count(),0);assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');
   await page.screenshot({path:`/tmp/simple-crypts-${name}-tour.png`,fullPage:true});
-  assert.equal(await page.locator('#chapter-state').getAttribute('aria-disabled'),'false');
   const enrolledKey=await page.locator('#device-public-key').textContent();
-  await page.locator('#chapter-state').click();await ready(page);
-  assert.equal(await page.locator('#chapter-state').getAttribute('aria-current'),'step');assert.equal(await page.locator('#device-public-key').textContent(),enrolledKey);
-  await update(page,'#temperature-form','#temperature','12.345');await send(page,'device');
-  await action(page,'duplicate');await action(page,'corrupt');await action(page,'deliver');
-  assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');assert.match(await page.locator('#events').textContent(),/rejected/);
-  await action(page,'deliver');assert.equal(await page.locator('#server-temperature').textContent(),'12.345 °C');
-  await update(page,'#temperature-form','#temperature','13');await send(page,'device');await update(page,'#temperature-form','#temperature','14');await send(page,'device');
-  await action(page,'deliver',1);await action(page,'deliver',0);assert.equal(await page.locator('#server-temperature').textContent(),'14.000 °C');
-  await update(page,'#name-form','#name','é'.repeat(33));assert.match(await page.locator('#error').textContent(),/64 UTF-8/);
-  await update(page,'#name-form','#name','<img src=x onerror=alert(1)>');await send(page,'server');await action(page,'deliver');assert.equal(await page.locator('#device-name img').count(),0);assert.match(await page.locator('#device-name').textContent(),/<img/);
-  await toolsOpen(page);await page.locator('#budget').fill('1');await send(page,'device');assert.match(await page.locator('#error').textContent(),/bounds/);await toolsOpen(page);await page.locator('#budget').fill('512');
-  await send(page,'device');
-  // Fill queue through real UI duplication; no endpoints run on their own.
+  await page.locator('#chapter-attack').click();await ready(page);
+  assert.equal(await page.locator('#chapter-attack').getAttribute('aria-current'),'step');
+  assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
+  assert(await page.locator('#name-form').isHidden());assert(await page.locator('#temperature-form').isHidden());
+  await generateIdentity(page);assert.notEqual(await page.locator('#device-public-key').textContent(),enrolledKey);
+  await page.locator('#next').click();await ready(page);
+  // Drop a challenge: nothing changes until a retained copy is replayed.
+  await action(page,'drop');assert.equal(await page.locator('.packet').count(),0);assert(await page.locator('#next').isDisabled());
+  assert.equal(await page.locator('#server-temperature').textContent(),'—');
+  await page.locator('#retry').click();await ready(page);
+  // Alter one duplicate, reject it, then deliver the unchanged original.
+  await action(page,'duplicate');await action(page,'corrupt',1);await action(page,'deliver',1);
+  assert.match(await page.locator('#device-result').textContent(),/Rejected/);assert(await page.locator('#next').isDisabled());
+  await action(page,'deliver');assert(!(await page.locator('#next').isDisabled()));
+  await page.locator('#next').click();await ready(page);
+  // A response reflected to its sender is rejected, not mistaken for confirmation.
+  await action(page,'duplicate');
+  await page.locator('.packet').last().locator('[data-select]').dragTo(page.locator('#device-panel h2'));await ready(page);
+  assert.match(await page.locator('#device-result').textContent(),/Rejected/);
+  await action(page,'duplicate');await action(page,'deliver',1);
+  assert.match(await page.locator('#server-summary').textContent(),/Awaiting approval/);
+  assert.equal(await page.locator('#server-temperature').textContent(),'—');
+  await action(page,'deliver');assert.match(await page.locator('#server-result').textContent(),/no newer state/);
+  assert.equal(await page.locator('#server-temperature').textContent(),'—');
+  // Only the trusted approval accepts the staged temperature and key.
+  await page.locator('#next').click();await ready(page);assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');
+  await page.locator('#next').click();await ready(page);await action(page,'drop');
+  assert.equal(await page.locator('#device-temperature-state').textContent(),'Awaiting server receipt');
+  await toolsOpen(page);await page.locator('#archive [data-replay]').first().click();await ready(page);
+  await action(page,'deliver');assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
+  await toolsOpen(page);await page.locator('#archive [data-replay]').first().click();await ready(page);
+  await action(page,'deliver');assert.match(await page.locator('#device-result').textContent(),/no newer state/);
+  await page.screenshot({path:`/tmp/simple-crypts-${name}-attack-enrollment.png`,fullPage:true});
+  // Copies remain bounded even when the intermediary withholds every packet.
+  await toolsOpen(page);await page.locator('#archive [data-replay]').first().click();await ready(page);
   for(let i=1;i<64;i++)await action(page,'duplicate',0);
-  assert.equal(await page.locator('.packet').count(),64);assert(await page.locator('[data-transmit="device"]').isDisabled());assert(await page.locator('[data-action="duplicate"]').first().isDisabled());
-  await action(page,'drop');assert.equal(await page.locator('.packet').count(),63);assert(!(await page.locator('[data-transmit="device"]').isDisabled()));
+  assert.equal(await page.locator('.packet').count(),64);assert(await page.locator('[data-action="duplicate"]').first().isDisabled());
+  await action(page,'drop');assert.equal(await page.locator('.packet').count(),63);
+  await page.locator('#chapter-trust').click();await ready(page);assert.equal(await page.locator('#chapter-trust').getAttribute('aria-current'),'step');
   await page.locator('#reset').click();await ready(page);await generateIdentity(page);assert.equal(await page.locator('.packet').count(),0);assert.notEqual(await page.locator('#device-details').textContent(),firstIdentity);
   const resetIdentity=await page.locator('#device-details').textContent();await page.reload();await ready(page);await generateIdentity(page);assert.notEqual(await page.locator('#device-details').textContent(),resetIdentity);
   // Browser remains idle across rendering turns: initialization sends no frames.
@@ -160,12 +186,9 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await x.locator('.tour-message [data-select]').dragTo(x.locator('#server-panel h2'));await ready(x);assert.equal(await x.locator('.packet').count(),1);assert.equal(await x.locator('#archive .archive-card').count(),0);
   await x.locator('.tour-message [data-select]').focus();await x.keyboard.press('Enter');await x.locator('[data-destination="device"]').focus();await x.keyboard.press('Enter');await ready(x);assert(await x.locator('#next').isDisabled());assert.equal(await x.locator('.packet').count(),1);await drag(x,'device');
   await x.locator('#next').click();await ready(x);await drag(x,'server');await x.locator('#next').click();await ready(x);await x.locator('#next').click();await ready(x);await drag(x,'device');
-  await x.locator('#chapter-state').click();await update(x,'#name-form','#name','Freezer 3');await send(x,'server');
-  await x.locator('.packet [data-select]').dragTo(x.locator('[data-destination="server"]'));await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);
-  await toolsOpen(x);await x.locator('#archive [data-replay]').first().click();await ready(x);await toolsClose(x);await x.locator('.packet [data-action="corrupt"]').click();await ready(x);await toolsClose(x);await action(x,'deliver');assert.match(await x.locator('#result-title').textContent(),/rejected/);
-  await toolsOpen(x);await x.locator('#archive [data-replay]').nth(1).click();await ready(x);await toolsClose(x);await action(x,'deliver');assert.equal(await x.locator('#device-name').textContent(),'Freezer 3');assert.equal(await x.locator('#device-unique-id').textContent(),'mcu-0001');
-  await toolsOpen(x);await x.locator('#archive [data-replay]').first().click();await ready(x);await toolsClose(x);await action(x,'deliver');assert.match(await x.locator('#result-title').textContent(),/no newer state/);
-  await x.setViewportSize({width:390,height:844});await toolsOpen(x);await x.locator('#archive [data-replay]').first().click();await ready(x);await toolsClose(x);await x.locator('.packet [data-select]').dragTo(x.locator('[data-destination="server"]'));await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);assert(await x.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  // Attack chapter is also directly available before enrollment, without prerequisite traffic.
+  await x.locator('#chapter-attack').click();await ready(x);assert.equal(await x.locator('.packet').count(),0);
+  assert.equal(await x.locator('#server-status').textContent(),'Not enrolled');
   await experiment.close();
   if(name==='chromium'){
    const touchContext=await browser.newContext({viewport:{width:390,height:844},hasTouch:true});const t=await touchContext.newPage();await t.goto(base);await ready(t);await generateIdentity(t);await t.locator('#next').click();await ready(t);
@@ -201,10 +224,14 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    await t.locator('#reset').tap();await ready(t);await generateIdentity(t);await t.locator('#next').tap();await ready(t);
    await t.locator('.tour-message [data-select]').tap();assert.equal(await t.locator('.selected').count(),0);
    assert(await t.locator('#next').isDisabled());await t.locator('[data-destination="device"]').tap();await ready(t);assert(await t.locator('#next').isDisabled());assert.equal(await t.locator('.packet').count(),1);await touchMove('#device-panel h2');assert(!(await t.locator('#next').isDisabled()));
+   await t.locator('#chapter-attack').tap();await ready(t);await generateIdentity(t);await t.locator('#next').tap();await ready(t);
+   await t.locator('[data-action="corrupt"]').tap();await ready(t);
+   await touchMove('#device-panel h2');assert.match(await t.locator('#device-result').textContent(),/Rejected/);
+   await t.locator('#retry').tap();await ready(t);await touchMove('#device-panel h2');assert(!(await t.locator('#next').isDisabled()));
    await touchContext.close();
   }
   const noRng=await browser.newContext();await noRng.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const r=await noRng.newPage();await r.goto(base);await r.locator('#error').waitFor({state:'visible'});assert.match(await r.locator('#error').textContent(),/randomness/);assert(await r.locator('#next').isDisabled());await noRng.close();
-  console.log(`PASS ${name}: user-delivered tour, drag/drop, reflection/replay, focused instructions, bounds, reset, UTF-8, keyboard/mobile, no external requests, RNG failure`);
+  console.log(`PASS ${name}: user-delivered tour, drag/drop, reflection/replay, focused instructions, bounded queues, enrollment attacks, reset, keyboard/mobile, no external requests, RNG failure`);
  }finally{await browser.close();}
 }
 }finally{await new Promise(r=>server.close(r));}

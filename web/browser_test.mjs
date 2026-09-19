@@ -54,6 +54,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   assert.equal(staleStyleRequests,0);
   for(const role of ['device','server'])assert(await page.locator('#'+role+'-panel').isVisible());
   await page.screenshot({path:`/tmp/simple-crypts-${name}-pre-enrollment.png`,fullPage:true});
+  for(const role of ['device','server']){assert(await page.locator('#'+role+'-temperature').isVisible());assert(await page.locator('#'+role+'-name').isVisible());assert.equal(await page.locator('#'+role+'-temperature').textContent(),'—');}
   await provision(page);
   assert.equal(await page.locator('.packet').count(),0);
   const firstIdentity=await page.locator('#device-details').textContent();
@@ -66,7 +67,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    assert(await page.locator('#next').isDisabled());
    assert(await page.locator('#next').isHidden());
    assert.equal(await page.locator('[data-destination]:visible').count(),1);
-   for(const selector of ['.hero','.readings','.result-panel','.archive-panel','.below','.notes','.endpoint form','.packet-actions','.packet details','#budget'])assert(await page.locator(selector).first().isHidden(),selector+' should be hidden in the guide');
+   for(const selector of ['.hero','.result-panel','.archive-panel','.below','.notes','.endpoint form','.packet-actions','.packet details','#budget'])assert(await page.locator(selector).first().isHidden(),selector+' should be hidden in the guide');
    assert((await page.locator('#tour-text').textContent()).split(/\s+/).length<=14);
 
    assert.equal(await page.locator('.tour-message').count(),1);
@@ -84,9 +85,14 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    assert.match(await page.locator('#packet-wire').textContent(),/Sender public key: [a-f0-9]{64}/);
    assert.equal(await page.locator('#archive .archive-card').count(),step);
    if(step===0)await page.screenshot({path:`/tmp/simple-crypts-${name}-messages.png`,fullPage:true});
+   for(const role of ['device','server']){assert(await page.locator('#'+role+'-temperature').isVisible());assert.equal(await page.locator('#'+role+'-name').textContent(),'Not assigned');}
+   assert.equal(await page.locator('#device-temperature').textContent(),step===0?'—':'-18.125 °C');
+   assert.equal(await page.locator('#server-temperature').textContent(),step<2?'—':'-18.125 °C');
    await drag(page,destinations[step]);assert(!(await page.locator('#next').isDisabled()));
-   if(step===1){assert.match(await page.locator('#server-summary').textContent(),/Awaiting approval/);assert.equal(await page.locator('#registered-device-key').textContent(),await page.locator('#device-public-key').textContent());}
+   if(step===1){assert.equal(await page.locator('#server-temperature').textContent(),'—');assert.equal(await page.locator('#server-temperature-state').textContent(),'Report received · awaiting approval');assert.match(await page.locator('#server-summary').textContent(),/Awaiting approval/);assert.equal(await page.locator('#registered-device-key').textContent(),await page.locator('#device-public-key').textContent());}
   }
+  assert.equal(await page.locator('#device-temperature-state').textContent(),'Receipt confirmed');
+  assert.equal(await page.locator('#server-temperature-state').textContent(),'Accepted report');
   assert.equal(await page.locator('#device-status').textContent(),'Confirmed');assert.equal(await page.locator('#server-status').textContent(),'Confirmed');
   assert.equal(await page.locator('.packet').count(),0);assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');
   await page.screenshot({path:`/tmp/simple-crypts-${name}-tour.png`,fullPage:true});

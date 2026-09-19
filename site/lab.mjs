@@ -1,4 +1,4 @@
-import {hex} from './endpoint.mjs?v=88661e900ab3b65576a9';
+import {hex} from './endpoint.mjs?v=4159710fa33acd7f4b97';
 export const MAX_QUEUE=64, MAX_EVENTS=200;
 // The demo device has a fixed serial before it generates keys or enrolls.
 export const DEVICE_SERIAL='mcu-0001';
@@ -23,7 +23,7 @@ export class Lab {
       // Compatibility slot only: signed enrollment uses no shared enrollment secret.
       const secret='00'.repeat(32);
       for(const role of ['device','server']){
-        const worker=this.workerFactory(new URL('./worker.mjs?v=88661e900ab3b65576a9',import.meta.url));this.workers[role]=worker;
+        const worker=this.workerFactory(new URL('./worker.mjs?v=4159710fa33acd7f4b97',import.meta.url));this.workers[role]=worker;
         worker.onmessage=({data})=>{const p=this.pending.get(data.id);if(!p)return;this.pending.delete(data.id);data.error?p.reject(new Error(data.error)):p.resolve(data.result);};
         worker.onerror=()=>{for(const [id,p]of this.pending){if(p.role===role){this.pending.delete(id);p.reject(new Error(`${role} runtime failed to load or execute`));}}};
       }
@@ -37,7 +37,7 @@ export class Lab {
       if(device.code!==0)throw new Error(device.status);
       if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
       const enabledDevice=await this.raw('device','enrollment_enable');if(enabledDevice.code!==0)throw new Error(enabledDevice.status);this.states={server:enabled.state,device:enabledDevice.state};this.ready=true;
-      this.event('Fresh identities provisioned. The device holds the server’s public key. No frames have been sent.');
+      this.event('Fresh identities ready. The device holds the server’s public key. No frames have been sent.');
     }catch(error){if(epoch===this.epoch){this.stop();this.event(error.message,'error');}throw error;}
   }
   async generateDevice(){
@@ -51,7 +51,7 @@ export class Lab {
     const epoch=this.epoch;const result=await this.raw('device','init',{role:'device',serial:DEVICE_SERIAL,secret:this.authorization,server_public_key:this.states.server.public_key});
     if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
     if(result.code!==0)throw new Error(result.status);
-    const enabled=await this.raw('device','enrollment_enable');if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');if(enabled.code!==0)throw new Error(enabled.status);this.states.device=enabled.state;this.authorization=null;this.event('Device provisioned with its serial and pinned server Ed25519 public key.');
+    const enabled=await this.raw('device','enrollment_enable');if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');if(enabled.code!==0)throw new Error(enabled.status);this.states.device=enabled.state;this.authorization=null;this.event('Device identity ready; its serial and trusted server public key are already available.');
   }
   raw(role,command,args={}){
     const worker=this.workers[role];if(!worker)return Promise.reject(new Error('Endpoint is unavailable'));

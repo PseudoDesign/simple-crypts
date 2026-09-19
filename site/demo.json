@@ -1,12 +1,12 @@
 {
-  "source_commit": "9c7885ceb47389a808131b67c3a0b233d95b19b4",
+  "source_commit": "00f867caf9dec7861096e6b66b2aa965fee56ce5",
   "runtime": "C core + nanopb + libsodium 1.0.20 / Emscripten 4.0.10",
   "storage": "temporary; simulated durable storage across reboot control only",
   "assets": {
-    "index.html": "37cd7f8ea06f9064b4d0eddd63bc9023df1737a77068bc211e61982e2afd248f",
-    "style.css": "2cc8bce2c630c921fcb07671cc30c1ebc01f1586baf910fbc6b4b0a4c8602ab6",
-    "app.mjs": "e8d41bdedac9d028759642f5d736c80d447fffa73b773e6c0f97402c8c73c393",
-    "lab.mjs": "09a9b85817749405e806f60d622c070e19cd13526f66dab266ee7882994ffc60",
+    "index.html": "2534208e4e790819b8378d1600f328b067b5ba8939c97f5f8cb229b32576736b",
+    "style.css": "07b6d855cecf20d076c308af72a8fc990bf08734d30e9792a21cebba2a58296b",
+    "app.mjs": "9a5a05f4ab7ff21b66f6e98b4d6730e53365bd2e9b27277832850f957d877956",
+    "lab.mjs": "4b0bb9348dbe4260c94e48509b6ed6f96f7a9912436014a281d3238020dfe81f",
     "endpoint.mjs": "58605e38250cf3100f06a001e4ba288f70cb7d3da952b6a4fdce3c61c1249dec",
     "worker.mjs": "f95bd6206bed35ceca2fc99e9a424d03b9155cc0e6efafbb416320a68ff02d8e",
     "THIRD_PARTY_NOTICES.txt": "a307460e32a98ea7fb9594fb280f80b5c06e819ab1e49503231d9141eddc8598",

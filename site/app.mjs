@@ -20,11 +20,12 @@ function render(){
   document.body.dataset.mode=mode;
   document.body.dataset.phase=step<0?'intro':completed?'complete':'deliver';
   document.body.dataset.target=mode==='tour'&&step>=0?tour[step].target:'';
+  $('enrollment-packet').hidden=mode!=='tour'||step<0;
   for(const role of ['device','server']){
     document.querySelector('#'+role+'-panel h2').textContent=mode==='tour'?(role==='device'?'Device':'Server'):(role==='device'?'Temperature sensor':'Device registry');
     const state=lab.states[role];
     const temperature=state?.has_temperature?(state.temperature/1000).toFixed(3)+' °C':'';
-    text(role+'-summary',state?(role==='device'?[temperature,state.actual_name].filter(Boolean).join(' · '):state.registered?[temperature,state.pending?'Name pending':state.actual_name].filter(Boolean).join(' · '):'Not enrolled'):'');
+    text(role+'-summary',state?(state.registered?(role==='device'?'Enrollment confirmed':'Serial + key registered'):(role==='device'?'Awaiting confirmation':'Not enrolled')):'');
   }
   for(const role of ['device','server']){
     const s=lab.states[role];
@@ -63,7 +64,7 @@ function render(){
   document.body.dataset.busy=String(busy);document.body.dataset.ready=String(lab.ready);
   text('session-status',!lab.ready?'Initializing local endpoints…':busy?'Running the library…':mode==='sandbox'?'Sandbox · every message may be tried against either endpoint.':step<0?'Start the tour to generate the first message.':completed?'Action complete · continue when you are ready.':'Your turn · move the highlighted message.');
 }
-function intro(){step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','5 STEPS');text('tour-title','Deliver a packet.');text('tour-text','You move each encrypted packet. We’ll guide you.');text('next','Start →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}
+function intro(){step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','ENROLLMENT · 2 STEPS');text('tour-title','Enroll a device.');text('tour-text','The device already has the server’s public key and an enrollment code for its serial.');text('next','Start →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}
 async function run(fn){if(busy)return;const id=++operation;busy=true;$('error').hidden=true;render();try{await fn();}catch(error){if(id===operation&&error.name!=='AbortError'){text('error',error.message);$('error').hidden=false;}}finally{if(id===operation){busy=false;render();}}}
 async function place(id,target){
   if(mode==='tour'&&(step<0||completed||target!==tour[step].target))return;
@@ -78,7 +79,7 @@ async function place(id,target){
   }
   selected=null;hint();
   if(mode==='tour'&&step>=0&&!completed&&p.origin===expected&&target===tour[step].target&&(target==='discard'||result?.code===0)){
-    completed=true;text('tour-title',step===tour.length-1?'They’re in sync.':target==='discard'?'Packet discarded.':'Delivered.');text('tour-text',tour[step].success);text('next',step===tour.length-1?'Start again ↺':'Continue →');$('progress-fill').style.width=((step+1)/tour.length*100)+'%';
+    completed=true;text('tour-title',step===tour.length-1?'Enrollment complete.':target==='discard'?'Packet discarded.':'Delivered.');text('tour-text',tour[step].success);text('next',step===tour.length-1?'Start again ↺':'Continue →');$('progress-fill').style.width=((step+1)/tour.length*100)+'%';
   }else if(mode==='tour'&&step>=0&&!completed&&target!=='relay'){
     text('tour-text',`You tried ${target==='discard'?'discarding it':`the ${target} inbox`}. The result below comes from the library. To continue this lesson, move the highlighted message to ${tour[step].target==='discard'?'Discard':`the ${tour[step].target} inbox`}. If it is gone or modified, use “Try this message again.”`);
   }
@@ -89,6 +90,13 @@ $('next').onclick=()=>run(async()=>{
   if(mode==='sandbox'||step===tour.length-1){mode='tour';intro();await lab.reset();}
   const next=step+1;const id=await tour[next].prepare(lab);if(id===null)throw new Error('No message generated. Reset the tour to start a fresh exchange.');
   step=next;completed=false;expected=lab.packet(id).origin;original={...lab.packet(id),bytes:lab.packet(id).bytes.slice()};
+  const sender=lab.states[original.from];
+  text('packet-label',`${original.from.toUpperCase()} → ${original.to.toUpperCase()} · ${original.bytes.length} BYTES`);
+  text('packet-title',step===0?'Enrollment request + first report':'Enrollment confirmation');
+  const fields=step===0?[['Message type','Report (includes enrollment claim)'],['Serial',sender.serial],['Enrollment code','Included inside encryption · value hidden'],['First report',`${sender.temperature} millidegrees Celsius`],['Report revision',sender.reported_revision]]:[['Message type','Desired snapshot + receipt'],['Serial',sender.serial],['Enrollment confirmed','true'],['Acknowledged report revision',sender.reported_revision],['Desired revision',sender.desired_revision+' · no name change']];
+  $('packet-fields').replaceChildren();for(const [name,value]of fields){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;dd.textContent=value;$('packet-fields').append(dt,dd);}
+  text('packet-wire',`Sender public key: ${sender.public_key}\nRecipient public key: ${lab.states[original.to].public_key}\n\nActual wire frame (public routing header + encrypted body):\n${hex(original.bytes).match(/.{1,48}/g).join('\n')}`);
+  $('enrollment-packet').querySelector('details').open=false;
   text('tour-progress',`STEP ${step+1} OF ${tour.length}`);text('tour-title',tour[step].title);text('tour-text',tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
 });
 $('retry').onclick=()=>run(()=>lab.replay(original));

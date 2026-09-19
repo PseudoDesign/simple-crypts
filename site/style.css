@@ -50,3 +50,8 @@ body[data-mode="tour"] footer{display:none}body[data-mode="tour"] main{padding-t
 .drag-handle.touch-source{opacity:.3}
 .touch-packet{position:fixed;z-index:1000;pointer-events:none;transform:translate(-50%,-100%);padding:15px 18px;max-width:220px;border:2px solid var(--green);border-radius:10px;background:#dcead4;color:var(--ink);font-weight:650;font-size:13px;box-shadow:0 10px 25px #1d302c30;user-select:none}
 body[data-mode="tour"] .dropzone.drag-over{background:#cee8d0;border-color:var(--green);border-style:solid;box-shadow:0 0 0 4px #22684e22}
+
+.enrollment-packet{max-width:800px;margin:22px auto 0;padding:18px 22px;border:1px solid var(--line);border-radius:12px;background:white}
+.enrollment-packet h2{font-size:18px}.packet-perspective{font-size:12px;color:var(--muted);margin:6px 0 14px}
+.enrollment-packet dl{display:grid;grid-template-columns:1fr 2fr;gap:7px 16px;font-size:12px;margin:0}.enrollment-packet dt{color:var(--muted)}.enrollment-packet dd{margin:0;overflow-wrap:anywhere}.enrollment-packet details{margin-top:14px;font-size:12px}.enrollment-packet pre{max-height:180px;overflow:auto}
+@media(max-width:500px){.enrollment-packet{padding:14px}.enrollment-packet dl{grid-template-columns:1fr 1.5fr;gap:7px 10px;font-size:11px}}

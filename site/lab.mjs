@@ -1,4 +1,4 @@
-import {hex} from './endpoint.mjs?v=06c9c0e61cb39e23bf20';
+import {hex} from './endpoint.mjs?v=1b36d97ecc24cf8d48c4';
 export const MAX_QUEUE=64, MAX_EVENTS=200;
 export class Lab {
   constructor(onChange=()=>{},workerFactory=url=>new Worker(url,{type:'module'})) {
@@ -21,7 +21,7 @@ export class Lab {
       // Compatibility slot only: signed enrollment uses no shared enrollment secret.
       const secret='00'.repeat(32);
       for(const role of ['device','server']){
-        const worker=this.workerFactory(new URL('./worker.mjs?v=06c9c0e61cb39e23bf20',import.meta.url));this.workers[role]=worker;
+        const worker=this.workerFactory(new URL('./worker.mjs?v=1b36d97ecc24cf8d48c4',import.meta.url));this.workers[role]=worker;
         worker.onmessage=({data})=>{const p=this.pending.get(data.id);if(!p)return;this.pending.delete(data.id);data.error?p.reject(new Error(data.error)):p.resolve(data.result);};
         worker.onerror=()=>{for(const [id,p]of this.pending){if(p.role===role){this.pending.delete(id);p.reject(new Error(`${role} runtime failed to load or execute`));}}};
       }

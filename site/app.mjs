@@ -1,9 +1,13 @@
-import {Lab,tour} from './lab.mjs?v=06c9c0e61cb39e23bf20';
-import {hex} from './endpoint.mjs?v=06c9c0e61cb39e23bf20';
+import {Lab,tour} from './lab.mjs?v=1b36d97ecc24cf8d48c4';
+import {hex} from './endpoint.mjs?v=1b36d97ecc24cf8d48c4';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0;
 const lab=new Lab(render);
+function showTip(){ $('guide-popup').hidden=false; }
+$('hide-tip').onclick=()=>{$('guide-popup').hidden=true;document.querySelector('.show-tip').focus();};
+for(const button of document.querySelectorAll('.show-tip'))button.onclick=showTip;
+$('deliver').onclick=()=>run(async()=>{const packet=lab.queue.find(p=>p.origin===expected&&!p.corrupted);if(packet)await place(packet.id,tour[step].target);});
 const text=(id,value)=>{$(id).textContent=value;};
 function datetime(seconds){
   const value=BigInt(seconds);
@@ -112,13 +116,17 @@ function render(){
   for(const zone of document.querySelectorAll('[data-destination]')){zone.disabled=locked||(mode==='tour'&&(step<0||completed||zone.dataset.destination!==tour[step].target));zone.classList.toggle('suggested',mode==='tour'&&step>=0&&!completed&&zone.dataset.destination===tour[step].target);zone.setAttribute('aria-describedby','move-hint');}
   $('begin-enrollment').disabled=locked||mode!=='sandbox'||!!lab.states.server?.registered;
   $('approve-enrollment').disabled=locked||mode!=='sandbox'||!lab.states.server||lab.states.server.candidate_revision==='0';
+  $('packet-inspector').hidden=mode!=='tour'||step<0;
+  $('experiment-tools').hidden=mode!=='sandbox';
+  $('deliver').hidden=mode!=='tour'||step<0||completed;
+  $('deliver').disabled=locked||!lab.queue.some(p=>p.origin===expected&&!p.corrupted);
   $('next').hidden=mode==='tour'&&step>=0&&!completed;
   $('next').disabled=locked||(mode==='tour'&&step>=0&&!completed);$('sandbox').disabled=locked||mode==='sandbox';
   $('retry').hidden=mode!=='tour'||step<0||completed||lab.queue.some(p=>p.origin===expected&&!p.corrupted);$('retry').disabled=locked||lab.queue.length>=64;
   document.body.dataset.busy=String(busy);document.body.dataset.ready=String(lab.ready);
   text('session-status',!lab.ready?'Initializing local endpoints…':busy?'Running the library…':mode==='sandbox'?'Sandbox · every message may be tried against either endpoint.':step<0?'Start the tour to generate the first message.':completed?'Action complete · continue when you are ready.':'Your turn · move the highlighted message.');
 }
-function intro(){setup=0;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','STEP 1 OF 6');text('tour-title','Generate the device’s key pair.');text('tour-text','Create a public identity and a private key inside the device.');text('next','Generate key pair →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}
+function intro(){showTip();$('packet-inspector').open=false;$('experiment-tools').open=false;setup=0;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','STEP 1 OF 6');text('tour-title','Generate the device’s key pair.');text('tour-text','Create a public identity and a private key inside the device.');text('next','Generate key pair →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}
 async function run(fn){if(busy)return;const id=++operation;busy=true;$('error').hidden=true;render();try{await fn();}catch(error){if(id===operation&&error.name!=='AbortError'){text('error',error.message);$('error').hidden=false;}}finally{if(id===operation){busy=false;render();}}}
 async function place(id,target){
   if(mode==='tour'&&(step<0||completed||target!==tour[step].target))return;
@@ -133,7 +141,7 @@ async function place(id,target){
   }
   selected=null;hint();
   if(mode==='tour'&&step>=0&&!completed&&p.origin===expected&&target===tour[step].target&&(target==='discard'||result?.code===0)){
-    completed=true;text('tour-title',step===tour.length-1?'Enrollment complete.':target==='discard'?'Packet discarded.':'Delivered.');text('tour-text',tour[step].success);text('next',step===tour.length-1?'Start again ↺':step===1?'Approve this serial + key →':'Create encrypted response →');$('progress-fill').style.width=((step===2?6:step+3)/6*100)+'%';
+    showTip();completed=true;text('tour-title',step===tour.length-1?'Enrollment complete.':target==='discard'?'Packet discarded.':'Delivered.');text('tour-text',tour[step].success);text('next',step===tour.length-1?'Start again ↺':step===1?'Approve this serial + key →':'Create encrypted response →');$('progress-fill').style.width=((step===2?6:step+3)/6*100)+'%';
   }else if(mode==='tour'&&step>=0&&!completed&&target!=='relay'){
     text('tour-text',`You tried ${target==='discard'?'discarding it':`the ${target} inbox`}. The result below comes from the library. To continue this lesson, move the highlighted message to ${tour[step].target==='discard'?'Discard':`the ${tour[step].target} inbox`}. If it is gone or modified, use “Try this message again.”`);
   }
@@ -171,7 +179,7 @@ document.addEventListener('click',e=>{
   if(b.dataset.select){selected=selected===Number(b.dataset.select)?null:Number(b.dataset.select);hint();render();}
   if(b.dataset.destination){if(selected===null){text('move-hint','Select or drag a message first.');return;}run(()=>place(selected,b.dataset.destination));}
   if(b.dataset.action)run(()=>lab[b.dataset.action](Number(b.dataset.packet)));
-  if(b.dataset.replay)run(()=>lab.replay(lab.archive.find(p=>p.id===Number(b.dataset.replay))));
+  if(b.dataset.replay)run(()=>{const packet=lab.archive.find(p=>p.id===Number(b.dataset.replay));const id=lab.replay(packet);lab.move(id,packet.from+'-outbox');$('experiment-tools').open=false;});
 });
 document.addEventListener('keydown',e=>{const handle=e.target.closest('[data-select]');if(handle&&(e.key==='Enter'||e.key===' ')){e.preventDefault();handle.click();return;}if(e.key==='Escape'){cancelTouch();selected=null;dragged=null;clearHighlights();hint();render();}});
 function clearHighlights(){for(const z of document.querySelectorAll('.drag-over'))z.classList.remove('drag-over');}

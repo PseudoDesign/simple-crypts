@@ -25,7 +25,6 @@ body[data-mode="tour"] .outbox{padding:0;margin:auto 0}
 body[data-mode="tour"] .packet{max-width:210px;margin:8px auto;padding:0;border:0;border-radius:10px;box-shadow:0 4px 0 #bccfba}
 body[data-mode="tour"] .drag-handle{font-size:15px;padding:30px 12px;text-align:center;background:#dcead4;border:1px solid #aec7a8;border-radius:10px}
 body[data-mode="tour"] .inbox{display:none}
-body[data-mode="tour"][data-target="device"][data-phase="deliver"] [data-destination="device"],body[data-mode="tour"][data-target="server"][data-phase="deliver"] [data-destination="server"]{display:block}
 body[data-mode="tour"] .dropzone{margin:auto 0;width:100%;min-height:105px;box-shadow:none;border-color:#88ac80;background:#f2f7ec;border-width:2px}
 body[data-mode="tour"] .dropzone span{display:none}
 body[data-mode="tour"] .relay{display:none}
@@ -191,3 +190,6 @@ body[data-mode="tour"] .guide-popup>details{margin-top:6px}
  body[data-mode="tour"] .drag-handle.has-summary{padding:8px 5px}
  body[data-mode="tour"] .guide-popup .tour-copy h2{font-size:17px}
 }
+
+.endpoint.suggested{border:2px dashed #88ac80}
+.endpoint.drag-over{background:#eef7eb!important;border:2px solid var(--green)!important;box-shadow:0 0 0 4px #22684e22!important}

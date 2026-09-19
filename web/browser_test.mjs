@@ -36,8 +36,21 @@ async function update(page,form,input,value){await page.locator(input).fill(valu
 async function toolsOpen(page){if(!await page.locator('#experiment-tools').evaluate(e=>e.open))await page.locator('#experiment-tools>summary').click();}
 async function toolsClose(page){if(await page.locator('#experiment-tools').evaluate(e=>e.open))await page.locator('#experiment-tools>summary').click();}
 async function send(page,role){await toolsClose(page);await page.locator(`[data-transmit="${role}"]`).click();await ready(page);}
+// Target the visible part of a recipient taller than the viewport. Firefox cancels
+// native drags if automation scrolls to an off-screen panel center mid-gesture.
+async function dragRecipient(source,target){
+ if(!await target.evaluate(e=>e.classList.contains('endpoint')))return source.dragTo(target);
+ await source.scrollIntoViewIfNeeded();
+ const from=await source.boundingBox(),to=await target.boundingBox(),page=source.page();
+ const x=from.x+from.width/2,y=from.y+from.height/2;
+ const destination={x:to.x+to.width/2,y:Math.max(to.y+8,Math.min(to.y+to.height-8,y))};
+ await page.mouse.move(x,y);await page.mouse.down();
+ await page.mouse.move(x+12,y,{steps:4});
+ await page.mouse.move(destination.x,destination.y,{steps:12});
+ await page.mouse.move(destination.x+1,destination.y);await page.mouse.up();
+}
 async function action(page,action,index=0){
- if(action==='deliver'||action==='drop'){const card=page.locator('.packet').nth(index);if(action==='drop')await toolsOpen(page);await card.locator('[data-select]').dragTo(page.locator(`[data-destination="${action==='drop'?'discard':(await card.locator('[data-select]').textContent()).includes('Device →')?'server':'device'}"]`));}
+ if(action==='deliver'||action==='drop'){const count=await page.locator('.packet').count();const card=page.locator('.packet').nth(index);if(action==='drop')await toolsOpen(page);await dragRecipient(card.locator('[data-select]'),page.locator(`[data-destination="${action==='drop'?'discard':(await card.locator('[data-select]').textContent()).includes('Device →')?'server':'device'}"]`));await page.waitForFunction(n=>document.querySelectorAll('.packet').length===n,count-1);}
  else await page.locator(`[data-action="${action}"]`).nth(index).click();
  await ready(page);await toolsClose(page);
 }
@@ -54,7 +67,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   let staleStyleRequests=0;
   await page.route('**/style.css',route=>{staleStyleRequests++;return route.fulfill({contentType:'text/css',body:'body[data-phase="intro"] .lanes{display:none!important}'});});
   await page.goto(base);await ready(page);
-  assert.equal(staleStyleRequests,0);assert.equal(await page.locator('#chapter-trust').getAttribute('aria-current'),'step');assert.equal(await page.locator('#chapter-state').getAttribute('aria-disabled'),'true');assert.equal(await page.locator('#deliver').count(),0);
+  assert.equal(staleStyleRequests,0);assert.equal(await page.locator('#chapter-trust').getAttribute('aria-current'),'step');assert.equal(await page.locator('#chapter-state').getAttribute('aria-disabled'),'true');assert.equal(await page.locator('#deliver').count(),0);assert.equal(await page.locator('.inbox').count(),0);
   assert.equal(await page.locator('#guide-popup').getAttribute('data-role'),'device');
   assert.equal(await page.locator('.lanes>article:visible').count(),2);
   assert(await page.locator('.top').isHidden());assert(await page.locator('#guide-popup').isVisible());
@@ -74,7 +87,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    assert.match(await page.locator('#tour-progress').textContent(),new RegExp(`STEP ${step===2?5:step+2} OF 5`));
    assert(await page.locator('#next').isDisabled());
    assert(await page.locator('#next').isHidden());
-   assert.equal(await page.locator('[data-destination]:visible').count(),1);
+   assert.equal(await page.locator('[data-destination][data-drop-enabled="true"]:visible').count(),1);
    for(const selector of ['.hero','.result-panel','.archive-panel','.below','.notes','.endpoint form','.packet-actions','.packet details','#budget'])assert(await page.locator(selector).first().isHidden(),selector+' should be hidden in the guide');
    assert((await page.locator('#tour-text').textContent()).split(/\s+/).length<=14);
 
@@ -177,14 +190,14 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    await touchMove('#tour-title');assert(await t.locator('#next').isDisabled());
    await touchMove('#device-panel h2','touchCancel');assert(await t.locator('#next').isDisabled());
    assert.equal(await t.locator('.packet').count(),1);assert.equal(await t.locator('#archive .archive-card').count(),0);
-   // Both enrollment steps: deliberately drop on entity headers, outside the inbox buttons.
+   // Deliver all enrollment packets directly onto the recipient headers.
    for(const [index,target]of ['#device-panel h2','#server-panel h2','#device-panel h2'].entries()){
     if(index===2){await t.locator('#next').tap();await ready(t);}
     if(index){await t.locator('#next').tap();await ready(t);}
     await touchMove(target);assert(!(await t.locator('#next').isDisabled()));
     assert.equal(await t.locator('#archive .archive-card').count(),index+1);
    }
-   // Taps on a packet and inbox must never deliver it; dragging is required.
+   // Taps on a packet and recipient must never deliver it; dragging is required.
    await t.locator('#reset').tap();await ready(t);await generateIdentity(t);await t.locator('#next').tap();await ready(t);
    await t.locator('.tour-message [data-select]').tap();assert.equal(await t.locator('.selected').count(),0);
    assert(await t.locator('#next').isDisabled());await t.locator('[data-destination="device"]').tap();await ready(t);assert(await t.locator('#next').isDisabled());assert.equal(await t.locator('.packet').count(),1);await touchMove('#device-panel h2');assert(!(await t.locator('#next').isDisabled()));

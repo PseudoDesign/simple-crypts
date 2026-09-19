@@ -72,7 +72,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   assert.equal(await page.locator('.lanes>article:visible').count(),2);
   assert(await page.locator('.top').isHidden());assert(await page.locator('#guide-popup').isVisible());
   await page.locator('#hide-tip').click();assert(await page.locator('#guide-popup').isHidden());
-  await page.locator('#device-panel .show-tip').click();assert(await page.locator('#guide-popup').isVisible());
+  await page.locator('#chapter-trust').click();assert(await page.locator('#guide-popup').isVisible());
   for(const role of ['device','server'])assert(await page.locator('#'+role+'-panel').isVisible());
   await page.screenshot({path:`/tmp/simple-crypts-${name}-pre-enrollment.png`,fullPage:true});
   for(const role of ['device','server']){assert(await page.locator('#'+role+'-temperature').isVisible());assert(await page.locator('#'+role+'-name').isVisible());assert.equal(await page.locator('#'+role+'-temperature').textContent(),'—');}

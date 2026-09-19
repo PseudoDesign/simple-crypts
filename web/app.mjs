@@ -19,8 +19,7 @@ function positionTip(){
 }
 function showTip(){ $('guide-popup').hidden=false;positionTip(); }
 window.addEventListener('resize',positionTip);
-$('hide-tip').onclick=()=>{const role=guideRole();$('guide-popup').hidden=true;positionTip();$(role+'-panel').querySelector('.show-tip').focus();};
-for(const button of document.querySelectorAll('.show-tip'))button.onclick=()=>{sandboxRole=button.closest('.endpoint').id==='device-panel'?'device':'server';showTip();};
+$('hide-tip').onclick=()=>{$('guide-popup').hidden=true;positionTip();document.querySelector('.chapter-banner [aria-current]').focus();};
 const text=(id,value)=>{$(id).textContent=value;};
 function datetime(seconds){
   const value=BigInt(seconds);

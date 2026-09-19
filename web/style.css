@@ -92,7 +92,6 @@ body[data-mode="tour"] .readings small{font-size:10px;min-height:0;margin-top:2p
 main,body[data-mode="tour"] main{max-width:1100px;padding:240px 24px 32px}
 .lanes,body[data-mode="tour"] .lanes{grid-template-columns:minmax(0,1fr) minmax(0,1fr);max-width:940px;gap:40px;align-items:stretch}
 .endpoint header{position:relative}
-.show-tip{position:absolute;right:0;top:0;width:26px;height:26px;padding:0;border-radius:50%;font-size:12px}
 .guide-popup{position:fixed;z-index:20;top:16px;left:50%;transform:translateX(-50%);width:min(590px,calc(100% - 28px));max-height:calc(100dvh - 32px);overflow:auto;padding:18px 24px;background:#fffef9;border:1px solid #b9caba;border-radius:16px;box-shadow:0 12px 40px #1d302c24}
 .hide-tip{position:absolute;right:9px;top:7px;border:0;padding:0 7px;background:transparent;font-size:22px;color:var(--muted)}
 .guide-popup .walkthrough,body[data-mode="tour"] .guide-popup .walkthrough{padding:0;min-height:0;text-align:left;border:0;background:transparent;display:block}

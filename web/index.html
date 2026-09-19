@@ -36,7 +36,7 @@
 <section class="hero"><div><p class="eyebrow">A small API. A real encrypted exchange.</p><h1>You move the messages.<br><em>The endpoints keep the truth.</em></h1><p class="lede">Every box is a real signed or encrypted message. Act as the intermediary: deliver it, hold it, discard it, or try it against a different endpoint state.</p></div><div class="live-note"><span class="dot"></span> Real cryptography, in your browser <small>C library · WebAssembly · NaCl box</small></div></section>
 <p id="move-hint" class="move-hint" role="status">Drag a message onto the recipient to deliver it. Escape cancels dragging.</p>
 <section class="lanes" aria-label="Device and server">
-<article class="endpoint" id="device-panel" data-destination="device" tabindex="0"><header><button class="show-tip" aria-label="Show step guidance for device">?</button><span class="node-icon" aria-hidden="true">◉</span><div><p class="eyebrow">01 / DEVICE</p><h2>Temperature sensor</h2></div><span id="device-status" class="badge">Starting</span></header>
+<article class="endpoint" id="device-panel" data-destination="device" tabindex="0"><header><span class="node-icon" aria-hidden="true">◉</span><div><p class="eyebrow">01 / DEVICE</p><h2>Temperature sensor</h2></div><span id="device-status" class="badge">Starting</span></header>
 <p class="guided-state" id="device-summary"></p><div class="identity-card" aria-label="Device identity and keys">
 <span class="key-label">Unique ID · serial number</span><code id="device-unique-id" class="device-unique-id">mcu-0001</code>
 <span class="key-label">Public key · Ed25519</span><code id="device-public-key" class="public-key">Not generated yet</code>
@@ -46,7 +46,7 @@
 <form id="temperature-form"><label for="temperature">Report a temperature <span>°C</span></label><div class="input-row"><input id="temperature" type="number" value="-18.125" step="0.001" min="-2147483.648" max="2147483.647" required><button type="submit">Update</button></div></form>
 <div class="endpoint-actions"><button data-transmit="device" class="send">Create message →</button><button data-reboot="device" class="quiet">Reboot</button></div>
 <details><summary>Identity &amp; revisions</summary><pre id="device-details"></pre></details></article>
-<article class="endpoint" id="server-panel" data-destination="server" tabindex="0"><header><button class="show-tip" aria-label="Show step guidance for server">?</button><span class="node-icon" aria-hidden="true">▤</span><div><p class="eyebrow">03 / SERVER</p><h2>Device registry</h2></div><span id="server-status" class="badge">Starting</span></header>
+<article class="endpoint" id="server-panel" data-destination="server" tabindex="0"><header><span class="node-icon" aria-hidden="true">▤</span><div><p class="eyebrow">03 / SERVER</p><h2>Device registry</h2></div><span id="server-status" class="badge">Starting</span></header>
 <p class="guided-state" id="server-summary"></p><div class="identity-card" aria-label="Server keys">
 <span class="key-label">Public key · Ed25519</span><code id="server-public-key" class="public-key">Not generated yet</code>
 <span class="key-label private-label">Private key</span><p id="server-private-key">Not generated yet</p>

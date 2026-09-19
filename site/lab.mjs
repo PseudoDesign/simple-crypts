@@ -1,9 +1,10 @@
-import {hex} from './endpoint.mjs?v=f5e7b960356801be21ec';
+import {hex} from './endpoint.mjs?v=f2d92df3ebf0dab01dd3';
 export const MAX_QUEUE=64, MAX_EVENTS=200;
 export class Lab {
   constructor(onChange=()=>{},workerFactory=url=>new Worker(url,{type:'module'})) {
     this.onChange=onChange;this.workerFactory=workerFactory;this.epoch=0;this.workers={};this.pending=new Map();this.sequence=0;
-    this.queue=[];this.archive=[];this.events=[];this.states={};this.nextPacket=1;this.ready=false;this.time=1000;
+    this.queue=[];this.archive=[];this.events=[];this.states={};this.nextPacket=1;this.ready=false;// Freeze the simulated server clock at a real date for readable packet timestamps.
+    this.time=Math.floor(Date.now()/1000);
   }
   notify(){this.onChange(this);}
   event(message,kind='info'){this.events.push({message,kind});if(this.events.length>MAX_EVENTS)this.events.shift();this.notify();}
@@ -20,7 +21,7 @@ export class Lab {
       // Compatibility slot only: signed enrollment uses no shared enrollment secret.
       const secret='00'.repeat(32);
       for(const role of ['device','server']){
-        const worker=this.workerFactory(new URL('./worker.mjs?v=f5e7b960356801be21ec',import.meta.url));this.workers[role]=worker;
+        const worker=this.workerFactory(new URL('./worker.mjs?v=f2d92df3ebf0dab01dd3',import.meta.url));this.workers[role]=worker;
         worker.onmessage=({data})=>{const p=this.pending.get(data.id);if(!p)return;this.pending.delete(data.id);data.error?p.reject(new Error(data.error)):p.resolve(data.result);};
         worker.onerror=()=>{for(const [id,p]of this.pending){if(p.role===role){this.pending.delete(id);p.reject(new Error(`${role} runtime failed to load or execute`));}}};
       }

@@ -69,6 +69,7 @@ body[data-mode="tour"] .endpoint{min-height:440px}
 
 .packet-title{display:block}
 .packet-summary{display:block;margin-top:9px;font-size:10px;line-height:1.5;font-weight:400;color:#496044;overflow-wrap:anywhere}
-.packet-summary>span{display:block}
+.packet-summary>span{display:block;text-align:left}
+.packet-summary strong{font-weight:600}
 body[data-mode="tour"] .drag-handle.has-summary{padding:14px 10px}
 @media(max-width:800px){body[data-mode="tour"] .drag-handle.has-summary{padding:11px 5px}.packet-summary{font-size:9px;margin-top:7px}}

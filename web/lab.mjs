@@ -86,9 +86,6 @@ export class Lab {
   }
 }
 export const tour=[
-  {title:'Drag the packet to the server.',text:'The device is reporting −18.125 °C.',target:'server',success:'The server enrolled the device and received its temperature.',code:'sc_report_temperature(&device, -18125);\nsc_receive(&server, frame, length);',prepare:async l=>{await l.update('device','report',{temperature:-18125});return l.transmit('device');}},
-  {title:'Drag the reply to the device.',text:'The server wants to name it “Freezer 3.”',target:'device',success:'The device applied its new name.',code:'sc_set_name(&server, "Freezer 3");\nsc_receive(&device, frame, length);',prepare:async l=>{await l.update('server','name',{name:'Freezer 3'});return l.transmit('server');}},
-  {title:'Drag this packet to Discard.',text:'Let’s lose the device’s confirmation.',target:'discard',success:'The server is still waiting for confirmation.',code:'sc_outbound(&device, 512, frame, sizeof frame, &length);\n// The intermediary discards the report.',prepare:l=>l.transmit('device')},
-  {title:'Drag the retry to the server.',text:'The device rebooted and generated another report.',target:'server',success:'The server now knows the name was applied.',code:'sc_init(&device, &config, &provider);\nsc_receive(&server, frame, length);',prepare:async l=>{await l.update('device','reboot',{});return l.transmit('device');}},
-  {title:'Drag the receipt to the device.',text:'One last delivery confirms the exchange.',target:'device',success:'Both endpoints agree: Freezer 3, −18.125 °C.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')}
+  {title:'Deliver the enrollment request.',text:'Drag the device’s sealed request to the server.',target:'server',success:'The server verified the enrollment code, bound this serial to the device key, and accepted its first report.',code:'sc_report_temperature(&device, -18125);\nsc_receive(&server, frame, length);',prepare:async l=>{await l.update('device','report',{temperature:-18125});return l.transmit('device');}},
+  {title:'Deliver the enrollment confirmation.',text:'Drag the server’s sealed reply to the device.',target:'device',success:'The device authenticated the server’s reply. Enrollment is confirmed; its first report is acknowledged.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')}
 ];

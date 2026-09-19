@@ -61,8 +61,12 @@ users can also select a box and activate a destination. A destination inbox
 always invokes that endpoint, including attempts to reflect a message back to
 its sender. State differences and rejection reasons come from the real library.
 
-The five-step guided tour shows one short instruction, one packet, and its
-intended drop target. Forms, history, protocol details, and experiment controls
+The two-step enrollment tour shows one short instruction, one packet, and its
+intended drop target. The first request carries the enrollment claim and first
+temperature report; the server reply confirms enrollment and acknowledges that
+report. Each step shows a sender-side explanation of the fields, actual frame
+size, and expandable public keys/wire bytes. This teaching view is not host-side
+decryption; the enrollment code value is never displayed. Forms, history, and experiment controls
 are hidden until Sandbox is opened. A successful drop shows a short result and
 Continue; the next packet is generated only when Continue is activated. Wrong
 drops leave the current packet untouched. Mouse dragging, touch dragging, and

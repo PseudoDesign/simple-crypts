@@ -12,7 +12,7 @@
 <main>
 <section class="hero"><div><p class="eyebrow">A small API. A real encrypted exchange.</p><h1>You move the messages.<br><em>The endpoints keep the truth.</em></h1><p class="lede">Every box is a real encrypted message. Act as the intermediary: deliver it, hold it, discard it, or try it against a different endpoint state.</p></div><div class="live-note"><span class="dot"></span> Real cryptography, in your browser <small>C library · WebAssembly · NaCl box</small></div></section>
 <section id="walkthrough" class="walkthrough" aria-labelledby="tour-title">
-<div class="tour-copy" aria-live="polite" aria-atomic="true"><p class="eyebrow" id="tour-progress">5 STEPS</p><h2 id="tour-title">Deliver a packet.</h2><p id="tour-text">You move each encrypted packet. We’ll guide you.</p></div>
+<div class="tour-copy" aria-live="polite" aria-atomic="true"><p class="eyebrow" id="tour-progress">ENROLLMENT · 2 STEPS</p><h2 id="tour-title">Enroll a device.</h2><p id="tour-text">The device already has the server’s public key and an enrollment code for its serial.</p></div>
 
 <div class="progress" aria-hidden="true"><span id="progress-fill"></span></div>
 </section>
@@ -41,6 +41,13 @@
 <details><summary>Identity &amp; revisions</summary><pre id="server-details"></pre></details></article>
 </section>
 <div class="tour-actions"><button id="next" class="primary" disabled>Start →</button><button id="retry" hidden>Try this message again</button><button id="sandbox" disabled>Explore sandbox</button></div>
+<section id="enrollment-packet" class="enrollment-packet" aria-labelledby="packet-title" hidden>
+<p class="eyebrow" id="packet-label">PACKET DETAILS</p><h2 id="packet-title"></h2>
+<p class="packet-perspective">Sender’s view before encryption. The host forwards opaque bytes.</p>
+<dl id="packet-fields"></dl>
+<details><summary>Public keys &amp; encrypted wire bytes</summary><pre id="packet-wire"></pre></details>
+</section>
+
 <section class="result-panel" aria-live="polite"><p class="eyebrow">RESULT OF YOUR LAST DELIVERY</p><h2 id="result-title">No message has been delivered.</h2><p id="result-text">An inbox receives only when you drop a message into it.</p><ul id="result-changes"></ul></section>
 <section class="archive-panel"><div class="section-title"><h2>Messages you have tried</h2><span>Latest 16 · queue a copy to replay</span></div><div id="archive" class="archive"></div></section>
 <section class="below"><article class="history"><div class="section-title"><h2>What happened</h2><span>Latest 200 events</span></div><ol id="events" aria-label="Exchange history"></ol></article><article class="code-panel"><p class="eyebrow">THE API BEHIND THE STEP</p><h2>A few calls do the work.</h2><pre><code id="step-code">sc_report_temperature(&amp;device, -18125);

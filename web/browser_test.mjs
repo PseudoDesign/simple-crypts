@@ -32,11 +32,11 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await page.goto(base);await ready(page);
   assert.equal(await page.locator('.packet').count(),0);
   const firstIdentity=await page.locator('#device-details').textContent();
-  const destinations=['server','device','discard','server','device'];
+  const destinations=['server','device'];
   for(let step=0;step<destinations.length;step++){
    await page.locator('#next').click();await ready(page);
    assert.equal(await page.locator('#error').isVisible(),false,await page.locator('#error').textContent());
-   assert.match(await page.locator('#tour-progress').textContent(),new RegExp(`STEP ${step+1} OF 5`));
+   assert.match(await page.locator('#tour-progress').textContent(),new RegExp(`STEP ${step+1} OF 2`));
    assert(await page.locator('#next').isDisabled());
    assert(await page.locator('#next').isHidden());
    assert.equal(await page.locator('[data-destination]:visible').count(),1);
@@ -44,10 +44,13 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    assert((await page.locator('#tour-text').textContent()).split(/\s+/).length<=12);
 
    assert.equal(await page.locator('.tour-message').count(),1);
+   assert(await page.locator('#enrollment-packet').isVisible());
+   assert.match(await page.locator('#packet-fields').textContent(),step===0?/Enrollment code.*encryption.*-18125.*Report revision1/:/Enrollment confirmedtrue.*Acknowledged report revision1/);
+   assert.match(await page.locator('#packet-wire').textContent(),/Sender public key: [a-f0-9]{64}/);
    assert.equal(await page.locator('#archive .archive-card').count(),step);
    if(step===0)await page.screenshot({path:`/tmp/simple-crypts-${name}-messages.png`,fullPage:true});
    await drag(page,destinations[step]);assert(!(await page.locator('#next').isDisabled()));
-   if(step===1){assert.equal(await page.locator('#server-status').textContent(),'Pending');assert.equal(await page.locator('#device-name').textContent(),'Freezer 3');}
+   if(step===0){assert.equal(await page.locator('#device-status').textContent(),'Pending');assert.match(await page.locator('#server-summary').textContent(),/registered/);}
   }
   assert.equal(await page.locator('#device-status').textContent(),'Confirmed');assert.equal(await page.locator('#server-status').textContent(),'Confirmed');
   assert.equal(await page.locator('.packet').count(),0);assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');
@@ -78,12 +81,12 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await context.close();
   // Hold a report command, reset, then release the stale command to a terminated worker.
   const resetContext=await browser.newContext();await resetContext.addInitScript(()=>{const Original=Worker;window.__held=[];window.Worker=class extends Original{postMessage(message,...rest){if(message.command==='report')window.__held.push(()=>super.postMessage(message,...rest));else super.postMessage(message,...rest);}};});
-  const p=await resetContext.newPage();await p.goto(base);await ready(p);await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/5 STEPS/);await resetContext.close();
+  const p=await resetContext.newPage();await p.goto(base);await ready(p);await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/2 STEPS/);await resetContext.close();
   const experiment=await browser.newContext();const x=await experiment.newPage();await x.goto(base);await ready(x);await x.locator('#next').click();await ready(x);
   // The focused guide has only its intended destination. A wrong drop leaves the packet untouched.
   await x.locator('.tour-message [data-select]').dragTo(x.locator('#device-panel h2'));await ready(x);assert.equal(await x.locator('.packet').count(),1);assert.equal(await x.locator('#archive .archive-card').count(),0);
   await x.locator('.tour-message [data-select]').focus();await x.keyboard.press('Enter');await x.locator('[data-destination="server"]').focus();await x.keyboard.press('Enter');await ready(x);assert(!(await x.locator('#next').isDisabled()));
-  await x.locator('#next').click();await ready(x);await x.locator('#sandbox').click();
+  await x.locator('#sandbox').click();await update(x,'#name-form','#name','Freezer 3');await send(x,'server');
   await x.locator('.packet [data-select]').click();await x.locator('[data-destination="server"]').click();await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);
   await x.locator('#archive [data-replay]').first().click();await ready(x);await x.locator('.packet [data-action="corrupt"]').click();await ready(x);await action(x,'deliver');assert.match(await x.locator('#result-title').textContent(),/rejected/);
   await x.locator('#archive [data-replay]').nth(1).click();await ready(x);await action(x,'deliver');assert.equal(await x.locator('#device-name').textContent(),'Freezer 3');
@@ -112,8 +115,8 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    await touchMove('#tour-title');assert(await t.locator('#next').isDisabled());
    await touchMove('#server-panel h2','touchCancel');assert(await t.locator('#next').isDisabled());
    assert.equal(await t.locator('.packet').count(),1);assert.equal(await t.locator('#archive .archive-card').count(),0);
-   // All five steps: deliberately drop on entity headers, outside the inbox buttons.
-   for(const [index,target]of ['#server-panel h2','#device-panel h2','[data-destination="discard"]','#server-panel h2','#device-panel h2'].entries()){
+   // Both enrollment steps: deliberately drop on entity headers, outside the inbox buttons.
+   for(const [index,target]of ['#server-panel h2','#device-panel h2'].entries()){
     if(index){await t.locator('#next').tap();await ready(t);}
     await touchMove(target);assert(!(await t.locator('#next').isDisabled()));
     assert.equal(await t.locator('#archive .archive-card').count(),index+1);

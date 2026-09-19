@@ -96,8 +96,8 @@ export class Lab {
   packet(id){const p=this.queue.find(p=>p.id===id);if(!p)throw new Error('Frame is no longer queued');return p;}
   remember(packet,outcome){this.archive.unshift({...packet,bytes:packet.bytes.slice(),outcome});if(this.archive.length>16)this.archive.pop();}
   move(id,location){if(!['relay','device-outbox','server-outbox'].includes(location))throw new Error('Unknown holding area');this.packet(id).location=location;this.event(`Message ${id} held; no endpoint has received it.`);}
-  drop(id){const p=this.packet(id);this.remember(p,'discarded');this.queue=this.queue.filter(p=>p.id!==id);this.event(`Host discarded message ${id}.`);}
-  replay(packet){if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue is full (64 messages).');const copy={...packet,id:this.nextPacket++,bytes:packet.bytes.slice(),location:'relay'};delete copy.outcome;this.queue.push(copy);this.event(`An identical copy of message ${packet.id} is queued as message ${copy.id}.`);return copy.id;}
+  drop(id){const p=this.packet(id);this.remember({...p,result:null},'dropped · receiver not called');this.queue=this.queue.filter(p=>p.id!==id);this.event(`Host discarded message ${id}.`);}
+  replay(packet){if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue is full (64 messages).');const copy={...packet,id:this.nextPacket++,bytes:packet.bytes.slice(),location:'relay'};delete copy.outcome;delete copy.result;this.queue.push(copy);this.event(`An identical copy of message ${packet.id} is queued as message ${copy.id}.`);return copy.id;}
   duplicate(id){
     if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue is full (64 frames).');
     const p=this.packet(id);const copy={...p,id:this.nextPacket++,bytes:p.bytes.slice()};this.queue.push(copy);this.event(`Host duplicated frame ${id} as frame ${copy.id}.`);return copy.id;
@@ -112,7 +112,7 @@ export class Lab {
     const fields=['registered','temperature','actual_name','desired_name','reported_revision','desired_revision','processed_desired_revision','acked_reported_revision','pending','challenge','candidate_key','candidate_revision'];
     const changes=fields.filter(k=>before[k]!==result.state[k]).map(k=>({field:k,before:before[k],after:result.state[k]}));
     result.changes=changes;
-    this.remember(p,result.code<0?'rejected by '+target:changes.length?'accepted by '+target:'accepted; no newer state');
+    this.remember({...p,result:{code:result.code,status:result.status,target,changed:changes.length}},result.code<0?'rejected by '+target:changes.length?'accepted by '+target:'accepted; no newer state');
     this.event(`Frame ${id} delivered to ${target}: ${result.code<0?'rejected — '+result.status:'authenticated and processed'}.`,result.code<0?'rejected':'success');
     return result;
   }

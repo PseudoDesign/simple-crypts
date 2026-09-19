@@ -1,5 +1,5 @@
-import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=4159710fa33acd7f4b97';
-import {hex} from './endpoint.mjs?v=4159710fa33acd7f4b97';
+import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=524238ce938a241da5bd';
+import {hex} from './endpoint.mjs?v=524238ce938a241da5bd';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0;
@@ -96,6 +96,7 @@ function render(){
   $('registered-key-details').hidden=!lab.states.server?.registered&&(!lab.states.server||lab.states.server.candidate_revision==='0');
   text('registered-key-label',lab.states.server?.registered?'Registered device public key':'Proposed device public key · unapproved');
   text('registered-device-key',lab.states.server?.registered?lab.states.server.peer_public_key:lab.states.server?.candidate_key??'');
+  for(const key of document.querySelectorAll('.public-key'))key.title=key.textContent;
   $('enrollment-packet').hidden=mode!=='tour'||step<0;
   for(const role of ['device','server']){
     document.querySelector('#'+role+'-panel h2').textContent=mode==='tour'?(role==='device'?'Device':'Server'):(role==='device'?'Temperature sensor':'Device registry');

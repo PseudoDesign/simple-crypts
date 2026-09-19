@@ -1,5 +1,5 @@
-import {Lab,tour} from './lab.mjs?v=b07f66e441ae39c1c29a';
-import {hex} from './endpoint.mjs?v=b07f66e441ae39c1c29a';
+import {Lab,tour} from './lab.mjs?v=06c9c0e61cb39e23bf20';
+import {hex} from './endpoint.mjs?v=06c9c0e61cb39e23bf20';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0;
@@ -77,6 +77,10 @@ function render(){
   }
   for(const role of ['device','server']){
     const s=lab.states[role];
+    text(role+'-temperature-state',role==='device'
+      ? !s?.has_temperature?'Not measured':s.acked_reported_revision===s.reported_revision?'Receipt confirmed':'Awaiting server receipt'
+      : s?.has_temperature?'Accepted report':s?.candidate_revision&&s.candidate_revision!=='0'?'Report received · awaiting approval':'No accepted report');
+    if(role==='device')text('device-name-state',!s||s.desired_revision==='0'?'No name received':s.apply_status===2?'Name rejected':`Applied · revision ${s.applied_desired_revision}`);
     if(!s){text(role+'-temperature','—');text(role+'-name','Not assigned');text(role+'-details','');text(role+'-status',role==='device'?'No identity yet':'Starting');$(role+'-status').className='badge';continue;}
     text(role+'-temperature',s.has_temperature?(s.temperature/1000).toFixed(3)+' °C':'—');
     text(role+'-name',(role==='device'?s.actual_name:s.desired_name)||'Not assigned');
@@ -84,7 +88,7 @@ function render(){
     $(role+'-status').className='badge '+(s.pending?'pending':s.registered?'confirmed':'');
     const fields={serial:s.serial,public_key:s.public_key,registered:!!s.registered,desired_revision:s.desired_revision,reported_revision:s.reported_revision,applied_desired_revision:s.applied_desired_revision,acked_reported_revision:s.acked_reported_revision};
     text(role+'-details',Object.entries(fields).map(([k,v])=>`${k}: ${v}`).join('\n'));
-    if(role==='server')text('server-applied',s.processed_desired_revision==='0'?'No name application report yet':s.apply_status===2?'Device rejected the requested name':`Device reported name revision ${s.applied_desired_revision} applied`);
+    if(role==='server')text('server-applied',s.desired_revision==='0'?'No name requested':s.processed_desired_revision!==s.desired_revision?'Awaiting device application report':s.apply_status===2?'Device rejected the requested name':`Device reported name revision ${s.applied_desired_revision} applied`);
   }
   if(!lab.states.server)text('server-applied','No application report yet');
   text('queue-count',`${lab.queue.length} / 64`);

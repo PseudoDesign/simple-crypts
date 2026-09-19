@@ -1,5 +1,5 @@
-import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=4cc1547acad2c9ec5270';
-import {hex} from './endpoint.mjs?v=4cc1547acad2c9ec5270';
+import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=88661e900ab3b65576a9';
+import {hex} from './endpoint.mjs?v=88661e900ab3b65576a9';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0;
@@ -73,7 +73,16 @@ function card(p){
   const details=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent=p.signed?'Inspect signed bytes':'Inspect opaque bytes';pre.textContent=hex(p.bytes).match(/.{1,48}/g).join('\n');details.append(summary,pre);
   article.append(handle,meta,actions,details);return article;
 }
+$('chapter-trust').onclick=e=>{e.preventDefault();if(mode==='tour'){showTip();return;}$('reset').click();};
+$('chapter-state').onclick=e=>{e.preventDefault();if(busy)return;if(!lab.states.device?.registered||!lab.states.server?.registered){showTip();return;}if(mode!=='sandbox')$('sandbox').click();showTip();};
 function render(){
+  const enrolled=!!lab.states.device?.registered&&!!lab.states.server?.registered;
+  const sharing=mode==='sandbox'&&enrolled;
+  for(const [id,current]of [['chapter-trust',!sharing],['chapter-state',sharing]]){if(current)$(id).setAttribute('aria-current','step');else $(id).removeAttribute('aria-current');}
+  $('chapter-state').setAttribute('aria-disabled',String(!enrolled||busy));
+  $('chapter-state').title=enrolled?'Change the name, report temperature, and drag messages between endpoints':'Complete enrollment to share state';
+  $('chapter-trust').title=mode==='tour'?'Current enrollment chapter':'Restart enrollment with fresh keys';
+
   document.body.dataset.mode=mode;
   document.body.dataset.phase=step<0?'intro':completed?'complete':'deliver';
   document.body.dataset.target=mode==='tour'&&step>=0?tour[step].target:'';
@@ -160,7 +169,7 @@ async function place(id,target){
   }
 }
 $('reset').onclick=()=>{cancelTouch();operation++;busy=false;intro();mode='tour';run(()=>lab.reset({deferDevice:true}));};
-$('sandbox').onclick=()=>run(async()=>{cancelTouch();if(!lab.states.device){if(!lab.devicePublicKey)await lab.generateDevice();await lab.provisionDevice();setup=2;}mode='sandbox';text('tour-progress','SANDBOX · YOU ARE THE INTERMEDIARY');text('tour-title','Try any message against either endpoint.');text('tour-text','Generate messages, deliver older ones first, reflect them back to their sender, or replay a box from the history. Leave a box in Hold to delay it.');text('next','Restart guided tour →');render();});
+$('sandbox').onclick=()=>run(async()=>{cancelTouch();if(!lab.states.device){if(!lab.devicePublicKey)await lab.generateDevice();await lab.provisionDevice();setup=2;}mode='sandbox';text('tour-progress','EXPLORE · YOU MOVE THE MESSAGES');text('tour-title','Share state between the endpoints.');text('tour-text','The server chooses a name; the device measures temperature. Create and drag messages to see when the other side learns each change.');text('next','Restart guided tour →');render();});
 $('next').onclick=()=>run(async()=>{
   if(mode==='sandbox'||step===tour.length-1){mode='tour';intro();await lab.reset({deferDevice:true});return;}
   if(setup===0){await lab.generateDevice();setup=1;text('tour-title','The device has its own identity.');text('tour-text','The public key can be shared. The private key stays with the device.');text('next','Provision device →');$('progress-fill').style.width='17%';return;}

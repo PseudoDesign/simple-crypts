@@ -47,7 +47,7 @@ try{
 for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
  const browser=await browserType.launch({headless:true});
  try{
-  const context=await browser.newContext({viewport:{width:1440,height:1100},reducedMotion:'reduce'});const page=await context.newPage();const errors=[],outside=[];
+  const context=await browser.newContext({viewport:{width:1366,height:768},reducedMotion:'reduce'});const page=await context.newPage();const errors=[],outside=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(!r.url().startsWith(base))outside.push(r.url());});
   // Model a returning browser with the old unversioned stylesheet cached.
   // The old pre-enrollment rule must never be requested by this release.
@@ -79,6 +79,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    assert((await page.locator('#tour-text').textContent()).split(/\s+/).length<=14);
 
    assert.equal(await page.locator('.tour-message').count(),1);
+   for(const role of ['device','server']){const box=await page.locator('#'+role+'-panel').boundingBox();assert(box.y+box.height<=768,role+' panel should fit on a laptop screen');}
    const speaker=step===1?'device':'server';
    assert.equal(await page.locator('#guide-popup').getAttribute('data-role'),speaker);
    const popupBox=await page.locator('#guide-popup').boundingBox(),roleBox=await page.locator('#'+speaker+'-panel').boundingBox();
@@ -158,6 +159,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    const cdp=await touchContext.newCDPSession(t);
    const center=box=>({x:box.x+box.width/2,y:box.y+box.height/2});
    async function touchMove(target,end='touchEnd'){
+    for(const role of ['device','server']){const box=await t.locator('#'+role+'-panel').boundingBox();assert(box.y>=0&&box.y+box.height<=844,role+' panel should fit on a phone screen');}
     const handle=t.locator('.tour-message [data-select]');
     const from=await handle.boundingBox(),to=await t.locator(target).boundingBox();
     assert(from.y>=0&&from.y+from.height<=844&&to.y>=0&&to.y+to.height<=844);

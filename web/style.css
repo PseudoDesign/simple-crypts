@@ -139,3 +139,5 @@ body[data-mode="sandbox"] .move-hint{display:none}
 }
 
 .identity-card .device-unique-id{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:10px}
+/* Expanded relay tools must leave endpoint packets available for dragging. */
+body[data-mode="sandbox"] .guide-popup{max-height:210px}

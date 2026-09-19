@@ -37,7 +37,7 @@ async function toolsOpen(page){if(!await page.locator('#experiment-tools').evalu
 async function toolsClose(page){if(await page.locator('#experiment-tools').evaluate(e=>e.open))await page.locator('#experiment-tools>summary').click();}
 async function send(page,role){await toolsClose(page);await page.locator(`[data-transmit="${role}"]`).click();await ready(page);}
 async function action(page,action,index=0){
- if(action==='deliver'||action==='drop'){const card=page.locator('.packet').nth(index);await card.locator('[data-select]').click();if(action==='drop')await toolsOpen(page);await page.locator(`[data-destination="${action==='drop'?'discard':(await card.locator('[data-select]').textContent()).includes('Device →')?'server':'device'}"]`).click();}
+ if(action==='deliver'||action==='drop'){const card=page.locator('.packet').nth(index);if(action==='drop')await toolsOpen(page);await card.locator('[data-select]').dragTo(page.locator(`[data-destination="${action==='drop'?'discard':(await card.locator('[data-select]').textContent()).includes('Device →')?'server':'device'}"]`));}
  else await page.locator(`[data-action="${action}"]`).nth(index).click();
  await ready(page);await toolsClose(page);
 }
@@ -54,7 +54,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   let staleStyleRequests=0;
   await page.route('**/style.css',route=>{staleStyleRequests++;return route.fulfill({contentType:'text/css',body:'body[data-phase="intro"] .lanes{display:none!important}'});});
   await page.goto(base);await ready(page);
-  assert.equal(staleStyleRequests,0);
+  assert.equal(staleStyleRequests,0);assert.equal(await page.locator('#deliver').count(),0);
   assert.equal(await page.locator('#guide-popup').getAttribute('data-role'),'device');
   assert.equal(await page.locator('.lanes>article:visible').count(),2);
   assert(await page.locator('.top').isHidden());assert(await page.locator('#guide-popup').isVisible());
@@ -137,18 +137,18 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await context.close();
   // Hold a report command, reset, then release the stale command to a terminated worker.
   const resetContext=await browser.newContext();await resetContext.addInitScript(()=>{const Original=Worker;window.__held=[];window.Worker=class extends Original{postMessage(message,...rest){if(message.command==='report')window.__held.push(()=>super.postMessage(message,...rest));else super.postMessage(message,...rest);}};});
-  const p=await resetContext.newPage();await p.goto(base);await ready(p);await provision(p);await p.locator('#next').click();await ready(p);await p.locator('#deliver').click();await ready(p);await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/STEP 1 OF 6/);await resetContext.close();
+  const p=await resetContext.newPage();await p.goto(base);await ready(p);await provision(p);await p.locator('#next').click();await ready(p);await drag(p,'device');await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/STEP 1 OF 6/);await resetContext.close();
   const experiment=await browser.newContext();const x=await experiment.newPage();await x.goto(base);await ready(x);await provision(x);await x.locator('#next').click();await ready(x);
   // The focused guide has only its intended destination. A wrong drop leaves the packet untouched.
   await x.locator('.tour-message [data-select]').dragTo(x.locator('#server-panel h2'));await ready(x);assert.equal(await x.locator('.packet').count(),1);assert.equal(await x.locator('#archive .archive-card').count(),0);
-  await x.locator('.tour-message [data-select]').focus();await x.keyboard.press('Enter');await x.locator('[data-destination="device"]').focus();await x.keyboard.press('Enter');await ready(x);assert(!(await x.locator('#next').isDisabled()));
+  await x.locator('.tour-message [data-select]').focus();await x.keyboard.press('Enter');await x.locator('[data-destination="device"]').focus();await x.keyboard.press('Enter');await ready(x);assert(await x.locator('#next').isDisabled());assert.equal(await x.locator('.packet').count(),1);await drag(x,'device');
   await x.locator('#next').click();await ready(x);await drag(x,'server');await x.locator('#next').click();await ready(x);await x.locator('#next').click();await ready(x);await drag(x,'device');
   await x.locator('#sandbox').click();await update(x,'#name-form','#name','Freezer 3');await send(x,'server');
-  await x.locator('.packet [data-select]').click();await x.locator('[data-destination="server"]').click();await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);
+  await x.locator('.packet [data-select]').dragTo(x.locator('[data-destination="server"]'));await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);
   await toolsOpen(x);await x.locator('#archive [data-replay]').first().click();await ready(x);await toolsClose(x);await x.locator('.packet [data-action="corrupt"]').click();await ready(x);await toolsClose(x);await action(x,'deliver');assert.match(await x.locator('#result-title').textContent(),/rejected/);
   await toolsOpen(x);await x.locator('#archive [data-replay]').nth(1).click();await ready(x);await toolsClose(x);await action(x,'deliver');assert.equal(await x.locator('#device-name').textContent(),'Freezer 3');assert.equal(await x.locator('#device-unique-id').textContent(),'mcu-0001');
   await toolsOpen(x);await x.locator('#archive [data-replay]').first().click();await ready(x);await toolsClose(x);await action(x,'deliver');assert.match(await x.locator('#result-title').textContent(),/no newer state/);
-  await x.setViewportSize({width:390,height:844});await toolsOpen(x);await x.locator('#archive [data-replay]').first().click();await ready(x);await toolsClose(x);await x.locator('.packet [data-select]').click();await x.locator('[data-destination="server"]').click();await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);assert(await x.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await x.setViewportSize({width:390,height:844});await toolsOpen(x);await x.locator('#archive [data-replay]').first().click();await ready(x);await toolsClose(x);await x.locator('.packet [data-select]').dragTo(x.locator('[data-destination="server"]'));await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);assert(await x.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await experiment.close();
   if(name==='chromium'){
    const touchContext=await browser.newContext({viewport:{width:390,height:844},hasTouch:true});const t=await touchContext.newPage();await t.goto(base);await ready(t);await provision(t);await t.locator('#next').click();await ready(t);
@@ -179,10 +179,10 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
     await touchMove(target);assert(!(await t.locator('#next').isDisabled()));
     assert.equal(await t.locator('#archive .archive-card').count(),index+1);
    }
-   // Tap/select remains a no-drag alternative and does not accidentally deliver on selection.
+   // Taps on a packet and inbox must never deliver it; dragging is required.
    await t.locator('#reset').tap();await ready(t);await provision(t);await t.locator('#next').tap();await ready(t);
-   await t.locator('.tour-message [data-select]').tap();assert.equal(await t.locator('.selected').count(),1);
-   assert(await t.locator('#next').isDisabled());await t.locator('[data-destination="device"]').tap();await ready(t);assert(!(await t.locator('#next').isDisabled()));
+   await t.locator('.tour-message [data-select]').tap();assert.equal(await t.locator('.selected').count(),0);
+   assert(await t.locator('#next').isDisabled());await t.locator('[data-destination="device"]').tap();await ready(t);assert(await t.locator('#next').isDisabled());assert.equal(await t.locator('.packet').count(),1);await touchMove('#device-panel h2');assert(!(await t.locator('#next').isDisabled()));
    await touchContext.close();
   }
   const noRng=await browser.newContext();await noRng.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const r=await noRng.newPage();await r.goto(base);await r.locator('#error').waitFor({state:'visible'});assert.match(await r.locator('#error').textContent(),/randomness/);assert(await r.locator('#next').isDisabled());await noRng.close();

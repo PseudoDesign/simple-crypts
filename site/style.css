@@ -55,3 +55,5 @@ body[data-mode="tour"] .dropzone.drag-over{background:#cee8d0;border-color:var(-
 .enrollment-packet h2{font-size:18px}.packet-perspective{font-size:12px;color:var(--muted);margin:6px 0 14px}
 .enrollment-packet dl{display:grid;grid-template-columns:1fr 2fr;gap:7px 16px;font-size:12px;margin:0}.enrollment-packet dt{color:var(--muted)}.enrollment-packet dd{margin:0;overflow-wrap:anywhere}.enrollment-packet details{margin-top:14px;font-size:12px}.enrollment-packet pre{max-height:180px;overflow:auto}
 @media(max-width:500px){.enrollment-packet{padding:14px}.enrollment-packet dl{grid-template-columns:1fr 1.5fr;gap:7px 10px;font-size:11px}}
+/* Before a packet exists, keep attention on the key/provisioning action. */
+body[data-mode="tour"][data-phase="intro"] .lanes{display:none}

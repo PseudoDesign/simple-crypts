@@ -19,6 +19,12 @@ export class Endpoint {
   state() { return JSON.parse(this.m.UTF8ToString(this.m._scw_state())); }
   async command(command, args = {}) {
     const m = this.m; let status = 0, frame;
+    if (command === 'generate') {
+      if(this.initialized)throw new Error('Already initialized');
+      if(!globalThis.crypto?.getRandomValues)throw new Error('Secure browser randomness is unavailable');
+      status=m._scw_generate();
+      return {code:status,status:m.UTF8ToString(m._scw_status(status)),public_key:status===0?hex(m.HEAPU8.slice(m._scw_public(),m._scw_public()+32)):null};
+    }
     if (command === 'init') {
       if (this.initialized) throw new Error('Already initialized');
       if (!globalThis.crypto?.getRandomValues) throw new Error('Secure browser randomness is unavailable');

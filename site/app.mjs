@@ -2,7 +2,7 @@ import {Lab,tour} from './lab.mjs';
 import {hex} from './endpoint.mjs';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
-let expected=null,completed=false,original=null;
+let expected=null,completed=false,original=null,setup=0;
 const lab=new Lab(render);
 const text=(id,value)=>{$(id).textContent=value;};
 function hint(){if(mode==='tour'){text('move-hint',selected===null?'Drag the packet, or select it and activate the highlighted destination.':`Packet selected. Activate ${tour[step]?.target==='discard'?'Discard':`the ${tour[step]?.target??'highlighted'} inbox`}.`);return;}text('move-hint',selected===null?'Drag a message box, or select one and activate a destination. Escape cancels selection.':`Message ${selected} selected. Choose Device inbox, Server inbox, Hold here, or Discard.`);}
@@ -20,6 +20,11 @@ function render(){
   document.body.dataset.mode=mode;
   document.body.dataset.phase=step<0?'intro':completed?'complete':'deliver';
   document.body.dataset.target=mode==='tour'&&step>=0?tour[step].target:'';
+  $('key-setup').hidden=mode!=='tour'||step>=0;
+  $('provisioning-details').hidden=setup<2;
+  text('pinned-server-key',lab.states.device?.peer_public_key??'');
+  text('device-public-key',lab.devicePublicKey??'Not generated yet');
+  text('setup-status',setup===0?'Private key: not generated.':setup===1?'Private key: stays inside the device’s simulated keystore. Nothing sent.':'Provisioned: serial mcu-0001, one-time enrollment code, and server public key. Nothing sent.');
   $('enrollment-packet').hidden=mode!=='tour'||step<0;
   for(const role of ['device','server']){
     document.querySelector('#'+role+'-panel h2').textContent=mode==='tour'?(role==='device'?'Device':'Server'):(role==='device'?'Temperature sensor':'Device registry');
@@ -29,7 +34,7 @@ function render(){
   }
   for(const role of ['device','server']){
     const s=lab.states[role];
-    if(!s){text(role+'-temperature','—');text(role+'-name','Not assigned');text(role+'-details','');text(role+'-status','Starting');$(role+'-status').className='badge';continue;}
+    if(!s){text(role+'-temperature','—');text(role+'-name','Not assigned');text(role+'-details','');text(role+'-status',role==='device'?'No identity yet':'Starting');$(role+'-status').className='badge';continue;}
     text(role+'-temperature',s.has_temperature?(s.temperature/1000).toFixed(3)+' °C':'—');
     text(role+'-name',(role==='device'?s.actual_name:s.desired_name)||'Not assigned');
     text(role+'-status',s.pending?'Pending':s.apply_status===2?'Rejected':s.registered?'Confirmed':'Not enrolled');
@@ -64,7 +69,7 @@ function render(){
   document.body.dataset.busy=String(busy);document.body.dataset.ready=String(lab.ready);
   text('session-status',!lab.ready?'Initializing local endpoints…':busy?'Running the library…':mode==='sandbox'?'Sandbox · every message may be tried against either endpoint.':step<0?'Start the tour to generate the first message.':completed?'Action complete · continue when you are ready.':'Your turn · move the highlighted message.');
 }
-function intro(){step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','ENROLLMENT · 2 STEPS');text('tour-title','Enroll a device.');text('tour-text','The device already has the server’s public key and an enrollment code for its serial.');text('next','Start →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}
+function intro(){setup=0;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','STEP 1 OF 4');text('tour-title','Generate the device’s key pair.');text('tour-text','Create a public identity and a private key inside the device.');text('next','Generate key pair →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}
 async function run(fn){if(busy)return;const id=++operation;busy=true;$('error').hidden=true;render();try{await fn();}catch(error){if(id===operation&&error.name!=='AbortError'){text('error',error.message);$('error').hidden=false;}}finally{if(id===operation){busy=false;render();}}}
 async function place(id,target){
   if(mode==='tour'&&(step<0||completed||target!==tour[step].target))return;
@@ -79,15 +84,17 @@ async function place(id,target){
   }
   selected=null;hint();
   if(mode==='tour'&&step>=0&&!completed&&p.origin===expected&&target===tour[step].target&&(target==='discard'||result?.code===0)){
-    completed=true;text('tour-title',step===tour.length-1?'Enrollment complete.':target==='discard'?'Packet discarded.':'Delivered.');text('tour-text',tour[step].success);text('next',step===tour.length-1?'Start again ↺':'Continue →');$('progress-fill').style.width=((step+1)/tour.length*100)+'%';
+    completed=true;text('tour-title',step===tour.length-1?'Enrollment complete.':target==='discard'?'Packet discarded.':'Delivered.');text('tour-text',tour[step].success);text('next',step===tour.length-1?'Start again ↺':'Create confirmation →');$('progress-fill').style.width=((step+3)/4*100)+'%';
   }else if(mode==='tour'&&step>=0&&!completed&&target!=='relay'){
     text('tour-text',`You tried ${target==='discard'?'discarding it':`the ${target} inbox`}. The result below comes from the library. To continue this lesson, move the highlighted message to ${tour[step].target==='discard'?'Discard':`the ${tour[step].target} inbox`}. If it is gone or modified, use “Try this message again.”`);
   }
 }
-$('reset').onclick=()=>{cancelTouch();operation++;busy=false;intro();mode='tour';run(()=>lab.reset());};
-$('sandbox').onclick=()=>{cancelTouch();mode='sandbox';text('tour-progress','SANDBOX · YOU ARE THE INTERMEDIARY');text('tour-title','Try any message against either endpoint.');text('tour-text','Generate messages, deliver older ones first, reflect them back to their sender, or replay a box from the history. Leave a box in Hold to delay it.');text('next','Restart guided tour →');render();};
+$('reset').onclick=()=>{cancelTouch();operation++;busy=false;intro();mode='tour';run(()=>lab.reset({deferDevice:true}));};
+$('sandbox').onclick=()=>run(async()=>{cancelTouch();if(!lab.states.device){if(!lab.devicePublicKey)await lab.generateDevice();await lab.provisionDevice();setup=2;}mode='sandbox';text('tour-progress','SANDBOX · YOU ARE THE INTERMEDIARY');text('tour-title','Try any message against either endpoint.');text('tour-text','Generate messages, deliver older ones first, reflect them back to their sender, or replay a box from the history. Leave a box in Hold to delay it.');text('next','Restart guided tour →');render();});
 $('next').onclick=()=>run(async()=>{
-  if(mode==='sandbox'||step===tour.length-1){mode='tour';intro();await lab.reset();}
+  if(mode==='sandbox'||step===tour.length-1){mode='tour';intro();await lab.reset({deferDevice:true});return;}
+  if(setup===0){await lab.generateDevice();setup=1;text('tour-title','The device has its own identity.');text('tour-text','The public key can be shared. The private key stays with the device.');text('next','Provision device →');$('progress-fill').style.width='25%';return;}
+  if(setup===1){await lab.provisionDevice();setup=2;text('tour-progress','STEP 2 OF 4');text('tour-title','Prepare the device for enrollment.');text('tour-text','Trusted provisioning pins the server’s public key and assigns a serial and enrollment code.');text('next','Create enrollment request →');$('progress-fill').style.width='50%';return;}
   const next=step+1;const id=await tour[next].prepare(lab);if(id===null)throw new Error('No message generated. Reset the tour to start a fresh exchange.');
   step=next;completed=false;expected=lab.packet(id).origin;original={...lab.packet(id),bytes:lab.packet(id).bytes.slice()};
   const sender=lab.states[original.from];
@@ -97,7 +104,7 @@ $('next').onclick=()=>run(async()=>{
   $('packet-fields').replaceChildren();for(const [name,value]of fields){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;dd.textContent=value;$('packet-fields').append(dt,dd);}
   text('packet-wire',`Sender public key: ${sender.public_key}\nRecipient public key: ${lab.states[original.to].public_key}\n\nActual wire frame (public routing header + encrypted body):\n${hex(original.bytes).match(/.{1,48}/g).join('\n')}`);
   $('enrollment-packet').querySelector('details').open=false;
-  text('tour-progress',`STEP ${step+1} OF ${tour.length}`);text('tour-title',tour[step].title);text('tour-text',tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
+  text('tour-progress',`STEP ${step+3} OF 4`);text('tour-title',tour[step].title);text('tour-text',tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
 });
 $('retry').onclick=()=>run(()=>lab.replay(original));
 $('temperature-form').onsubmit=e=>{e.preventDefault();run(()=>lab.update('device','report',{temperature:Math.round(Number($('temperature').value)*1000)}));};
@@ -173,4 +180,4 @@ for(const event of ['pointercancel','lostpointercapture'])document.addEventListe
 document.addEventListener('contextmenu',e=>{if(e.target.closest('[data-select]'))e.preventDefault();});
 window.addEventListener('blur',cancelTouch);
 window.addEventListener('pagehide',()=>{cancelTouch();lab.stop();});
-run(()=>lab.reset());
+intro();run(()=>lab.reset({deferDevice:true}));

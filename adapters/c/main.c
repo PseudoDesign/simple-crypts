@@ -99,6 +99,10 @@ static int command(sc_host **host,const object *o,char *frame64,size_t framecap)
         if(!status&&get(o,"initial_revision")){if(!unsigned_value(o,"initial_revision",0,&revision))return SC_ERR_ARGUMENT;status=sc_host_fixture_revision(*host,revision);}return status;
     }
     if(!*host)return SC_ERR_ARGUMENT;
+    if(!strcmp(cmd,"enrollment_enable"))return sc_host_enrollment_enable(*host);
+    if(!strcmp(cmd,"enrollment_cancel"))return sc_host_enrollment_cancel(*host);
+    if(!strcmp(cmd,"enrollment_begin")){uint64_t now,expires;if(!unsigned_value(o,"now",0,&now)||!unsigned_value(o,"expires",0,&expires))return SC_ERR_ARGUMENT;return sc_host_enrollment_begin(*host,now,expires);}
+    if(!strcmp(cmd,"enrollment_approve")){uint64_t now;if(!decode_key(text(o,"challenge",""),secret)||!decode_key(text(o,"key",""),seed)||!unsigned_value(o,"now",0,&now))return SC_ERR_ARGUMENT;return sc_host_enrollment_approve(*host,secret,seed,now);}
     if(!strcmp(cmd,"state"))return SC_OK;
     if(!strcmp(cmd,"close")){sc_host_close(*host);*host=NULL;return SC_OK;}
     if(!strcmp(cmd,"name"))return sc_host_name(*host,text(o,"name",""));
@@ -114,9 +118,10 @@ static int command(sc_host **host,const object *o,char *frame64,size_t framecap)
         if(status==SC_OK)sodium_bin2base64(frame64,framecap,frame,length,sodium_base64_VARIANT_ORIGINAL);
         return status;
     }
-    if(!strcmp(cmd,"rx")) {
+    if(!strcmp(cmd,"rx")||!strcmp(cmd,"rx_at")) {
         const char *encoded=text(o,"frame","");const char *end=NULL;
         if(sodium_base642bin(frame,sizeof frame,encoded,strlen(encoded),NULL,&length,&end,sodium_base64_VARIANT_ORIGINAL)||!end||*end)return SC_ERR_ARGUMENT;
+        if(!strcmp(cmd,"rx_at")){uint64_t now;if(!unsigned_value(o,"now",0,&now))return SC_ERR_ARGUMENT;return sc_host_receive_at(*host,frame,length,now);}
         return sc_host_receive(*host,frame,length);
     }
     return SC_ERR_ARGUMENT;

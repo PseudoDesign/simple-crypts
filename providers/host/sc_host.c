@@ -15,6 +15,7 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <time.h>
 
 #define HOST_CRYPTO_ERROR (-12)
 #define HOST_PATH_MAX 4096
@@ -27,7 +28,7 @@ typedef struct {
     uint8_t magic[8];
     uint32_t format, role;
     char serial[SC_MAX_SERIAL + 1];
-    uint8_t public_key[32], private_key[32], server_key[32], token[32];
+    uint8_t public_key[32], private_key[64], server_key[32], token[32];
     counter_slot counters[HOST_NONCE_DOMAINS];
     uint64_t generation;
     uint32_t length;
@@ -110,7 +111,7 @@ static sc_status p_seal(void *user, sc_key_handle key, const uint8_t peer[32],
     if (key != 1 || length > SIZE_MAX - 16 || capacity < length + 16) return SC_ERR_BOUNDS;
     if (h->poisoned) return SC_ERR_STORAGE;
     if (consume(&h->fail_crypto)) return (sc_status)HOST_CRYPTO_ERROR;
-    return sc_sodium_seal(&h->keystore, key, peer, nonce, plain, length, cipher, capacity);
+    return sc_sodium_ed_seal(&h->keystore, key, peer, nonce, plain, length, cipher, capacity);
 }
 static sc_status p_open(void *user, sc_key_handle key, const uint8_t peer[32],
                         const uint8_t nonce[24], const uint8_t *cipher,
@@ -119,7 +120,7 @@ static sc_status p_open(void *user, sc_key_handle key, const uint8_t peer[32],
     if (key != 1 || length < 16 || capacity < length - 16) return SC_ERR_BOUNDS;
     if (h->poisoned) return SC_ERR_STORAGE;
     if (consume(&h->fail_crypto)) return (sc_status)HOST_CRYPTO_ERROR;
-    return sc_sodium_open(&h->keystore, key, peer, nonce, cipher, length, plain, capacity);
+    return sc_sodium_ed_open(&h->keystore, key, peer, nonce, cipher, length, plain, capacity);
 }
 static sc_status p_random(void *user, uint8_t *out, size_t length) {
     sc_host *h = user;
@@ -166,17 +167,25 @@ static sc_status p_reserve(void *user, uint32_t domain, uint64_t count, uint64_t
     return persist(h, &next);
 }
 int sc_host_fixture_public(const uint8_t seed[32], uint8_t public_key[32]) {
-    uint8_t sk[32]; int result;
+    uint8_t sk[64]; int result;
     if (!seed || !public_key || sodium_init() < 0) return HOST_CRYPTO_ERROR;
-    result = crypto_box_seed_keypair(public_key, sk, seed);
+    result = crypto_sign_seed_keypair(public_key, sk, seed);
     sodium_memzero(sk, sizeof sk);
     return result ? HOST_CRYPTO_ERROR : SC_OK;
+}
+static sc_status p_sign(void *user,sc_key_handle key,const uint8_t *m,size_t n,uint8_t sig[64]){
+    sc_host *h=user;if(consume(&h->fail_crypto))return SC_ERR_CRYPTO;
+    return sc_sodium_sign(&h->keystore,key,m,n,sig);
+}
+static sc_status p_verify(void *user,const uint8_t key[32],const uint8_t *m,size_t n,const uint8_t sig[64]){
+    sc_host *h=user;if(consume(&h->fail_crypto))return SC_ERR_CRYPTO;
+    return sc_sodium_verify(&h->keystore,key,m,n,sig);
 }
 int sc_host_initialize(int role, const char *storage, const char *serial,
                        const uint8_t *secret, const uint8_t *seed,
                        const uint8_t *server_key, int random_unavailable, sc_host **out) {
     sc_host *h = NULL; sc_config config; sc_provider provider;
-    disk_record initial; uint8_t digest[32], check_pk[32], check_sk[32];
+    disk_record initial; uint8_t digest[32], check_pk[32], check_sk[64];
     int fd, created, result = SC_ERR_STORAGE; size_t used; ssize_t n; struct stat st;
     if (!out) return SC_ERR_ARGUMENT;
     *out = NULL;
@@ -213,7 +222,7 @@ int sc_host_initialize(int role, const char *storage, const char *serial,
         close(fd);
         crypto_generichash(digest, sizeof digest, (const unsigned char *)&initial,
                            offsetof(disk_record, digest), NULL, 0);
-        if (memcmp(initial.magic, "SCSTORE1", 8) || initial.format != 1 ||
+        if (memcmp(initial.magic, "SCSTORE2", 8) || initial.format != 2 ||
             initial.length > SC_MAX_RECORD || sodium_memcmp(digest, initial.digest, 32)) goto fail;
         if (initial.role != (uint32_t)role || sodium_memcmp(initial.token, secret, 32) ||
             strncmp(initial.serial, serial, sizeof initial.serial) ||
@@ -221,7 +230,7 @@ int sc_host_initialize(int role, const char *storage, const char *serial,
             result = SC_ERR_CONFLICT; goto fail;
         }
         if (seed) {
-            crypto_box_seed_keypair(check_pk, check_sk, seed);
+            crypto_sign_seed_keypair(check_pk, check_sk, seed);
             sodium_memzero(check_sk, sizeof check_sk);
             if (memcmp(check_pk, initial.public_key, 32)) { result = SC_ERR_CONFLICT; goto fail; }
         }
@@ -229,15 +238,15 @@ int sc_host_initialize(int role, const char *storage, const char *serial,
     } else {
         if (errno != ENOENT) goto fail;
         memset(&initial, 0, sizeof initial);
-        memcpy(initial.magic, "SCSTORE1", 8); initial.format = 1; initial.role = (uint32_t)role;
+        memcpy(initial.magic, "SCSTORE2", 8); initial.format = 2; initial.role = (uint32_t)role;
         memcpy(initial.serial, serial, strlen(serial) + 1); memcpy(initial.token, secret, 32);
         if (role == SC_DEVICE) memcpy(initial.server_key, server_key, 32);
-        if (seed) crypto_box_seed_keypair(initial.public_key, initial.private_key, seed);
+        if (seed) crypto_sign_seed_keypair(initial.public_key, initial.private_key, seed);
         else {
             uint8_t generated_seed[32];
             result = p_random(h, generated_seed, sizeof generated_seed);
             if (result != SC_OK) goto fail;
-            crypto_box_seed_keypair(initial.public_key, initial.private_key, generated_seed);
+            crypto_sign_seed_keypair(initial.public_key, initial.private_key, generated_seed);
             sodium_memzero(generated_seed, sizeof generated_seed);
         }
         result = persist(h, &initial);
@@ -247,7 +256,7 @@ int sc_host_initialize(int role, const char *storage, const char *serial,
     memcpy(config.serial, serial, strlen(serial) + 1);
     if (role == SC_DEVICE) memcpy(config.peer_public_key, server_key, 32);
     memset(&provider, 0, sizeof provider);
-    provider.user = h; provider.public_key = p_public; provider.seal = p_seal; provider.open = p_open;
+    provider.user = h; provider.sign=p_sign;provider.verify=p_verify; provider.public_key = p_public; provider.seal = p_seal; provider.open = p_open;
     provider.random = p_random; provider.enrollment_secret = p_secret; provider.load = p_load;
     provider.commit = p_commit; provider.reserve = p_reserve;
     result = sc_init(&h->core, &config, &provider);
@@ -264,7 +273,7 @@ void sc_host_close(sc_host *h) {
 }
 int sc_host_name(sc_host *h, const char *name) { return h ? sc_set_name(&h->core, name) : SC_ERR_ARGUMENT; }
 int sc_host_report(sc_host *h, int32_t temp) { return h ? sc_report_temperature(&h->core, temp) : SC_ERR_ARGUMENT; }
-int sc_host_receive(sc_host *h, const uint8_t *frame, size_t n) { return h ? sc_receive(&h->core, frame, n) : SC_ERR_ARGUMENT; }
+int sc_host_receive(sc_host *h, const uint8_t *frame, size_t n) { return h ? sc_receive_at(&h->core, frame, n,(uint64_t)time(NULL)) : SC_ERR_ARGUMENT; }
 int sc_host_outbound(sc_host *h, size_t budget, uint8_t *frame, size_t capacity, size_t *n) {
     return h ? sc_outbound(&h->core, budget, frame, capacity, n) : SC_ERR_ARGUMENT;
 }
@@ -307,6 +316,11 @@ static void json_string(const char *input, char *output) {
     }
     *output = 0;
 }
+int sc_host_enrollment_enable(sc_host *h){return h?sc_enrollment_enable(&h->core):SC_ERR_ARGUMENT;}
+int sc_host_enrollment_begin(sc_host *h,uint64_t now,uint64_t expires){return h?sc_enrollment_begin(&h->core,now,expires):SC_ERR_ARGUMENT;}
+int sc_host_enrollment_approve(sc_host *h,const uint8_t challenge[32],const uint8_t key[32],uint64_t now){return h?sc_enrollment_approve(&h->core,challenge,key,now):SC_ERR_ARGUMENT;}
+int sc_host_enrollment_cancel(sc_host *h){return h?sc_enrollment_cancel(&h->core):SC_ERR_ARGUMENT;}
+int sc_host_receive_at(sc_host *h,const uint8_t *frame,size_t n,uint64_t now){return h?sc_receive_at(&h->core,frame,n,now):SC_ERR_ARGUMENT;}
 int sc_host_inspect(sc_host *h, char *json, size_t capacity) {
     sc_state state; char serial[6 * SC_MAX_SERIAL + 1], desired[6 * SC_MAX_NAME + 1], actual[6 * SC_MAX_NAME + 1];
     char public_key[65], peer_key[65], buffer[4096]; int n, result;
@@ -328,6 +342,13 @@ int sc_host_inspect(sc_host *h, char *json, size_t capacity) {
         state.desired_revision, state.reported_revision, state.processed_desired_revision, state.applied_desired_revision,
         state.acked_reported_revision, state.last_sent_reported_revision, state.last_sent_desired_revision, state.storage_generation,
         state.apply_status == SC_APPLY_OK ? "applied" : state.apply_status == SC_APPLY_REJECTED ? "rejected" : "none", public_key, peer_key);
+    if(n>0&&(size_t)n<sizeof buffer){
+        char challenge[65],candidate[65];size_t used=(size_t)n-1;
+        sodium_bin2hex(challenge,sizeof challenge,state.challenge,32);sodium_bin2hex(candidate,sizeof candidate,state.candidate_key,32);
+        n=snprintf(buffer+used,sizeof buffer-used,",\"enrollment_mode\":%u,\"challenge\":\"%s\",\"candidate_key\":\"%s\",\"candidate_revision\":\"%" PRIu64 "\",\"enrollment_expires\":\"%" PRIu64 "\"}",state.enrollment_mode,challenge,candidate,state.candidate_revision,state.enrollment_expires);
+        if(n<0||(size_t)n>=sizeof buffer-used)return SC_ERR_BOUNDS;
+        n+=(int)used;
+    }
     if (n < 0 || (size_t)n >= sizeof buffer || capacity <= (size_t)n) return SC_ERR_BOUNDS;
     memcpy(json, buffer, (size_t)n + 1); return SC_OK;
 }

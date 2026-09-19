@@ -23,7 +23,18 @@ int main(int argc, char **argv) {
         decode(argv[3], peer, sizeof peer) != 32 ||
         decode(argv[4], nonce, sizeof nonce) != 24) return 3;
     length = decode(argv[5], data, sizeof data);
-    if (strcmp(argv[1], "seal") == 0) {
+    if (strcmp(argv[1], "edkeys") == 0 || strcmp(argv[1], "sign") == 0) {
+        unsigned char pk[32],sk[64];crypto_sign_seed_keypair(pk,sk,secret);
+        if(!strcmp(argv[1],"edkeys")){
+            memcpy(result,pk,32);status=crypto_sign_ed25519_pk_to_curve25519(result+32,pk);
+            if(!status)status=crypto_sign_ed25519_sk_to_curve25519(result+64,sk);
+            result_length=96;
+        }else{status=crypto_sign_detached(result,NULL,data,length,sk);result_length=64;}
+        sodium_memzero(sk,sizeof sk);
+    } else if(!strcmp(argv[1],"verify")){
+        if(length<64)return 2;
+        status=crypto_sign_verify_detached(data,data+64,length-64,peer);result_length=0;
+    } else if (strcmp(argv[1], "seal") == 0) {
         result_length = length + crypto_box_MACBYTES;
         status = crypto_box_easy(result, data, length, nonce, peer, secret);
     } else if (strcmp(argv[1], "open") == 0) {

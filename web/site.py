@@ -60,7 +60,7 @@ def assemble(output,module,source_commit):
     copy_asset(module.with_suffix('.wasm'),root/'endpoint.wasm.wasm')
     version_assets(root)
     (root/'.nojekyll').write_text('')
-    manifest={'source_commit':source_commit,'runtime':'C core + nanopb + libsodium 1.0.20 / Emscripten 4.0.10','storage':'temporary; simulated durable storage across reboot control only','assets':{name:digest(root/name) for name in (*FILES,'endpoint.wasm.mjs','endpoint.wasm.wasm')}}
+    manifest={'source_commit':source_commit,'runtime':'C core + nanopb + libsodium 1.0.20 / Ed25519 identities + NaCl box / Emscripten 4.0.10','storage':'temporary; simulated durable storage across reboot control only','assets':{name:digest(root/name) for name in (*FILES,'endpoint.wasm.mjs','endpoint.wasm.wasm')}}
     (root/'demo.json').write_text(json.dumps(manifest,indent=2)+'\n')
     verify(root,require_commit=source_commit!='working-tree')
 

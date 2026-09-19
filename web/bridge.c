@@ -16,7 +16,7 @@ static sc_context ctx;
 static sc_config config;
 static struct {
     sc_sodium_keystore keys; /* First member: provider and keystore share user. */
-    uint8_t pk[32], sk[32], token[32], record[SC_MAX_RECORD];
+    uint8_t pk[32], sk[64], token[32], record[SC_MAX_RECORD];
     size_t length;
     uint64_t generation, next[3];
     int ready, key_ready;
@@ -57,7 +57,7 @@ static sc_status reserve(void *u,uint32_t d,uint64_t n,uint64_t *first) {
 API int scw_reboot(void) {
     sc_provider p={0};
     if(!store.ready)return SC_ERR_ARGUMENT;
-    p.user=&store;p.public_key=sc_sodium_public;p.seal=sc_sodium_seal;p.open=sc_sodium_open;
+    p.user=&store;p.sign=sc_sodium_sign;p.verify=sc_sodium_verify;p.public_key=sc_sodium_public;p.seal=sc_sodium_ed_seal;p.open=sc_sodium_ed_open;
     p.random=entropy;p.enrollment_secret=token;p.load=load;p.commit=commit;p.reserve=reserve;
     sodium_memzero(&ctx,sizeof ctx);frame_length=0;
     return sc_init(&ctx,&config,&p);
@@ -66,7 +66,7 @@ API int scw_reboot(void) {
 API int scw_generate(void) {
     if(store.key_ready || store.ready)return SC_ERR_ARGUMENT;
     if(sodium_init()<0)return SC_ERR_RANDOM;
-    if(crypto_box_keypair(store.pk,store.sk)!=0)return SC_ERR_CRYPTO;
+    if(crypto_sign_keypair(store.pk,store.sk)!=0)return SC_ERR_CRYPTO;
     store.key_ready=1;
     return SC_OK;
 }
@@ -76,7 +76,7 @@ static int initialize(int role,const uint8_t *seed) {
     if(store.ready || (role!=SC_DEVICE && role!=SC_SERVER))return SC_ERR_ARGUMENT;
     if(!memchr(input+64,0,SC_MAX_SERIAL+1))return SC_ERR_ARGUMENT;
     if(sodium_init()<0)return SC_ERR_RANDOM;
-    if(seed){if(store.key_ready)return SC_ERR_ARGUMENT;crypto_box_seed_keypair(store.pk,store.sk,seed);store.key_ready=1;}
+    if(seed){if(store.key_ready)return SC_ERR_ARGUMENT;crypto_sign_seed_keypair(store.pk,store.sk,seed);store.key_ready=1;}
     else if(!store.key_ready){int status=scw_generate();if(status!=SC_OK)return status;}
     memcpy(store.token,input,32);memset(&config,0,sizeof config);
     config.role=(sc_role)role;config.identity_key=1;memcpy(config.peer_public_key,input+32,32);
@@ -90,6 +90,11 @@ API uint8_t *scw_input(void){return input;}
 API const uint8_t *scw_public(void){return store.pk;}
 API const uint8_t *scw_frame(void){return frame;}
 API size_t scw_frame_length(void){return frame_length;}
+API int scw_enrollment_enable(void){return sc_enrollment_enable(&ctx);}
+API int scw_enrollment_begin(uint64_t now,uint64_t expires){return sc_enrollment_begin(&ctx,now,expires);}
+API int scw_enrollment_approve(uint64_t now){return sc_enrollment_approve(&ctx,input,input+32,now);}
+API int scw_enrollment_cancel(void){return sc_enrollment_cancel(&ctx);}
+API int scw_receive_at(size_t n,uint64_t now){if(n>SC_MAX_FRAME)return SC_ERR_BOUNDS;return sc_receive_at(&ctx,input,n,now);}
 API int scw_report(int32_t t){return sc_report_temperature(&ctx,t);}
 API int scw_name(size_t n){
     if(n>SC_MAX_NAME || memchr(input,0,n))return SC_ERR_BOUNDS;
@@ -110,6 +115,11 @@ API const char *scw_state(void){
     snprintf(json,sizeof json,"{\"role\":%u,\"serial\":\"%s\",\"desired_name\":\"%s\",\"actual_name\":\"%s\",\"temperature\":%" PRId32 ",\"has_temperature\":%u,\"registered\":%u,\"pending\":%u,\"apply_status\":%u,\"public_key\":\"%s\",\"peer_public_key\":\"%s\","
       "\"desired_revision\":\"%" PRIu64 "\",\"reported_revision\":\"%" PRIu64 "\",\"processed_desired_revision\":\"%" PRIu64 "\",\"applied_desired_revision\":\"%" PRIu64 "\",\"acked_reported_revision\":\"%" PRIu64 "\",\"storage_generation\":\"%" PRIu64 "\"}",
       (unsigned)s.role,serial,desired,actual,s.temperature_mC,s.has_temperature,s.registered,s.pending,s.apply_status,pk,peer,s.desired_revision,s.reported_revision,s.processed_desired_revision,s.applied_desired_revision,s.acked_reported_revision,s.storage_generation);
+    {
+        char challenge[65],candidate[65];size_t used=strlen(json)-1;
+        sodium_bin2hex(challenge,sizeof challenge,s.challenge,32);sodium_bin2hex(candidate,sizeof candidate,s.candidate_key,32);
+        snprintf(json+used,sizeof json-used,",\"enrollment_mode\":%u,\"challenge\":\"%s\",\"candidate_key\":\"%s\",\"candidate_revision\":\"%" PRIu64 "\",\"enrollment_expires\":\"%" PRIu64 "\"}",s.enrollment_mode,challenge,candidate,s.candidate_revision,s.enrollment_expires);
+    }
     return json;
 }
 #ifdef SC_ENABLE_TESTING

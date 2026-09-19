@@ -181,3 +181,16 @@ func (e *Endpoint) FixtureRevision(revision uint64) error {
 	}
 	return check(C.sc_host_fixture_revision(e.handle, C.uint64_t(revision)))
 }
+
+// Enrollment methods are trusted application operations, never relay commands.
+func (e *Endpoint) EnrollmentEnable() error { return check(C.sc_host_enrollment_enable(e.handle)) }
+func (e *Endpoint) EnrollmentBegin(now, expires uint64) error { return check(C.sc_host_enrollment_begin(e.handle,C.uint64_t(now),C.uint64_t(expires))) }
+func (e *Endpoint) EnrollmentApprove(challenge,key []byte,now uint64) error {
+ c,err:=ptr32(challenge,false);if err!=nil{return err};k,err:=ptr32(key,false);if err!=nil{return err}
+ return check(C.sc_host_enrollment_approve(e.handle,c,k,C.uint64_t(now)))
+}
+func (e *Endpoint) EnrollmentCancel() error { return check(C.sc_host_enrollment_cancel(e.handle)) }
+func (e *Endpoint) ReceiveAt(frame []byte,now uint64) error {
+ if len(frame)==0{return &Error{"bounds"}}
+ return check(C.sc_host_receive_at(e.handle,(*C.uint8_t)(unsafe.Pointer(&frame[0])),C.size_t(len(frame)),C.uint64_t(now)))
+}

@@ -8,3 +8,6 @@ simplecrypts.Record.local_key max_size:32
 simplecrypts.Record.peer_key max_size:32
 simplecrypts.Record.desired_name max_size:64
 simplecrypts.Record.actual_name max_size:64
+
+simplecrypts.Record.challenge max_size:32
+simplecrypts.Record.candidate_key max_size:32

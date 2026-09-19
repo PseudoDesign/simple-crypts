@@ -10,6 +10,11 @@ use std::rc::Rc;
 #[link(name="simplecrypts")]
 extern "C" {
     fn sc_host_initialize(role:c_int,storage:*const c_char,serial:*const c_char,secret:*const u8,seed:*const u8,server_key:*const u8,random_unavailable:c_int,out:*mut *mut c_void)->c_int;
+    fn sc_host_enrollment_enable(h:*mut c_void)->c_int;
+    fn sc_host_enrollment_begin(h:*mut c_void,now:u64,expires:u64)->c_int;
+    fn sc_host_enrollment_approve(h:*mut c_void,challenge:*const u8,key:*const u8,now:u64)->c_int;
+    fn sc_host_enrollment_cancel(h:*mut c_void)->c_int;
+    fn sc_host_receive_at(h:*mut c_void,frame:*const u8,size:usize,now:u64)->c_int;
     fn sc_host_close(host:*mut c_void);
     fn sc_host_name(host:*mut c_void,name:*const c_char)->c_int;
     fn sc_host_report(host:*mut c_void,temperature:i32)->c_int;
@@ -54,6 +59,11 @@ impl Endpoint {
         check(unsafe{sc_host_initialize(match config.role{Role::Device=>1,Role::Server=>2},storage.as_ptr(),serial.as_ptr(),config.secret.as_ptr(),config.provisioned_seed.map_or(std::ptr::null(),|v|v.as_ptr()),config.server_public_key.map_or(std::ptr::null(),|v|v.as_ptr()),config.random_unavailable as c_int,&mut handle)})?;
         Ok(Self{handle:NonNull::new(handle).ok_or_else(Error::invalid)?,_single_owner:PhantomData})
     }
+    pub fn enrollment_enable(&mut self)->Result<(),Error>{check(unsafe{sc_host_enrollment_enable(self.handle.as_ptr())})}
+    pub fn enrollment_begin(&mut self,now:u64,expires:u64)->Result<(),Error>{check(unsafe{sc_host_enrollment_begin(self.handle.as_ptr(),now,expires)})}
+    pub fn enrollment_approve(&mut self,challenge:&[u8;32],key:&[u8;32],now:u64)->Result<(),Error>{check(unsafe{sc_host_enrollment_approve(self.handle.as_ptr(),challenge.as_ptr(),key.as_ptr(),now)})}
+    pub fn enrollment_cancel(&mut self)->Result<(),Error>{check(unsafe{sc_host_enrollment_cancel(self.handle.as_ptr())})}
+    pub fn receive_at(&mut self,frame:&[u8],now:u64)->Result<(),Error>{check(unsafe{sc_host_receive_at(self.handle.as_ptr(),frame.as_ptr(),frame.len(),now)})}
     pub fn name(&mut self,value:&str)->Result<(),Error>{let value=cstr(value)?;check(unsafe{sc_host_name(self.handle.as_ptr(),value.as_ptr())})}
     pub fn report(&mut self,temperature_millidegrees:i32)->Result<(),Error>{check(unsafe{sc_host_report(self.handle.as_ptr(),temperature_millidegrees)})}
     pub fn receive(&mut self,frame:&[u8])->Result<(),Error>{check(unsafe{sc_host_receive(self.handle.as_ptr(),frame.as_ptr(),frame.len())})}

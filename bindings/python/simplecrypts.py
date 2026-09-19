@@ -15,6 +15,11 @@ typedef struct sc_host sc_host;
 int sc_host_initialize(int,const char*,const char*,const unsigned char*,
  const unsigned char*,const unsigned char*,int,sc_host**);
 void sc_host_close(sc_host*);
+int sc_host_enrollment_enable(sc_host*);
+int sc_host_enrollment_begin(sc_host*,unsigned long long,unsigned long long);
+int sc_host_enrollment_approve(sc_host*,const unsigned char*,const unsigned char*,unsigned long long);
+int sc_host_enrollment_cancel(sc_host*);
+int sc_host_receive_at(sc_host*,const unsigned char*,size_t,unsigned long long);
 int sc_host_name(sc_host*,const char*);
 int sc_host_report(sc_host*,int);
 int sc_host_receive(sc_host*,const unsigned char*,size_t);
@@ -91,6 +96,23 @@ class Endpoint:
     def __del__(self):
         if hasattr(self, "_handle"):
             self.close()
+
+    def enrollment_enable(self):
+        _check(_lib.sc_host_enrollment_enable(self._open()))
+
+    def enrollment_begin(self, now, expires):
+        _check(_lib.sc_host_enrollment_begin(self._open(), now, expires))
+
+    def enrollment_approve(self, challenge, key, now):
+        _check(_lib.sc_host_enrollment_approve(self._open(), _bytes32(challenge), _bytes32(key), now))
+
+    def enrollment_cancel(self):
+        _check(_lib.sc_host_enrollment_cancel(self._open()))
+
+    def receive_at(self, frame, now):
+        if not isinstance(frame, bytes):
+            raise ValueError("frame must be bytes")
+        _check(_lib.sc_host_receive_at(self._open(), frame, len(frame), now))
 
     def name(self, value):
         if "\0" in value:

@@ -10,10 +10,10 @@ function card(p){
   const article=document.createElement('article');article.className='packet'+(p.corrupted?' corrupted':'');article.dataset.packet=p.id;article.dataset.origin=p.origin;
   const handle=document.createElement('div');handle.className='drag-handle';handle.draggable=true;handle.tabIndex=0;handle.setAttribute('role','button');handle.dataset.select=p.id;
   handle.setAttribute('aria-label',`Move message ${p.id} from ${p.from}`);handle.textContent=`⠿  Message ${p.id} · ${p.from === 'device'?'Device → Server':'Server → Device'}`;
-  const meta=document.createElement('p');meta.className='packet-meta';meta.textContent=`${p.bytes.length} bytes · ${p.corrupted?'modified ciphertext':'sealed message'}`;
+  const meta=document.createElement('p');meta.className='packet-meta';meta.textContent=`${p.bytes.length} bytes · ${p.corrupted?'modified packet':p.signed?'signed public challenge':'sealed message'}`;
   const actions=document.createElement('div');actions.className='packet-actions';
   for(const [action,label]of [['duplicate','Duplicate'],['corrupt','Corrupt']]){const b=document.createElement('button');b.textContent=label;b.dataset.action=action;b.dataset.packet=p.id;b.setAttribute('aria-label',`${label} message ${p.id}`);actions.append(b);}
-  const details=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent='Inspect opaque bytes';pre.textContent=hex(p.bytes).match(/.{1,48}/g).join('\n');details.append(summary,pre);
+  const details=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent=p.signed?'Inspect signed bytes':'Inspect opaque bytes';pre.textContent=hex(p.bytes).match(/.{1,48}/g).join('\n');details.append(summary,pre);
   article.append(handle,meta,actions,details);return article;
 }
 function render(){
@@ -26,13 +26,14 @@ function render(){
   text('server-public-key',lab.states.server?.public_key??'Starting…');
   text('device-private-key',lab.devicePublicKey||lab.states.device?'●●●● · Kept on device':'Not generated yet');
   text('server-private-key',lab.states.server?'●●●● · Kept on server':'Starting…');
-  $('registered-key-details').hidden=!lab.states.server?.registered;
-  text('registered-device-key',lab.states.server?.registered?lab.states.server.peer_public_key:'');
+  $('registered-key-details').hidden=!lab.states.server?.registered&&(!lab.states.server||lab.states.server.candidate_revision==='0');
+  text('registered-key-label',lab.states.server?.registered?'Registered device public key':'Proposed device public key · unapproved');
+  text('registered-device-key',lab.states.server?.registered?lab.states.server.peer_public_key:lab.states.server?.candidate_key??'');
   $('enrollment-packet').hidden=mode!=='tour'||step<0;
   for(const role of ['device','server']){
     document.querySelector('#'+role+'-panel h2').textContent=mode==='tour'?(role==='device'?'Device':'Server'):(role==='device'?'Temperature sensor':'Device registry');
     const state=lab.states[role];
-    text(role+'-summary',state?(state.registered?(role==='device'?'Enrollment confirmed':'Serial + key registered'):(role==='device'?'Ready to enroll':'Not enrolled')):role==='device'?(lab.devicePublicKey?'Key pair generated':'No key pair yet'):'Starting…');
+    text(role+'-summary',state?(state.registered?(role==='device'?'Enrollment confirmed':'Serial + key registered'):(role==='device'?'Not yet confirmed':state.candidate_revision!=='0'?'Awaiting approval':'Not enrolled')):role==='device'?(lab.devicePublicKey?'Key pair generated':'No key pair yet'):'Starting…');
   }
   for(const role of ['device','server']){
     const s=lab.states[role];
@@ -63,15 +64,17 @@ function render(){
   for(const el of document.querySelectorAll('.lanes button,.lanes input,#archive button'))el.disabled=locked;
   for(const el of document.querySelectorAll('.endpoint form button,.endpoint form input,[data-transmit],[data-reboot],#budget'))el.disabled=locked||mode!=='sandbox';
   for(const el of document.querySelectorAll('[data-transmit],[data-action="duplicate"],[data-replay]'))el.disabled=el.disabled||lab.queue.length>=64;
-  for(const el of document.querySelectorAll('[data-select]')){el.textContent=mode==='tour'?'⠿  Encrypted packet':`⠿  Message ${el.dataset.select} · ${lab.packet(Number(el.dataset.select)).from==='device'?'Device → Server':'Server → Device'}`;el.draggable=!locked;el.setAttribute('aria-disabled',String(locked));el.tabIndex=locked?-1:0;el.setAttribute('aria-pressed',String(Number(el.dataset.select)===selected));el.closest('.packet').classList.toggle('selected',Number(el.dataset.select)===selected);el.closest('.packet').classList.toggle('tour-message',mode==='tour'&&!completed&&Number(el.closest('.packet').dataset.origin)===expected);}
+  for(const el of document.querySelectorAll('[data-select]')){el.textContent=mode==='tour'?(lab.packet(Number(el.dataset.select)).signed?'⠿  Signed challenge':'⠿  Encrypted packet'):`⠿  Message ${el.dataset.select} · ${lab.packet(Number(el.dataset.select)).from==='device'?'Device → Server':'Server → Device'}`;el.draggable=!locked;el.setAttribute('aria-disabled',String(locked));el.tabIndex=locked?-1:0;el.setAttribute('aria-pressed',String(Number(el.dataset.select)===selected));el.closest('.packet').classList.toggle('selected',Number(el.dataset.select)===selected);el.closest('.packet').classList.toggle('tour-message',mode==='tour'&&!completed&&Number(el.closest('.packet').dataset.origin)===expected);}
   for(const zone of document.querySelectorAll('[data-destination]')){zone.disabled=locked||(mode==='tour'&&(step<0||completed||zone.dataset.destination!==tour[step].target));zone.classList.toggle('suggested',mode==='tour'&&step>=0&&!completed&&zone.dataset.destination===tour[step].target);zone.setAttribute('aria-describedby','move-hint');}
+  $('begin-enrollment').disabled=locked||mode!=='sandbox'||!!lab.states.server?.registered;
+  $('approve-enrollment').disabled=locked||mode!=='sandbox'||!lab.states.server||lab.states.server.candidate_revision==='0';
   $('next').hidden=mode==='tour'&&step>=0&&!completed;
   $('next').disabled=locked||(mode==='tour'&&step>=0&&!completed);$('sandbox').disabled=locked||mode==='sandbox';
   $('retry').hidden=mode!=='tour'||step<0||completed||lab.queue.some(p=>p.origin===expected&&!p.corrupted);$('retry').disabled=locked||lab.queue.length>=64;
   document.body.dataset.busy=String(busy);document.body.dataset.ready=String(lab.ready);
   text('session-status',!lab.ready?'Initializing local endpoints…':busy?'Running the library…':mode==='sandbox'?'Sandbox · every message may be tried against either endpoint.':step<0?'Start the tour to generate the first message.':completed?'Action complete · continue when you are ready.':'Your turn · move the highlighted message.');
 }
-function intro(){setup=0;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','STEP 1 OF 4');text('tour-title','Generate the device’s key pair.');text('tour-text','Create a public identity and a private key inside the device.');text('next','Generate key pair →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}
+function intro(){setup=0;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','STEP 1 OF 6');text('tour-title','Generate the device’s key pair.');text('tour-text','Create a public identity and a private key inside the device.');text('next','Generate key pair →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}
 async function run(fn){if(busy)return;const id=++operation;busy=true;$('error').hidden=true;render();try{await fn();}catch(error){if(id===operation&&error.name!=='AbortError'){text('error',error.message);$('error').hidden=false;}}finally{if(id===operation){busy=false;render();}}}
 async function place(id,target){
   if(mode==='tour'&&(step<0||completed||target!==tour[step].target))return;
@@ -86,7 +89,7 @@ async function place(id,target){
   }
   selected=null;hint();
   if(mode==='tour'&&step>=0&&!completed&&p.origin===expected&&target===tour[step].target&&(target==='discard'||result?.code===0)){
-    completed=true;text('tour-title',step===tour.length-1?'Enrollment complete.':target==='discard'?'Packet discarded.':'Delivered.');text('tour-text',tour[step].success);text('next',step===tour.length-1?'Start again ↺':'Create confirmation →');$('progress-fill').style.width=((step+3)/4*100)+'%';
+    completed=true;text('tour-title',step===tour.length-1?'Enrollment complete.':target==='discard'?'Packet discarded.':'Delivered.');text('tour-text',tour[step].success);text('next',step===tour.length-1?'Start again ↺':step===1?'Approve this serial + key →':'Create encrypted response →');$('progress-fill').style.width=((step===2?6:step+3)/6*100)+'%';
   }else if(mode==='tour'&&step>=0&&!completed&&target!=='relay'){
     text('tour-text',`You tried ${target==='discard'?'discarding it':`the ${target} inbox`}. The result below comes from the library. To continue this lesson, move the highlighted message to ${tour[step].target==='discard'?'Discard':`the ${tour[step].target} inbox`}. If it is gone or modified, use “Try this message again.”`);
   }
@@ -95,19 +98,23 @@ $('reset').onclick=()=>{cancelTouch();operation++;busy=false;intro();mode='tour'
 $('sandbox').onclick=()=>run(async()=>{cancelTouch();if(!lab.states.device){if(!lab.devicePublicKey)await lab.generateDevice();await lab.provisionDevice();setup=2;}mode='sandbox';text('tour-progress','SANDBOX · YOU ARE THE INTERMEDIARY');text('tour-title','Try any message against either endpoint.');text('tour-text','Generate messages, deliver older ones first, reflect them back to their sender, or replay a box from the history. Leave a box in Hold to delay it.');text('next','Restart guided tour →');render();});
 $('next').onclick=()=>run(async()=>{
   if(mode==='sandbox'||step===tour.length-1){mode='tour';intro();await lab.reset({deferDevice:true});return;}
-  if(setup===0){await lab.generateDevice();setup=1;text('tour-title','The device has its own identity.');text('tour-text','The public key can be shared. The private key stays with the device.');text('next','Provision device →');$('progress-fill').style.width='25%';return;}
-  if(setup===1){await lab.provisionDevice();setup=2;text('tour-progress','STEP 2 OF 4');text('tour-title','Prepare the device for enrollment.');text('tour-text','Trusted provisioning pins the server’s public key and assigns a serial and enrollment code.');text('next','Create enrollment request →');$('progress-fill').style.width='50%';return;}
+  if(setup===0){await lab.generateDevice();setup=1;text('tour-title','The device has its own identity.');text('tour-text','The public key can be shared. The private key stays with the device.');text('next','Provision device →');$('progress-fill').style.width='17%';return;}
+  if(setup===1){await lab.provisionDevice();setup=2;text('tour-progress','STEP 2 OF 6');text('tour-title','Prepare the device for enrollment.');text('tour-text','The device already knows the server’s Ed25519 public key and its own serial.');text('next','Authorize session & create challenge →');$('progress-fill').style.width='33%';return;}
+  if(step===1&&completed&&!lab.states.server.registered){await lab.approveEnrollment();text('tour-progress','STEP 5 OF 6');text('tour-title','The server approved this identity.');text('tour-text','Approval binds the serial and key, accepts the report, and consumes the session.');text('next','Create confirmation →');$('progress-fill').style.width='83%';return;}
   const next=step+1;const id=await tour[next].prepare(lab);if(id===null)throw new Error('No message generated. Reset the tour to start a fresh exchange.');
   step=next;completed=false;expected=lab.packet(id).origin;original={...lab.packet(id),bytes:lab.packet(id).bytes.slice()};
   const sender=lab.states[original.from];
   text('packet-label',`${original.from.toUpperCase()} → ${original.to.toUpperCase()} · ${original.bytes.length} BYTES`);
-  text('packet-title',step===0?'Enrollment request + first report':'Enrollment confirmation');
-  const fields=step===0?[['Message type','Report (includes enrollment claim)'],['Serial',sender.serial],['Enrollment code','Included inside encryption · value hidden'],['First report',`${sender.temperature} millidegrees Celsius`],['Report revision',sender.reported_revision]]:[['Message type','Desired snapshot + receipt'],['Serial',sender.serial],['Enrollment confirmed','true'],['Acknowledged report revision',sender.reported_revision],['Desired revision',sender.desired_revision+' · no name change']];
+  text('packet-title',step===0?'Signed enrollment challenge':step===1?'Encrypted enrollment response':'Enrollment confirmation');
+  document.querySelector('.packet-perspective').textContent=step===0?'Public packet. The device verifies the signature using its pinned server key.':'Sender’s view before encryption. The host forwards opaque bytes.';
+  const fields=step===0?[['Serial',sender.serial],['Session challenge',sender.challenge],['Expires at',sender.enrollment_expires+' · server clock'],['Signature','Ed25519 · 64 bytes'],['Authorization','Session open; no device key approved yet']]:step===1?[['Serial',sender.serial],['Session challenge',sender.challenge],['First report',`${sender.temperature} millidegrees Celsius`],['Report revision',sender.reported_revision],['Approval','Required before registration']]:[['Serial',sender.serial],['Session challenge',sender.challenge],['Enrollment confirmed','true'],['Acknowledged report revision',sender.reported_revision]];
   $('packet-fields').replaceChildren();for(const [name,value]of fields){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;dd.textContent=value;$('packet-fields').append(dt,dd);}
-  text('packet-wire',`Sender public key: ${sender.public_key}\nRecipient public key: ${lab.states[original.to].public_key}\n\nActual wire frame (public routing header + encrypted body):\n${hex(original.bytes).match(/.{1,48}/g).join('\n')}`);
+  text('packet-wire',`Sender public key: ${sender.public_key}\nRecipient public key: ${lab.states[original.to].public_key}\n\nActual wire frame:\n${hex(original.bytes).match(/.{1,48}/g).join('\n')}`);
   $('enrollment-packet').querySelector('details').open=false;
-  text('tour-progress',`STEP ${step+3} OF 4`);text('tour-title',tour[step].title);text('tour-text',tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
+  text('tour-progress',`STEP ${step===2?6:step+3} OF 6`);text('tour-title',tour[step].title);text('tour-text',tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
 });
+$('begin-enrollment').onclick=()=>run(()=>lab.beginEnrollment());
+$('approve-enrollment').onclick=()=>run(()=>lab.approveEnrollment());
 $('retry').onclick=()=>run(()=>lab.replay(original));
 $('temperature-form').onsubmit=e=>{e.preventDefault();run(()=>lab.update('device','report',{temperature:Math.round(Number($('temperature').value)*1000)}));};
 $('name-form').onsubmit=e=>{e.preventDefault();run(()=>lab.update('server','name',{name:$('name').value}));};

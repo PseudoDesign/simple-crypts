@@ -34,6 +34,16 @@ def main():
                     endpoint.fixture_revision(int(item["initial_revision"]))
             elif endpoint is None:
                 raise ValueError("not initialized")
+            elif command == "enrollment_enable":
+                endpoint.enrollment_enable()
+            elif command == "enrollment_begin":
+                endpoint.enrollment_begin(item["now"], item["expires"])
+            elif command == "enrollment_approve":
+                endpoint.enrollment_approve(hex32(item["challenge"]), hex32(item["key"]), item["now"])
+            elif command == "enrollment_cancel":
+                endpoint.enrollment_cancel()
+            elif command == "rx_at":
+                endpoint.receive_at(base64.b64decode(item["frame"], validate=True), item["now"])
             elif command == "name":
                 endpoint.name(item["name"])
             elif command == "report":

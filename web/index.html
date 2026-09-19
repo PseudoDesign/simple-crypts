@@ -10,9 +10,9 @@
 <a class="skip" href="#walkthrough">Skip to demo</a>
 <header class="top"><a class="brand" href="./"><span class="mark" aria-hidden="true">s:c</span> simple crypts</a><nav aria-label="Main"><a href="./report/">Test evidence ↗</a><a href="https://github.com/PseudoDesign/simple-crypts">Source ↗</a></nav></header>
 <main>
-<section class="hero"><div><p class="eyebrow">A small API. A real encrypted exchange.</p><h1>You move the messages.<br><em>The endpoints keep the truth.</em></h1><p class="lede">Every box is a real encrypted message. Act as the intermediary: deliver it, hold it, discard it, or try it against a different endpoint state.</p></div><div class="live-note"><span class="dot"></span> Real cryptography, in your browser <small>C library · WebAssembly · NaCl box</small></div></section>
+<section class="hero"><div><p class="eyebrow">A small API. A real encrypted exchange.</p><h1>You move the messages.<br><em>The endpoints keep the truth.</em></h1><p class="lede">Every box is a real signed or encrypted message. Act as the intermediary: deliver it, hold it, discard it, or try it against a different endpoint state.</p></div><div class="live-note"><span class="dot"></span> Real cryptography, in your browser <small>C library · WebAssembly · NaCl box</small></div></section>
 <section id="walkthrough" class="walkthrough" aria-labelledby="tour-title">
-<div class="tour-copy" aria-live="polite" aria-atomic="true"><p class="eyebrow" id="tour-progress">STEP 1 OF 4</p><h2 id="tour-title">Generate the device’s key pair.</h2><p id="tour-text">Create a public identity and a private key inside the device.</p></div>
+<div class="tour-copy" aria-live="polite" aria-atomic="true"><p class="eyebrow" id="tour-progress">STEP 1 OF 6</p><h2 id="tour-title">Generate the device’s key pair.</h2><p id="tour-text">Create a public identity and a private key inside the device.</p></div>
 
 <div class="progress" aria-hidden="true"><span id="progress-fill"></span></div>
 </section>
@@ -22,7 +22,7 @@
 <section class="lanes" aria-label="Live device, relay, and server">
 <article class="endpoint" id="device-panel"><header><span class="node-icon" aria-hidden="true">◉</span><div><p class="eyebrow">01 / DEVICE</p><h2>Temperature sensor</h2></div><span id="device-status" class="badge">Starting</span></header>
 <p class="guided-state" id="device-summary"></p><div class="identity-card" aria-label="Device keys">
-<span class="key-label">Public key · X25519</span><code id="device-public-key">Not generated yet</code>
+<span class="key-label">Public key · Ed25519</span><code id="device-public-key">Not generated yet</code>
 <span class="key-label private-label">Private key</span><p id="device-private-key">Not generated yet</p>
 <div id="provisioning-details" hidden><span class="key-label">Pinned server public key</span><code id="pinned-server-key"></code></div></div><div class="readings"><div><span class="label">Measured temperature</span><strong id="device-temperature">—</strong></div><div><span class="label">Applied name</span><strong id="device-name" class="name">Not assigned</strong></div></div>
 <button class="dropzone inbox" data-destination="device" aria-label="Device inbox"><strong>Device inbox</strong><span>Drop any message here to try it</span></button>
@@ -37,13 +37,13 @@
 <button class="dropzone discard" data-destination="discard"><strong>Discard</strong><span>Lose this transmission</span></button><p class="relay-foot">Every inbox accepts attempts—even reflected, old, or modified messages. The library decides the outcome.</p></article>
 <article class="endpoint" id="server-panel"><header><span class="node-icon" aria-hidden="true">▤</span><div><p class="eyebrow">03 / SERVER</p><h2>Device registry</h2></div><span id="server-status" class="badge">Starting</span></header>
 <p class="guided-state" id="server-summary"></p><div class="identity-card" aria-label="Server keys">
-<span class="key-label">Public key · X25519</span><code id="server-public-key">Not generated yet</code>
+<span class="key-label">Public key · Ed25519</span><code id="server-public-key">Not generated yet</code>
 <span class="key-label private-label">Private key</span><p id="server-private-key">Not generated yet</p>
-<div id="registered-key-details" hidden><span class="key-label">Registered device public key</span><code id="registered-device-key"></code></div></div><div class="readings"><div><span class="label">Last reported temperature</span><strong id="server-temperature">—</strong></div><div><span class="label">Desired name</span><strong id="server-name" class="name">Not assigned</strong><small id="server-applied">No application report yet</small></div></div>
+<div id="registered-key-details" hidden><span class="key-label" id="registered-key-label">Registered device public key</span><code id="registered-device-key"></code></div></div><div class="readings"><div><span class="label">Last reported temperature</span><strong id="server-temperature">—</strong></div><div><span class="label">Desired name</span><strong id="server-name" class="name">Not assigned</strong><small id="server-applied">No application report yet</small></div></div>
 <button class="dropzone inbox" data-destination="server" aria-label="Server inbox"><strong>Server inbox</strong><span>Drop any message here to try it</span></button>
 <div class="outbox"><p class="eyebrow">GENERATED BY THE SERVER</p><div id="server-outbox" class="message-tray"></div></div>
 <form id="name-form"><label for="name">Set the device’s name <span>up to 64 UTF-8 bytes</span></label><div class="input-row"><input id="name" value="Freezer 3" required><button type="submit">Update</button></div></form>
-<div class="endpoint-actions"><button data-transmit="server" class="send">← Create message</button><button data-reboot="server" class="quiet">Reboot</button></div>
+<div class="endpoint-actions"><button id="begin-enrollment">Authorize session</button><button id="approve-enrollment">Approve proposed key</button><button data-transmit="server" class="send">← Create message</button><button data-reboot="server" class="quiet">Reboot</button></div>
 <details><summary>Identity &amp; revisions</summary><pre id="server-details"></pre></details></article>
 </section>
 <div class="tour-actions"><button id="next" class="primary" disabled>Generate key pair →</button><button id="retry" hidden>Try this message again</button><button id="sandbox" disabled>Explore sandbox</button></div>
@@ -51,7 +51,7 @@
 <p class="eyebrow" id="packet-label">PACKET DETAILS</p><h2 id="packet-title"></h2>
 <p class="packet-perspective">Sender’s view before encryption. The host forwards opaque bytes.</p>
 <dl id="packet-fields"></dl>
-<details><summary>Public keys &amp; encrypted wire bytes</summary><pre id="packet-wire"></pre></details>
+<details><summary>Public keys &amp; wire bytes</summary><pre id="packet-wire"></pre></details>
 </section>
 
 <section class="result-panel" aria-live="polite"><p class="eyebrow">RESULT OF YOUR LAST DELIVERY</p><h2 id="result-title">No message has been delivered.</h2><p id="result-text">An inbox receives only when you drop a message into it.</p><ul id="result-changes"></ul></section>
@@ -59,7 +59,7 @@
 <section class="below"><article class="history"><div class="section-title"><h2>What happened</h2><span>Latest 200 events</span></div><ol id="events" aria-label="Exchange history"></ol></article><article class="code-panel"><p class="eyebrow">THE API BEHIND THE STEP</p><h2>A few calls do the work.</h2><pre><code id="step-code">sc_report_temperature(&amp;device, -18125);
 sc_set_name(&amp;server, "Freezer 3");
 // Forward opaque frames when a link is available.</code></pre><p>The same C core powers the language bindings and this demo. Encryption, enrollment, revisions, and receipts run inside the library.</p><div class="code-links"><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/core/sc.h">C API ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/examples/python_api.py">Python example ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/bindings/rust/src/lib.rs">Rust ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/bindings/go/simplecrypts.go">Go ↗</a></div></article></section>
-<section class="notes"><h2>What this demonstrates</h2><div><p><strong>Private contents. Visible delivery.</strong> The host handles encrypted frames and public routing information. Endpoint panels show each endpoint’s own knowledge; they are not a host decryption view.</p><p><strong>Agreement needs delivery.</strong> Cryptography detects tampering; it cannot make the host forward a message. Updates stay pending until the required authenticated report or receipt arrives.</p><p><strong>A local simulation with real code.</strong> Both endpoints run in this tab, each in its own worker. Reboot preserves simulated storage; refresh or Reset starts fresh. This is not a hardware keystore or a production server.</p></div></section>
+<section class="notes"><h2>What this demonstrates</h2><div><p><strong>Private contents. Visible delivery.</strong> The host can read signed challenges and public routing information. Device responses and confirmations are encrypted. Endpoint panels show each endpoint’s own knowledge; they are not a host decryption view.</p><p><strong>Agreement needs delivery.</strong> Cryptography detects tampering; it cannot make the host forward a message. Updates stay pending until the required authenticated report or receipt arrives.</p><p><strong>A local simulation with real code.</strong> Both endpoints run in this tab, each in its own worker. Reboot preserves simulated storage; refresh or Reset starts fresh. This is not a hardware keystore or a production server.</p></div></section>
 </main><footer><span>Simple Crypts · show, don’t tell. <a href="./demo.json">Build details</a> · <a href="./THIRD_PARTY_NOTICES.txt">Notices</a></span><a href="./report/">Explore the cross-language test evidence →</a></footer>
 <noscript>This demo needs JavaScript and WebAssembly. The <a href="./report/">test evidence</a> is available separately.</noscript>
 </body></html>

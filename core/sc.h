@@ -8,8 +8,8 @@
 extern "C" {
 #endif
 
-#define SC_VERSION 1u
-#define SC_PROFILE_NACL_BOX 1u
+#define SC_VERSION 2u
+#define SC_PROFILE_NACL_BOX 2u /* Ed25519 identities converted for NaCl box */
 #define SC_KEY_BYTES 32u
 #define SC_TOKEN_BYTES 32u
 #define SC_NONCE_BYTES 24u
@@ -66,6 +66,8 @@ typedef struct {
     sc_status (*commit)(void *, uint64_t expected_generation,
                         const uint8_t *record, size_t length);
     sc_status (*reserve)(void *, uint32_t domain, uint64_t count, uint64_t *first);
+    sc_status (*sign)(void *,sc_key_handle,const uint8_t *,size_t,uint8_t signature[64]);
+    sc_status (*verify)(void *,const uint8_t key[32],const uint8_t *,size_t,const uint8_t signature[64]);
 } sc_provider;
 
 typedef struct {
@@ -92,6 +94,11 @@ typedef struct {
     uint64_t last_sent_desired_revision;
     uint64_t storage_generation;
     uint8_t peer_public_key[SC_KEY_BYTES];
+    uint8_t enrollment_mode; /* 0=legacy token authorization, 1=signed challenge + approval */
+    uint8_t challenge[32], candidate_key[32];
+    uint64_t enrollment_expires, candidate_revision;
+    int32_t candidate_temperature;
+    uint8_t candidate_has_temperature;
     uint8_t registered;
     uint8_t has_temperature;
     uint8_t apply_status;
@@ -115,7 +122,8 @@ typedef struct {
 
 /* init loads an existing record or atomically creates one on SC_NOT_FOUND.
  * Initial revisions are zero, and no synthetic temperature is reported.
- * report_temperature creates revision 1 / the first self-contained enrollment.
+ * report_temperature creates revision 1. In signed enrollment mode the first
+ * report waits for a verified server challenge.
  * Contexts are single-owner; callers supply external synchronization. */
 sc_status sc_init(sc_context *ctx, const sc_config *config, const sc_provider *provider);
 sc_status sc_set_name(sc_context *ctx, const char *name);
@@ -125,6 +133,15 @@ sc_status sc_receive(sc_context *ctx, const uint8_t *frame, size_t length);
  * work is pending. Budget/capacity failure does not consume an output. */
 sc_status sc_outbound(sc_context *ctx, size_t byte_budget, uint8_t *frame,
                       size_t capacity, size_t *length);
+/* Opt into signed server-initiated enrollment before sending any report.
+ * Persisted mode cannot be disabled. now/expires use the SERVER's trusted time.
+ * Approval is an externally authorized operation over the exact session + key.
+ * Never expose begin/approve/cancel to the untrusted relay. */
+sc_status sc_enrollment_enable(sc_context *ctx);
+sc_status sc_enrollment_begin(sc_context *ctx,uint64_t now,uint64_t expires);
+sc_status sc_enrollment_approve(sc_context *ctx,const uint8_t challenge[32],const uint8_t key[32],uint64_t now);
+sc_status sc_enrollment_cancel(sc_context *ctx);
+sc_status sc_receive_at(sc_context *ctx,const uint8_t *frame,size_t length,uint64_t now);
 sc_status sc_inspect(const sc_context *ctx, sc_state *out);
 const char *sc_status_string(sc_status status);
 

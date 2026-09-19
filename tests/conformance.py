@@ -367,7 +367,64 @@ def generated_schedule(r):
     assert not s.state()["pending"] and not d.state()["pending"]
 
 
-SCENARIOS = [first_exchange, lost_initial, authorization, lost_receipts,
+def signed_enrollment(r):
+    d,s=r.pair()
+    for e in (d,s): e.ok("enrollment_enable")
+    d.ok("report", temperature=-12345)
+    assert r.opportunity("device") is None
+    now=9007199254740993
+    s.ok("enrollment_begin", now=now, expires=now+100)
+    invitation=r.opportunity("server")
+    before=d.state()
+    rejected(r.deliver(r.mutate(invitation,-1),"device"));assert d.state()==before
+    accepted(r.deliver(invitation,"device"))
+    assert d.state()["challenge"]==s.state()["challenge"]
+    response=r.opportunity("device")
+    def receive(identifier,at=now):
+        return s.command("rx_at",frame=base64.b64encode(r.queue[identifier]).decode(),now=at)
+    rejected(receive(response,now+100))
+    accepted(receive(response));assert not s.state()["registered"] and not s.state()["has_temperature"]
+    assert s.state()["candidate_key"]==d.state()["public_key"]
+    r.restart("server");r.restart("device")
+    accepted(receive(response))
+    args=dict(challenge=s.state()["challenge"],key=d.state()["public_key"],now=now)
+    rejected(s.command("enrollment_approve",**{**args,"key":"11"*32}))
+    rejected(s.command("enrollment_approve",**{**args,"challenge":"11"*32}))
+    rejected(s.command("enrollment_approve",**{**args,"now":now+100}))
+    s.ok("fail",operation="storage")
+    rejected(s.command("enrollment_approve",**args));assert not s.state()["registered"]
+    s.ok("enrollment_approve",**args);assert s.state()["temperature"]==-12345
+    r.restart("server");s.ok("enrollment_approve",**args)
+    lost=r.opportunity("server");assert lost is not None
+    accepted(receive(response))
+    accepted(r.deliver(r.opportunity("server"),"device"))
+    assert d.state()["registered"] and not d.state()["pending"]
+    rejected(s.command("enrollment_begin",now=now,expires=now+100))
+    rejected(s.command("enrollment_cancel"))
+
+
+def enrollment_session_replacement(r):
+    d,s=r.pair()
+    for e in (d,s): e.ok("enrollment_enable")
+    s.ok("fail",operation="random")
+    rejected(s.command("enrollment_begin",now=100,expires=200))
+    assert r.opportunity("server") is None
+    s.ok("enrollment_begin",now=100,expires=200)
+    accepted(r.deliver(r.opportunity("server"),"device"));d.ok("report",temperature=123)
+    old=r.opportunity("device");old_challenge=s.state()["challenge"]
+    s.ok("enrollment_cancel");r.restart("server")
+    frame=base64.b64encode(r.queue[old]).decode()
+    rejected(s.command("rx_at",frame=frame,now=101))
+    s.ok("enrollment_begin",now=101,expires=201)
+    assert s.state()["challenge"]!=old_challenge
+    rejected(s.command("rx_at",frame=frame,now=101))
+    accepted(r.deliver(r.opportunity("server"),"device"))
+    fresh=r.opportunity("device");s.ok("rx_at",frame=base64.b64encode(r.queue[fresh]).decode(),now=101)
+    s.ok("enrollment_approve",challenge=s.state()["challenge"],key=d.state()["public_key"],now=101)
+    accepted(r.deliver(r.opportunity("server"),"device"));assert d.state()["registered"]
+
+
+SCENARIOS = [signed_enrollment, enrollment_session_replacement, first_exchange, lost_initial, authorization, lost_receipts,
              lost_application_report, rejected_name, reordered_snapshots, tamper_and_reflect,
              reboot, failed_commits, buffer_and_provider_failures,
              unavailable_randomness, exact_uint64, bounded_withholding, generated_schedule]

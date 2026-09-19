@@ -31,6 +31,11 @@ fn perform(endpoint:&mut Option<Endpoint>,v:&Value,out:&mut Value)->Result<(),Er
     if command=="close"{if endpoint.take().is_none(){return Err(Error::invalid())}return Ok(())}
     let e=endpoint.as_mut().ok_or_else(Error::invalid)?;
     match command{
+        "enrollment_enable"=>e.enrollment_enable(),
+        "enrollment_begin"=>e.enrollment_begin(number(v,"now",0)?,number(v,"expires",0)?),
+        "enrollment_approve"=>e.enrollment_approve(&hex32(text(v,"challenge",""))?,&hex32(text(v,"key",""))?,number(v,"now",0)?),
+        "enrollment_cancel"=>e.enrollment_cancel(),
+        "rx_at"=>e.receive_at(&decode(text(v,"frame",""))?,number(v,"now",0)?),
         "state"=>Ok(()),"name"=>e.name(text(v,"name","")),
         "report"=>{let temp=v.get("temperature").or_else(||v.get("temperature_mC")).and_then(Value::as_i64).ok_or_else(Error::invalid)?;e.report(i32::try_from(temp).map_err(|_|Error::invalid())?)},
         "rx"=>e.receive(&decode(text(v,"frame",""))?),

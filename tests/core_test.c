@@ -76,7 +76,7 @@ static sc_status reserve(void *u, uint32_t domain, uint64_t count, uint64_t *fir
     *first = m->counters[domain]; m->counters[domain] += count; return SC_OK;
 }
 static sc_provider provider(memory_store *m) {
-    sc_provider p = {m, public_key, seal, open_box, random_bytes, secret, load, commit, reserve};
+    sc_provider p = {m, public_key, seal, open_box, random_bytes, secret, load, commit, reserve, NULL, NULL};
     return p;
 }
 static void start(sc_context *ctx, memory_store *m, sc_role role, const uint8_t peer[32]) {

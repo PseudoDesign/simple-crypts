@@ -20,6 +20,7 @@ message Packet {
   optional uint32 apply_status = 14;
   optional uint64 acked_reported_revision = 15;
   optional bool enrollment_confirmed = 16;
+  // Legacy bearer token, or public session challenge in signed enrollment mode.
   optional bytes enrollment_token = 17;
 }
 
@@ -43,4 +44,11 @@ message Record {
   required uint64 last_sent_reported_revision = 15;
   required uint64 last_sent_desired_revision = 16;
   required uint32 apply_status = 17;
+  optional uint32 enrollment_mode = 18;
+  optional bytes challenge = 19;
+  optional uint64 enrollment_expires = 20;
+  optional bytes candidate_key = 21;
+  optional uint64 candidate_revision = 22;
+  optional sint32 candidate_temperature = 23;
+  optional bool candidate_has_temperature = 24;
 }

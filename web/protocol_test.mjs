@@ -33,6 +33,24 @@ await scenario('separate production key generation and provisioning preserve ide
  await ok(d,'report',{temperature:1000});await move(d,server);await move(server,d);assert(d.state().registered);
  await assert.rejects(()=>d.command('generate'),/Already initialized/);
 });
+await scenario('signed enrollment stages a key and requires explicit session-bound approval',async()=>{
+ const[d,s]=await pair();for(const e of [d,s])await ok(e,'enrollment_enable');
+ await ok(d,'report',{temperature:1234});assert.equal((await d.command('tx')).code,1);
+ await assert.rejects(()=>s.command('enrollment_begin',{now:-1,expires:200}),/uint64/);
+ await assert.rejects(()=>s.command('enrollment_begin',{now:9007199254740992,expires:'18446744073709551615'}),/uint64/);
+ await ok(s,'enrollment_begin',{now:100n,expires:200n});const invitation=await tx(s);assert.equal(invitation.length,172);
+ const tampered=invitation.slice();tampered[70]^=1;assert((await d.command('rx',{frame:tampered})).code<0);
+ await ok(d,'rx',{frame:invitation});const response=await tx(d);
+ assert((await s.command('rx',{frame:response,now:200n})).code<0);
+ await ok(s,'rx',{frame:response,now:101n});assert(!s.state().registered);assert(!s.state().has_temperature);
+ assert.equal(s.state().candidate_key,d.state().public_key);
+ const args={challenge:s.state().challenge,key:d.state().public_key,now:101n};
+ assert((await s.command('enrollment_approve',{...args,key:'11'.repeat(32)})).code<0);
+ s.m._scw_test_fail(1);assert.equal((await s.command('enrollment_approve',args)).code,-5);assert(!s.state().registered);
+ await ok(s,'reboot');await ok(s,'enrollment_approve',args);assert.equal(s.state().temperature,1234);
+ const reply=await tx(s);await ok(d,'rx',{frame:reply});assert(d.state().registered);assert(!d.state().pending);
+ await ok(s,'enrollment_approve',args);await ok(d,'rx',{frame:await tx(s)});
+});
 await scenario('enrollment with useful data, lost first frame, confirmation, reboot',async()=>{
  const[d,s]=await pair();await ok(d,'report',{temperature:-18250});const lost=await tx(d);assert(!s.state().registered);
  await ok(d,'report',{temperature:-18125});const next=await tx(d);assert.notEqual(nonce(lost),nonce(next));await ok(s,'rx',{frame:next});assert.equal(s.state().temperature,-18125);

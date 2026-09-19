@@ -127,12 +127,15 @@ class Relay:
         assert response["status"] == "ok", response
         frame = base64.b64decode(response["frame"], validate=True)
         assert 0 < len(frame) <= min(512, budget, capacity), len(frame)
-        assert frame[:4] == b"SC\x01\x01" and len(frame) >= 78, frame.hex()
-        assert frame[4] in (1, 2) and frame[38] == frame[4]
-        domain_nonce = (frame[6:38], frame[38:62])
-        previous = self.nonces.get(domain_nonce)
-        assert previous is None or previous == frame, "nonce reused for different ciphertext"
-        self.nonces[domain_nonce] = frame
+        if frame[:4] == b"SCE2":
+            assert len(frame)==172
+        else:
+            assert frame[:4] == b"SC\x02\x02" and len(frame) >= 78, frame.hex()
+            assert frame[4] in (1, 2) and frame[38] == frame[4]
+            domain_nonce = (frame[6:38], frame[38:62])
+            previous = self.nonces.get(domain_nonce)
+            assert previous is None or previous == frame, "nonce reused for different ciphertext"
+            self.nonces[domain_nonce] = frame
         identifier = str(self.next_frame)
         self.next_frame += 1
         self.queue[identifier] = frame

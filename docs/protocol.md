@@ -1,9 +1,10 @@
-# Protocol version 1
+# Protocol version 2
 
-This sample fixes one profile: standard NaCl box, using X25519, XSalsa20 and
-Poly1305. There is no algorithm negotiation. The cryptographic provider operates
+Profile 2 uses Ed25519 identity keys. The libsodium provider converts them to
+X25519 for standard NaCl box (XSalsa20-Poly1305), and uses Ed25519 directly
+for signed enrollment challenges. There is no algorithm negotiation. The cryptographic provider operates
 on opaque identity-key handles. The protocol never obtains a private identity
-key. The profile does not provide forward secrecy or third-party signatures.
+key. Box traffic does not provide forward secrecy or third-party signatures; enrollment invitations have detached Ed25519 signatures.
 
 ## Bounds and encoding
 
@@ -15,8 +16,8 @@ fields have fixed capacities; the core validates both sizes and semantics.
 | Header byte offset | Length | Meaning |
 | --- | ---: | --- |
 | 0 | 2 | ASCII `SC` |
-| 2 | 1 | Protocol version, `1` |
-| 3 | 1 | Profile, `1` |
+| 2 | 1 | Protocol version, `2` |
+| 3 | 1 | Profile, `2` |
 | 4 | 1 | Direction: `1` device to server; `2` server to device |
 | 5 | 1 | Kind: `1` report; `2` desired snapshot plus receipt |
 | 6 | 32 | Sender public key, an untrusted routing hint |
@@ -62,7 +63,7 @@ overwrite a newer counter reservation. Providers sharing a key across contexts
 must allocate from a shared identity/direction counter namespace. Do not clone a
 store, restore an old backup, or reprovision the same key into a fresh counter
 store. Replacing both key material and its generation requires a future
-authorized lifecycle operation; version 1 deliberately has no key-reset command.
+authorized lifecycle operation; version 2 deliberately has no key-reset command.
 
 Application records use atomic compare-and-replace commits. The core stages
 changes and publishes them only after a successful commit. Before returning a
@@ -72,22 +73,81 @@ report ambiguous commit outcomes as unusable until the store has been reopened.
 
 ## Enrollment
 
-Before confirmation, every device report includes a 32-byte enrollment secret
-inside the encrypted body. Each report is independently sufficient to enroll
-and deliver useful data. The server verifies the serial authorization, then
-atomically records the peer key, consumes the authorization by marking the
-serial bound, and accepts the initial reported snapshot.
+Call `sc_enrollment_enable()` on a fresh device and server before transmission.
+The mode is persisted and cannot be disabled. The public host SDKs expose the
+same operation. The pre-existing token-authorized path is retained only for
+explicit legacy sample callers/tests that do not enable signed enrollment.
+It does not prove hardware provenance. New demos and examples enable signed
+enrollment and use no shared enrollment secret.
 
-A bound serial accepts reports only from that key. Repeated claims from the
-same key do not consume the authorization again. Claims from a conflicting key
-cannot replace the binding, even if they contain the original secret. The
-reference store retains its provisioning material; authorization consumption
-means the irreversible binding in the atomic protocol record, not erasure of
-every copy of the provisioning secret.
+1. The existing trusted server mechanism calls `sc_enrollment_begin(now, expires)`
+   for the context's serial. The server needs cryptographic randomness for a
+   fresh 32-byte session challenge; signing and encryption need no fresh RNG.
+2. On a transmission opportunity the server emits a **public, signed** invitation.
+   The device verifies the signature against its pinned Ed25519 server identity,
+   checks the serial, and durably retains the challenge. It need not have a clock.
+3. The device encrypts a report containing the challenge and its Ed25519 public
+   identity. The server uses `sc_receive_at(..., now)` to validate the response
+   against the active, unexpired session. The response stages a candidate key
+   and first report; it does not register a device or accept application state.
+4. The trusted mechanism calls `sc_enrollment_approve(challenge, key, now)`.
+   It must authorize this **exact serial, session, and key**. Registration,
+   initial state acceptance, and session consumption commit atomically.
+5. An encrypted confirmation echoes the challenge and acknowledges the report.
+   A duplicate authenticated response regenerates a lost confirmation.
 
-The server's protected receipt confirms enrollment. Until that receipt arrives
-the device continues attaching the claim. Losing the first report or any number
-of receipts therefore does not require a special recovery handshake.
+No mTLS or user authentication is implemented here. Those are inputs to the
+trusted approval operation, never actions authorized by a relay packet.
+`sc_enrollment_cancel()` and session replacement invalidate pending responses.
+Pending candidates survive reboot. Only one candidate is retained per session;
+a different key is rejected until the trusted mechanism replaces the session.
+The first candidate may include a temperature report but may not claim prior
+name application. The current reporting API creates that first report with
+`sc_report_temperature()`.
+
+Expiry uses trusted server time in a caller-chosen consistent unit. A receive
+or approval at `now >= expires` fails. The normal host `receive()` supplies OS
+wall-clock seconds; `receive_at()` supports a trusted application's clock and
+deterministic tests. Core `sc_receive()` has no clock, so it fails closed on
+unapproved server responses; use `sc_receive_at()` there. Consumed sessions stay
+bound: idempotent approval or duplicate reports cannot change the identity.
+
+The invitation is exactly 172 bytes, all fields except the signature signed:
+
+| Offset | Bytes | Value |
+| --- | ---: | --- |
+| 0 | 4 | Domain/version marker `SCE2` |
+| 4 | 32 | Server Ed25519 public key |
+| 36 | 32 | Serial, zero-padded |
+| 68 | 32 | Random session challenge |
+| 100 | 8 | Expiration, unsigned big-endian |
+| 108 | 64 | Ed25519 signature over bytes 0–107 |
+
+The protobuf `enrollment_token` field carries the public challenge in signed
+mode, including confirmations and subsequent reports. It is not a bearer secret.
+The encrypted protocol binds both Ed25519 identities; conversion to X25519 is
+only a provider operation. Invalid public-key conversions fail closed.
+
+A signed challenge proves the server originated the invitation, not that the
+responding hardware is genuine. The trusted approver is responsible for the
+serial/key association. A clockless device can accept an old signed invitation,
+but its response cannot enroll against an expired, canceled, or replaced server
+session. An untrusted host can always withhold traffic.
+
+### Key and storage compatibility
+
+Each identity uses one Ed25519 key pair. The software keystore stores the
+libsodium 64-byte secret representation; temporary X25519 secret scalars are
+wiped after each box operation. Public keys, pins, wire identity fields, and
+approvals are all Ed25519. The raw-X25519 helper functions remain available
+only for independent primitive tests and the deferred hardware probe.
+
+This is a wire/storage break from version 1. Old envelopes and `SCSTORE1`
+stores are rejected; existing keys are not silently reinterpreted or overwritten.
+Reprovisioning and field migration require an explicit authorized deployment
+plan. Sharing one identity for signatures and encryption couples their rotation
+and compromise. This sample follows the requested single-identity design;
+[libsodium documents the conversion and recommends separate keys when feasible](https://doc.libsodium.org/advanced/ed25519-curve25519).
 
 ## Desired and reported state
 

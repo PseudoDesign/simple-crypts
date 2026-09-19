@@ -35,3 +35,23 @@ public bytes; fixed server seeds exist only in explicitly test-oriented helpers.
 Every adapter calls its language's public SDK directly. None launches a C adapter
 subprocess to impersonate a language implementation. JSON and base64 are test
 control formats; the relay forwards the returned opaque binary frames.
+
+## Signed enrollment (protocol/profile 2)
+
+Host identities are Ed25519; the provider converts them to X25519 for NaCl box.
+Private keys never cross the SDK boundary. Call `enrollment_enable()` on fresh
+Python/Rust endpoints (`EnrollmentEnable` in Go, `sc_host_enrollment_enable` in C)
+before sending traffic. Begin an authorized session, deliver its signed challenge,
+and deliver the encrypted response. Inspect `candidate_key` and approve the exact
+challenge/key pair through the existing trusted enrollment mechanism.
+
+`enrollment_begin(now, expires)`, `enrollment_approve(challenge, key, now)`, and
+`enrollment_cancel()` are trusted control-plane calls; they are not relay inputs.
+`receive_at(frame, now)` uses trusted server time for deterministic callers; normal
+host `receive()` uses OS wall-clock seconds. Session timestamps are uint64 values.
+The existing `secret` initialization argument is an unused compatibility slot in
+signed mode (examples pass 32 zero bytes). Legacy token-mode tests remain explicit
+callers that omit `enrollment_enable()`. Existing SCSTORE1 stores are rejected.
+
+See [the protocol](../docs/protocol.md#enrollment) and
+[the production Python example](../examples/python_api.py).

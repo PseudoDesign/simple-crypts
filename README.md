@@ -12,7 +12,7 @@ library and NaCl box run locally through WebAssembly. View the
 See [web build and browser tests](web/README.md) to run the demo locally.
 
 Milestone 1 uses a bounded C99 protocol core, nanopb, and NaCl box
-(X25519/XSalsa20-Poly1305). Python uses CFFI, Rust wraps the C ABI, and Go uses
+(X25519/XSalsa20-Poly1305), with Ed25519 identities converted inside the provider. Python uses CFFI, Rust wraps the C ABI, and Go uses
 cgo. Each SDK supports both roles. A server context represents one serial
 number; a fleet service supplies the registry and routes frames to contexts.
 
@@ -57,10 +57,13 @@ Host SDKs own their native context and reference file store. Firmware uses the
 caller-owned C context and supplies platform callbacks; it needs no filesystem,
 heap, sockets, wall clock, or background thread in the protocol engine.
 
-Provision each device with a unique identity key, the server's **public** key,
-its serial number, and a high-entropy enrollment secret. Supply that secret to
-the server through a trusted provisioning path. The device's first report
-contains its encrypted enrollment claim; no server round trip is necessary.
+Devices hold an Ed25519 identity, their serial, and the server's pinned Ed25519
+public key. Enable signed enrollment on both endpoints. The trusted server
+mechanism opens a session; the device verifies its signed challenge and sends
+an encrypted response. Registration occurs only after explicit approval of the
+exact serial/session/key binding. The protected reply confirms enrollment.
+See [the enrollment and key-format contract](docs/protocol.md#enrollment).
+Version 2 intentionally rejects the previous raw-X25519 wire/store format.
 
 The server's requested name remains pending until an authenticated device
 report says it was processed. Temperature is latest state, not an event log.

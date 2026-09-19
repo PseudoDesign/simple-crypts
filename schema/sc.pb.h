@@ -40,6 +40,7 @@ typedef struct _simplecrypts_Packet {
     uint64_t acked_reported_revision;
     bool has_enrollment_confirmed;
     bool enrollment_confirmed;
+    /* Legacy bearer token, or public session challenge in signed enrollment mode. */
     bool has_enrollment_token;
     simplecrypts_Packet_enrollment_token_t enrollment_token;
 } simplecrypts_Packet;
@@ -49,6 +50,8 @@ typedef PB_BYTES_ARRAY_T(32) simplecrypts_Record_local_key_t;
 typedef PB_BYTES_ARRAY_T(32) simplecrypts_Record_peer_key_t;
 typedef PB_BYTES_ARRAY_T(64) simplecrypts_Record_desired_name_t;
 typedef PB_BYTES_ARRAY_T(64) simplecrypts_Record_actual_name_t;
+typedef PB_BYTES_ARRAY_T(32) simplecrypts_Record_challenge_t;
+typedef PB_BYTES_ARRAY_T(32) simplecrypts_Record_candidate_key_t;
 /* Atomic bounded snapshot. Nonce reservations are a separate durable provider
  namespace and can never be rolled back by committing this record. */
 typedef struct _simplecrypts_Record {
@@ -70,6 +73,20 @@ typedef struct _simplecrypts_Record {
     uint64_t last_sent_reported_revision;
     uint64_t last_sent_desired_revision;
     uint32_t apply_status;
+    bool has_enrollment_mode;
+    uint32_t enrollment_mode;
+    bool has_challenge;
+    simplecrypts_Record_challenge_t challenge;
+    bool has_enrollment_expires;
+    uint64_t enrollment_expires;
+    bool has_candidate_key;
+    simplecrypts_Record_candidate_key_t candidate_key;
+    bool has_candidate_revision;
+    uint64_t candidate_revision;
+    bool has_candidate_temperature;
+    int32_t candidate_temperature;
+    bool has_candidate_has_temperature;
+    bool candidate_has_temperature;
 } simplecrypts_Record;
 
 
@@ -79,9 +96,9 @@ extern "C" {
 
 /* Initializer values for message structs */
 #define simplecrypts_Packet_init_default         {0, 0, 0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, {0, {0}}, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, {0, {0}}}
-#define simplecrypts_Record_init_default         {0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, {0, {0}}, {0, {0}}, false, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+#define simplecrypts_Record_init_default         {0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, {0, {0}}, {0, {0}}, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, false, {0, {0}}, false, 0, false, {0, {0}}, false, 0, false, 0, false, 0}
 #define simplecrypts_Packet_init_zero            {0, 0, 0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, {0, {0}}, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, {0, {0}}}
-#define simplecrypts_Record_init_zero            {0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, {0, {0}}, {0, {0}}, false, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+#define simplecrypts_Record_init_zero            {0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, {0, {0}}, {0, {0}}, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, false, {0, {0}}, false, 0, false, {0, {0}}, false, 0, false, 0, false, 0}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define simplecrypts_Packet_version_tag          1
@@ -118,6 +135,13 @@ extern "C" {
 #define simplecrypts_Record_last_sent_reported_revision_tag 15
 #define simplecrypts_Record_last_sent_desired_revision_tag 16
 #define simplecrypts_Record_apply_status_tag     17
+#define simplecrypts_Record_enrollment_mode_tag  18
+#define simplecrypts_Record_challenge_tag        19
+#define simplecrypts_Record_enrollment_expires_tag 20
+#define simplecrypts_Record_candidate_key_tag    21
+#define simplecrypts_Record_candidate_revision_tag 22
+#define simplecrypts_Record_candidate_temperature_tag 23
+#define simplecrypts_Record_candidate_has_temperature_tag 24
 
 /* Struct field encoding specification for nanopb */
 #define simplecrypts_Packet_FIELDLIST(X, a) \
@@ -158,7 +182,14 @@ X(a, STATIC,   REQUIRED, UINT64,   applied_desired_revision,  13) \
 X(a, STATIC,   REQUIRED, UINT64,   acked_reported_revision,  14) \
 X(a, STATIC,   REQUIRED, UINT64,   last_sent_reported_revision,  15) \
 X(a, STATIC,   REQUIRED, UINT64,   last_sent_desired_revision,  16) \
-X(a, STATIC,   REQUIRED, UINT32,   apply_status,     17)
+X(a, STATIC,   REQUIRED, UINT32,   apply_status,     17) \
+X(a, STATIC,   OPTIONAL, UINT32,   enrollment_mode,  18) \
+X(a, STATIC,   OPTIONAL, BYTES,    challenge,        19) \
+X(a, STATIC,   OPTIONAL, UINT64,   enrollment_expires,  20) \
+X(a, STATIC,   OPTIONAL, BYTES,    candidate_key,    21) \
+X(a, STATIC,   OPTIONAL, UINT64,   candidate_revision,  22) \
+X(a, STATIC,   OPTIONAL, SINT32,   candidate_temperature,  23) \
+X(a, STATIC,   OPTIONAL, BOOL,     candidate_has_temperature,  24)
 #define simplecrypts_Record_CALLBACK NULL
 #define simplecrypts_Record_DEFAULT NULL
 
@@ -172,7 +203,7 @@ extern const pb_msgdesc_t simplecrypts_Record_msg;
 /* Maximum encoded size of messages (where known) */
 #define SIMPLECRYPTS_SC_PB_H_MAX_SIZE            simplecrypts_Record_size
 #define simplecrypts_Packet_size                 297
-#define simplecrypts_Record_size                 339
+#define simplecrypts_Record_size                 450
 
 #ifdef __cplusplus
 } /* extern "C" */

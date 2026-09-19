@@ -57,27 +57,28 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await provision(page);
   assert.equal(await page.locator('.packet').count(),0);
   const firstIdentity=await page.locator('#device-details').textContent();
-  const destinations=['server','device'];
+  const destinations=['device','server','device'];
   for(let step=0;step<destinations.length;step++){
+   if(step===2){assert.equal(await page.locator('#server-status').textContent(),'Not enrolled');await page.locator('#next').click();await ready(page);assert.match(await page.locator('#tour-progress').textContent(),/STEP 5 OF 6/);}
    await page.locator('#next').click();await ready(page);
    assert.equal(await page.locator('#error').isVisible(),false,await page.locator('#error').textContent());
-   assert.match(await page.locator('#tour-progress').textContent(),new RegExp(`STEP ${step+3} OF 4`));
+   assert.match(await page.locator('#tour-progress').textContent(),new RegExp(`STEP ${step===2?6:step+3} OF 6`));
    assert(await page.locator('#next').isDisabled());
    assert(await page.locator('#next').isHidden());
    assert.equal(await page.locator('[data-destination]:visible').count(),1);
    for(const selector of ['.hero','.readings','.result-panel','.archive-panel','.below','.notes','.endpoint form','.packet-actions','.packet details','#budget'])assert(await page.locator(selector).first().isHidden(),selector+' should be hidden in the guide');
-   assert((await page.locator('#tour-text').textContent()).split(/\s+/).length<=12);
+   assert((await page.locator('#tour-text').textContent()).split(/\s+/).length<=14);
 
    assert.equal(await page.locator('.tour-message').count(),1);
    for(const role of ['device','server']){assert(await page.locator('#'+role+'-public-key').isVisible());assert(await page.locator('#'+role+'-private-key').isVisible());}
 
    assert(await page.locator('#enrollment-packet').isVisible());
-   assert.match(await page.locator('#packet-fields').textContent(),step===0?/Enrollment code.*encryption.*-18125.*Report revision1/:/Enrollment confirmedtrue.*Acknowledged report revision1/);
+   assert.match(await page.locator('#packet-fields').textContent(),step===0?/SignatureEd25519/:step===1?/First report-18125.*Report revision1/:/Enrollment confirmedtrue.*Acknowledged report revision1/);
    assert.match(await page.locator('#packet-wire').textContent(),/Sender public key: [a-f0-9]{64}/);
    assert.equal(await page.locator('#archive .archive-card').count(),step);
    if(step===0)await page.screenshot({path:`/tmp/simple-crypts-${name}-messages.png`,fullPage:true});
    await drag(page,destinations[step]);assert(!(await page.locator('#next').isDisabled()));
-   if(step===0){assert.equal(await page.locator('#device-status').textContent(),'Pending');assert.match(await page.locator('#server-summary').textContent(),/registered/);assert.equal(await page.locator('#registered-device-key').textContent(),await page.locator('#device-public-key').textContent());}
+   if(step===1){assert.match(await page.locator('#server-summary').textContent(),/Awaiting approval/);assert.equal(await page.locator('#registered-device-key').textContent(),await page.locator('#device-public-key').textContent());}
   }
   assert.equal(await page.locator('#device-status').textContent(),'Confirmed');assert.equal(await page.locator('#server-status').textContent(),'Confirmed');
   assert.equal(await page.locator('.packet').count(),0);assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');
@@ -108,11 +109,12 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await context.close();
   // Hold a report command, reset, then release the stale command to a terminated worker.
   const resetContext=await browser.newContext();await resetContext.addInitScript(()=>{const Original=Worker;window.__held=[];window.Worker=class extends Original{postMessage(message,...rest){if(message.command==='report')window.__held.push(()=>super.postMessage(message,...rest));else super.postMessage(message,...rest);}};});
-  const p=await resetContext.newPage();await p.goto(base);await ready(p);await provision(p);await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/STEP 1 OF 4/);await resetContext.close();
+  const p=await resetContext.newPage();await p.goto(base);await ready(p);await provision(p);await p.locator('#next').click();await ready(p);await drag(p,'device');await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/STEP 1 OF 6/);await resetContext.close();
   const experiment=await browser.newContext();const x=await experiment.newPage();await x.goto(base);await ready(x);await provision(x);await x.locator('#next').click();await ready(x);
   // The focused guide has only its intended destination. A wrong drop leaves the packet untouched.
-  await x.locator('.tour-message [data-select]').dragTo(x.locator('#device-panel h2'));await ready(x);assert.equal(await x.locator('.packet').count(),1);assert.equal(await x.locator('#archive .archive-card').count(),0);
-  await x.locator('.tour-message [data-select]').focus();await x.keyboard.press('Enter');await x.locator('[data-destination="server"]').focus();await x.keyboard.press('Enter');await ready(x);assert(!(await x.locator('#next').isDisabled()));
+  await x.locator('.tour-message [data-select]').dragTo(x.locator('#server-panel h2'));await ready(x);assert.equal(await x.locator('.packet').count(),1);assert.equal(await x.locator('#archive .archive-card').count(),0);
+  await x.locator('.tour-message [data-select]').focus();await x.keyboard.press('Enter');await x.locator('[data-destination="device"]').focus();await x.keyboard.press('Enter');await ready(x);assert(!(await x.locator('#next').isDisabled()));
+  await x.locator('#next').click();await ready(x);await drag(x,'server');await x.locator('#next').click();await ready(x);await x.locator('#next').click();await ready(x);await drag(x,'device');
   await x.locator('#sandbox').click();await update(x,'#name-form','#name','Freezer 3');await send(x,'server');
   await x.locator('.packet [data-select]').click();await x.locator('[data-destination="server"]').click();await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);
   await x.locator('#archive [data-replay]').first().click();await ready(x);await x.locator('.packet [data-action="corrupt"]').click();await ready(x);await action(x,'deliver');assert.match(await x.locator('#result-title').textContent(),/rejected/);
@@ -140,10 +142,11 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    }
    // Invalid drops and OS-cancelled gestures must retain the packet and allow retry.
    await touchMove('#tour-title');assert(await t.locator('#next').isDisabled());
-   await touchMove('#server-panel h2','touchCancel');assert(await t.locator('#next').isDisabled());
+   await touchMove('#device-panel h2','touchCancel');assert(await t.locator('#next').isDisabled());
    assert.equal(await t.locator('.packet').count(),1);assert.equal(await t.locator('#archive .archive-card').count(),0);
    // Both enrollment steps: deliberately drop on entity headers, outside the inbox buttons.
-   for(const [index,target]of ['#server-panel h2','#device-panel h2'].entries()){
+   for(const [index,target]of ['#device-panel h2','#server-panel h2','#device-panel h2'].entries()){
+    if(index===2){await t.locator('#next').tap();await ready(t);}
     if(index){await t.locator('#next').tap();await ready(t);}
     await touchMove(target);assert(!(await t.locator('#next').isDisabled()));
     assert.equal(await t.locator('#archive .archive-card').count(),index+1);
@@ -151,7 +154,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    // Tap/select remains a no-drag alternative and does not accidentally deliver on selection.
    await t.locator('#reset').tap();await ready(t);await provision(t);await t.locator('#next').tap();await ready(t);
    await t.locator('.tour-message [data-select]').tap();assert.equal(await t.locator('.selected').count(),1);
-   assert(await t.locator('#next').isDisabled());await t.locator('[data-destination="server"]').tap();await ready(t);assert(!(await t.locator('#next').isDisabled()));
+   assert(await t.locator('#next').isDisabled());await t.locator('[data-destination="device"]').tap();await ready(t);assert(!(await t.locator('#next').isDisabled()));
    await touchContext.close();
   }
   const noRng=await browser.newContext();await noRng.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const r=await noRng.newPage();await r.goto(base);await r.locator('#error').waitFor({state:'visible'});assert.match(await r.locator('#error').textContent(),/randomness/);assert(await r.locator('#next').isDisabled());await noRng.close();

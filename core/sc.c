@@ -105,6 +105,15 @@ static sc_status save(sc_context *ctx, const sc_state *next) {
     record.last_sent_reported_revision = next->last_sent_reported_revision;
     record.last_sent_desired_revision = next->last_sent_desired_revision;
     record.apply_status = next->apply_status;
+    if(next->enrollment_mode){
+        record.has_enrollment_mode=true;record.enrollment_mode=1;
+        record.has_challenge=true;SET_BYTES(record.challenge,next->challenge,32);
+        record.has_enrollment_expires=true;record.enrollment_expires=next->enrollment_expires;
+        record.has_candidate_key=true;SET_BYTES(record.candidate_key,next->candidate_key,32);
+        record.has_candidate_revision=true;record.candidate_revision=next->candidate_revision;
+        record.has_candidate_temperature=true;record.candidate_temperature=next->candidate_temperature;
+        record.has_candidate_has_temperature=true;record.candidate_has_temperature=next->candidate_has_temperature!=0;
+    }
     if (!pb_encode(&stream, simplecrypts_Record_fields, &record)) return SC_ERR_BOUNDS;
     status = ctx->provider.commit(ctx->provider.user, ctx->state.storage_generation, bytes, stream.bytes_written);
     wipe(bytes, sizeof bytes);
@@ -157,6 +166,13 @@ static sc_status restore(sc_context *ctx, const uint8_t *bytes, size_t n, uint64
     s->last_sent_desired_revision = r.last_sent_desired_revision;
     s->apply_status = (uint8_t)r.apply_status;
     s->storage_generation = generation;
+    if(r.enrollment_mode>1)return SC_ERR_STORAGE;
+    if(r.enrollment_mode){
+        if(!r.has_challenge||r.challenge.size!=32||!r.has_candidate_key||r.candidate_key.size!=32)return SC_ERR_STORAGE;
+        s->enrollment_mode=1;memcpy(s->challenge,r.challenge.bytes,32);memcpy(s->candidate_key,r.candidate_key.bytes,32);
+        s->enrollment_expires=r.enrollment_expires;s->candidate_revision=r.candidate_revision;
+        s->candidate_temperature=r.candidate_temperature;s->candidate_has_temperature=r.candidate_has_temperature;
+    }
     return SC_OK;
 }
 
@@ -193,6 +209,82 @@ sc_status sc_init(sc_context *ctx, const sc_config *config, const sc_provider *p
     ctx->initialized = 1;
     refresh_pending(ctx);
     return SC_OK;
+}
+
+/* Fixed, domain-separated signed invitation: magic, server Ed25519 key,
+ * zero-padded serial, random session challenge, big-endian expiry, signature.
+ * All 108 header bytes are signed. No device identity is known at this point. */
+#define SC_INVITATION_SIZE 172u
+static void put64(uint8_t *out,uint64_t n){unsigned i;for(i=0;i<8;i++)out[7-i]=(uint8_t)(n>>(i*8));}
+static uint64_t get64(const uint8_t *in){unsigned i;uint64_t n=0;for(i=0;i<8;i++)n=(n<<8)|in[i];return n;}
+sc_status sc_enrollment_enable(sc_context *ctx){
+    sc_state next;
+    if(!ctx||!ctx->initialized)return SC_ERR_ARGUMENT;
+    if(ctx->state.enrollment_mode)return SC_OK;
+    if(ctx->state.registered||ctx->state.reported_revision||ctx->state.desired_revision)return SC_ERR_CONFLICT;
+    if(!ctx->provider.verify||(ctx->config.role==SC_SERVER&&!ctx->provider.sign))return SC_ERR_ARGUMENT;
+    next=ctx->state;next.enrollment_mode=1;return save(ctx,&next);
+}
+sc_status sc_enrollment_begin(sc_context *ctx,uint64_t now,uint64_t expires){
+    sc_state next;sc_status status;
+    if(!ctx||!ctx->initialized||expires<=now)return SC_ERR_ARGUMENT;
+    if(ctx->config.role!=SC_SERVER)return SC_ERR_ROLE;
+    if(!ctx->state.enrollment_mode||ctx->state.registered)return SC_ERR_ENROLLMENT;
+    if(!ctx->provider.random||!ctx->provider.sign)return SC_ERR_RANDOM;
+    next=ctx->state;status=ctx->provider.random(ctx->provider.user,next.challenge,32);
+    if(status!=SC_OK)return status<0?status:SC_ERR_RANDOM;
+    if(zero_key(next.challenge)||equal_secret(next.challenge,ctx->state.challenge,32))return SC_ERR_RANDOM;
+    next.enrollment_expires=expires;memset(next.candidate_key,0,32);next.candidate_revision=0;
+    next.candidate_temperature=0;next.candidate_has_temperature=0;
+    return save(ctx,&next);
+}
+sc_status sc_enrollment_cancel(sc_context *ctx){
+    sc_state next;
+    if(!ctx||!ctx->initialized)return SC_ERR_ARGUMENT;
+    if(ctx->config.role!=SC_SERVER)return SC_ERR_ROLE;
+    if(!ctx->state.enrollment_mode||ctx->state.registered)return SC_ERR_ENROLLMENT;
+    next=ctx->state;memset(next.challenge,0,32);memset(next.candidate_key,0,32);
+    next.enrollment_expires=0;next.candidate_revision=0;next.candidate_temperature=0;next.candidate_has_temperature=0;
+    return save(ctx,&next);
+}
+sc_status sc_enrollment_approve(sc_context *ctx,const uint8_t challenge[32],const uint8_t key[32],uint64_t now){
+    sc_state next;sc_status status;
+    if(!ctx||!ctx->initialized||!challenge||!key)return SC_ERR_ARGUMENT;
+    if(ctx->config.role!=SC_SERVER)return SC_ERR_ROLE;
+    next=ctx->state;
+    if(!next.enrollment_mode||zero_key(challenge)||!equal_secret(next.challenge,challenge,32))return SC_ERR_ENROLLMENT;
+    if(next.registered){if(!equal_secret(next.peer_public_key,key,32))return SC_ERR_ENROLLMENT;ctx->receipt_pending=1;return SC_OK;}
+    if(!next.enrollment_expires||now>=next.enrollment_expires||!next.candidate_revision||!equal_secret(next.candidate_key,key,32))return SC_ERR_ENROLLMENT;
+    memcpy(next.peer_public_key,key,32);next.registered=1;next.enrollment_expires=0;
+    next.reported_revision=next.candidate_revision;next.has_temperature=next.candidate_has_temperature;
+    next.temperature_mC=next.candidate_temperature;
+    memset(next.candidate_key,0,32);next.candidate_revision=0;next.candidate_temperature=0;next.candidate_has_temperature=0;
+    status=save(ctx,&next);if(status==SC_OK)ctx->receipt_pending=1;return status;
+}
+static sc_status invitation(sc_context *ctx,uint8_t *frame,size_t cap,size_t budget,size_t *length){
+    sc_status status;
+    if(zero_key(ctx->state.challenge)||!ctx->state.enrollment_expires)return SC_NO_OUTPUT;
+    if(cap<SC_INVITATION_SIZE||budget<SC_INVITATION_SIZE)return SC_ERR_BOUNDS;
+    if(!ctx->provider.sign)return SC_ERR_CRYPTO;
+    memset(frame,0,SC_INVITATION_SIZE);memcpy(frame,"SCE2",4);memcpy(frame+4,ctx->local_public_key,32);
+    memcpy(frame+36,ctx->state.serial,strlen(ctx->state.serial));memcpy(frame+68,ctx->state.challenge,32);
+    put64(frame+100,ctx->state.enrollment_expires);
+    status=ctx->provider.sign(ctx->provider.user,ctx->config.identity_key,frame,108,frame+108);
+    if(status==SC_OK)*length=SC_INVITATION_SIZE;else wipe(frame,SC_INVITATION_SIZE);
+    return status<0?status:status==SC_OK?SC_OK:SC_ERR_CRYPTO;
+}
+static sc_status receive_invitation(sc_context *ctx,const uint8_t *frame,size_t length){
+    sc_state next;sc_status status;uint8_t serial[32]={0};
+    if(length!=SC_INVITATION_SIZE)return SC_ERR_BOUNDS;
+    if(ctx->config.role!=SC_DEVICE||!ctx->state.enrollment_mode||ctx->state.registered)return SC_ERR_ENROLLMENT;
+    if(!ctx->provider.verify||!equal_secret(frame+4,ctx->state.peer_public_key,32))return SC_ERR_AUTH;
+    status=ctx->provider.verify(ctx->provider.user,ctx->state.peer_public_key,frame,108,frame+108);
+    if(status!=SC_OK)return status<0?status:SC_ERR_AUTH;
+    memcpy(serial,ctx->state.serial,strlen(ctx->state.serial));
+    if(memcmp(serial,frame+36,32)||zero_key(frame+68)||!get64(frame+100))return SC_ERR_PROTOCOL;
+    if(equal_secret(ctx->state.challenge,frame+68,32))return SC_OK;
+    next=ctx->state;memcpy(next.challenge,frame+68,32);next.enrollment_expires=get64(frame+100);
+    return save(ctx,&next);
 }
 
 sc_status sc_set_name(sc_context *ctx, const char *name) {
@@ -248,7 +340,9 @@ static sc_status make_packet(sc_context *ctx, simplecrypts_Packet *p) {
         p->applied_desired_revision = s->applied_desired_revision;
         p->has_apply_status = true;
         p->apply_status = s->apply_status;
-        if (!s->registered) {
+        if (s->enrollment_mode) {
+            p->has_enrollment_token=true;SET_BYTES(p->enrollment_token,s->challenge,32);
+        } else if (!s->registered) {
             p->has_enrollment_token = true;
             p->enrollment_token.size = SC_TOKEN_BYTES;
             status = ctx->provider.enrollment_secret(ctx->provider.user, p->enrollment_token.bytes);
@@ -259,6 +353,7 @@ static sc_status make_packet(sc_context *ctx, simplecrypts_Packet *p) {
         SET_BYTES(p->name, s->desired_name, strlen(s->desired_name));
         p->has_acked_reported_revision = true;
         p->acked_reported_revision = s->reported_revision;
+        if(s->enrollment_mode){p->has_enrollment_token=true;SET_BYTES(p->enrollment_token,s->challenge,32);}
         p->has_enrollment_confirmed = true;
         p->enrollment_confirmed = true;
     }
@@ -296,6 +391,10 @@ sc_status sc_outbound(sc_context *ctx, size_t byte_budget, uint8_t *frame,
     if (length) *length = 0;
     if (!ctx || !ctx->initialized || !frame || !length) return SC_ERR_ARGUMENT;
     refresh_pending(ctx);
+    if(ctx->state.enrollment_mode&&!ctx->state.registered){
+        if(ctx->config.role==SC_SERVER)return invitation(ctx,frame,capacity,byte_budget,length);
+        if(zero_key(ctx->state.challenge))return SC_NO_OUTPUT;
+    }
     if (ctx->config.role == SC_DEVICE && !ctx->state.pending) return SC_NO_OUTPUT;
     if (ctx->config.role == SC_SERVER && (!ctx->state.registered ||
         (!ctx->state.pending && !ctx->receipt_pending))) return SC_NO_OUTPUT;
@@ -349,7 +448,7 @@ static int report_agrees(const sc_state *s, const simplecrypts_Packet *p) {
         memcmp(s->actual_name, p->name.bytes, p->name.size) == 0;
 }
 
-static sc_status receive_report(sc_context *ctx, const simplecrypts_Packet *p) {
+static sc_status receive_report(sc_context *ctx, const simplecrypts_Packet *p,uint64_t now) {
     sc_state next = ctx->state;
     sc_status status;
     uint8_t token[SC_TOKEN_BYTES];
@@ -366,6 +465,21 @@ static sc_status receive_report(sc_context *ctx, const simplecrypts_Packet *p) {
             p->applied_desired_revision >= p->processed_desired_revision) ||
         (p->apply_status == SC_APPLY_NONE && (p->applied_desired_revision || p->processed_desired_revision)))
         return SC_ERR_PROTOCOL;
+    if(next.enrollment_mode){
+        if(!p->has_enrollment_token||p->enrollment_token.size!=32||zero_key(next.challenge)||!equal_secret(next.challenge,p->enrollment_token.bytes,32))return SC_ERR_ENROLLMENT;
+        if(!next.registered){
+            if(!next.enrollment_expires||now>=next.enrollment_expires)return SC_ERR_ENROLLMENT;
+            if(p->name.size||p->processed_desired_revision||p->applied_desired_revision||p->apply_status)return SC_ERR_PROTOCOL;
+            if(!zero_key(next.candidate_key)&&!equal_secret(next.candidate_key,p->sender_key.bytes,32))return SC_ERR_CONFLICT;
+            if(p->revision<next.candidate_revision)return SC_OK;
+            if(p->revision==next.candidate_revision){
+                return next.candidate_has_temperature==(uint8_t)p->has_temperature_mC&&(!p->has_temperature_mC||next.candidate_temperature==p->temperature_mC)?SC_OK:SC_ERR_CONFLICT;
+            }
+            memcpy(next.candidate_key,p->sender_key.bytes,32);next.candidate_revision=p->revision;
+            next.candidate_has_temperature=p->has_temperature_mC;next.candidate_temperature=p->temperature_mC;
+            return save(ctx,&next);
+        }
+    }
     if (!next.registered) {
         if (!p->has_enrollment_token || p->enrollment_token.size != SC_TOKEN_BYTES) return SC_ERR_ENROLLMENT;
         if (!zero_key(next.peer_public_key) && !equal_secret(next.peer_public_key, p->sender_key.bytes, SC_KEY_BYTES))
@@ -404,7 +518,10 @@ static sc_status receive_report(sc_context *ctx, const simplecrypts_Packet *p) {
 static sc_status receive_desired(sc_context *ctx, const simplecrypts_Packet *p) {
     sc_state next = ctx->state;
     int changed = 0;
-    if (p->has_enrollment_token || p->has_temperature_mC ||
+    if(next.enrollment_mode){
+        if(!p->has_enrollment_token||p->enrollment_token.size!=32||zero_key(next.challenge)||!equal_secret(next.challenge,p->enrollment_token.bytes,32))return SC_ERR_ENROLLMENT;
+    } else if(p->has_enrollment_token)return SC_ERR_PROTOCOL;
+    if (p->has_temperature_mC ||
         p->has_processed_desired_revision || p->has_applied_desired_revision ||
         p->has_apply_status || !p->has_acked_reported_revision ||
         !p->has_enrollment_confirmed || !p->enrollment_confirmed ||
@@ -435,13 +552,14 @@ static sc_status receive_desired(sc_context *ctx, const simplecrypts_Packet *p) 
     return changed ? save(ctx, &next) : SC_OK;
 }
 
-sc_status sc_receive(sc_context *ctx, const uint8_t *frame, size_t length) {
+sc_status sc_receive_at(sc_context *ctx, const uint8_t *frame, size_t length,uint64_t now) {
     simplecrypts_Packet packet = simplecrypts_Packet_init_zero;
     pb_istream_t stream;
     sc_status status;
     uint8_t direction;
     size_t i, plain_len;
     if (!ctx || !ctx->initialized || !frame) return SC_ERR_ARGUMENT;
+    if(length>=4&&!memcmp(frame,"SCE2",4))return receive_invitation(ctx,frame,length);
     if (length < SC_HEADER + SC_TAG_BYTES || length > SC_MAX_FRAME) return SC_ERR_BOUNDS;
     direction = ctx->config.role == SC_DEVICE ? SC_SERVER : SC_DEVICE;
     if (frame[0] != 'S' || frame[1] != 'C' || frame[2] != SC_VERSION ||
@@ -468,10 +586,15 @@ sc_status sc_receive(sc_context *ctx, const uint8_t *frame, size_t length) {
         !equal_secret(packet.sender_key.bytes, frame + 6, SC_KEY_BYTES) ||
         !equal_secret(packet.recipient_key.bytes, ctx->local_public_key, SC_KEY_BYTES)) status = SC_ERR_PROTOCOL;
     else if (!valid_utf8(packet.name.bytes, packet.name.size)) status = SC_ERR_UTF8;
-    else status = ctx->config.role == SC_DEVICE ? receive_desired(ctx, &packet) : receive_report(ctx, &packet);
+    else status = ctx->config.role == SC_DEVICE ? receive_desired(ctx, &packet) : receive_report(ctx, &packet,now);
     wipe(&packet, sizeof packet);
     wipe(ctx->work, sizeof ctx->work);
     return status;
+}
+
+sc_status sc_receive(sc_context *ctx,const uint8_t *frame,size_t length){
+    /* Missing trusted server time must fail closed for an unapproved session. */
+    return sc_receive_at(ctx,frame,length,UINT64_MAX);
 }
 
 sc_status sc_inspect(const sc_context *ctx, sc_state *out) {

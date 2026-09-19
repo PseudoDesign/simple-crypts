@@ -92,6 +92,14 @@ func perform(endpoint **sc.Endpoint, m map[string]json.RawMessage, result map[st
 	if *endpoint == nil {
 		return errors.New("not initialized")
 	}
+    if command=="enrollment_enable" {return (*endpoint).EnrollmentEnable()}
+    if command=="enrollment_cancel" {return (*endpoint).EnrollmentCancel()}
+    if command=="enrollment_begin"||command=="enrollment_approve"||command=="rx_at" {
+        var now uint64;if err:=json.Unmarshal(m["now"],&now);err!=nil{return err}
+        if command=="enrollment_begin" {var expires uint64;if err:=json.Unmarshal(m["expires"],&expires);err!=nil{return err};return (*endpoint).EnrollmentBegin(now,expires)}
+        if command=="rx_at" {frame,err:=base64.StdEncoding.DecodeString(text(m,"frame",""));if err!=nil{return err};return (*endpoint).ReceiveAt(frame,now)}
+        challenge,err:=bytes32(text(m,"challenge",""));if err!=nil{return err};key,err:=bytes32(text(m,"key",""));if err!=nil{return err};return (*endpoint).EnrollmentApprove(challenge,key,now)
+    }
 	switch command {
 	case "state":
 		return nil

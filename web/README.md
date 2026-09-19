@@ -43,8 +43,8 @@ Each endpoint has its own worker and Wasm instance. Workers serialize commands;
 only public state and copied frames cross the application boundary. Identity
 private keys stay inside the software provider. The common page is still a
 trusted demo orchestrator, not a hostile security boundary or hardware keystore.
-Trusted initialization shares a fresh enrollment authorization and pins the
-server's public key on the device. Secure browser randomness is required at
+Initialization pins the server’s Ed25519 public key on the device. The demo
+enables signed, server-initiated enrollment; there is no shared enrollment code. Secure browser randomness is required at
 provisioning. Counter-based encryption and reboot use the retained keys without
 requiring new random nonces.
 
@@ -55,7 +55,7 @@ Refresh/Reset destroys the session and generates new keys. Nothing is saved to
 localStorage or IndexedDB. Wasm memory sizing is a browser build setting, not an
 MCU resource estimate.
 
-The message board shows each encrypted frame as a box in its source outbox.
+The message board shows each signed or encrypted frame as a box in its source outbox.
 Drag its handle to either endpoint inbox, Hold, or Discard. Keyboard and touch
 users can also select a box and activate a destination. A destination inbox
 always invokes that endpoint, including attempts to reflect a message back to
@@ -66,15 +66,19 @@ public keys and private-key status (private bytes remain in the worker).
 Provisioning adds the pinned server key to the device; successful enrollment
 adds the registered device key to the server.
 
-The four-step enrollment tour shows one short instruction, one packet, and its
-intended drop target. First, an explicit action generates a device key pair inside its Wasm worker.
-Next, trusted provisioning initializes the device with that same key, its serial,
-the enrollment code, and pinned server public key. Neither step transmits a
-frame. The first request carries the enrollment claim and first
-temperature report; the server reply confirms enrollment and acknowledges that
-report. Each step shows a sender-side explanation of the fields, actual frame
-size, and expandable public keys/wire bytes. This teaching view is not host-side
-decryption; the enrollment code value is never displayed. Forms, history, and experiment controls
+The six-step enrollment tour generates a device Ed25519 key pair, prepares the
+pinned server identity, sends a signed server challenge, delivers an encrypted
+device response, explicitly approves the serial/session/key binding, and delivers
+the encrypted confirmation. X25519 keys are converted internally for NaCl box.
+The existing trusted user-authentication mechanism is outside the demo; only
+its authorize/approve decisions are shown. The response is staged and cannot
+register a device before that separate approval action.
+
+Each packet shows its actual size and wire bytes. The signed invitation is
+public; response/confirmation details are a sender-side teaching view, not host
+decryption. The server clock is virtual and held at 1000 during the guided tour;
+sessions expire at 1600. Automated tests advance trusted time to test expiry.
+Forms, history, and experiment controls
 are hidden until Sandbox is opened. A successful drop shows a short result and
 Continue; the next packet is generated only when Continue is activated. Wrong
 drops leave the current packet untouched. Mouse dragging, touch dragging, and

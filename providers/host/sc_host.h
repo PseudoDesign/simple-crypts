@@ -21,6 +21,11 @@ int sc_host_initialize(int role, const char *storage, const char *serial,
                        const uint8_t *secret, const uint8_t *provisioned_seed,
                        const uint8_t *server_public_key, int random_unavailable,
                        sc_host **out);
+int sc_host_enrollment_enable(sc_host *);
+int sc_host_enrollment_begin(sc_host *,uint64_t now,uint64_t expires);
+int sc_host_enrollment_approve(sc_host *,const uint8_t challenge[32],const uint8_t key[32],uint64_t now);
+int sc_host_enrollment_cancel(sc_host *);
+int sc_host_receive_at(sc_host *,const uint8_t *,size_t,uint64_t now);
 void sc_host_close(sc_host *host);
 int sc_host_name(sc_host *host, const char *name);
 int sc_host_report(sc_host *host, int32_t temperature_mC);

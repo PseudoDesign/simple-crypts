@@ -54,7 +54,7 @@ static sc_status f_reserve(void *u, uint32_t domain, uint64_t count, uint64_t *f
 }
 static void f_init(sc_context *ctx, fuzz_store *store, sc_role role, const uint8_t *peer) {
     sc_config config;
-    sc_provider provider = {store, f_public, f_seal, f_open, NULL, f_secret, f_load, f_commit, f_reserve};
+    sc_provider provider = {store, f_public, f_seal, f_open, NULL, f_secret, f_load, f_commit, f_reserve, NULL, NULL};
     memset(&config, 0, sizeof config); config.role = role;
     memcpy(config.serial, "fuzz-device", 12);
     if (peer) memcpy(config.peer_public_key, peer, 32);

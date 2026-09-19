@@ -1,4 +1,4 @@
-import {Lab,tour} from './lab.mjs';
+import {Lab,tour,DEVICE_SERIAL} from './lab.mjs';
 import {hex} from './endpoint.mjs';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
@@ -80,6 +80,7 @@ function render(){
   document.body.dataset.target=mode==='tour'&&step>=0?tour[step].target:'';
   $('provisioning-details').hidden=setup<2;
   text('pinned-server-key',lab.states.device?.peer_public_key??'');
+  text('device-unique-id',lab.states.device?.serial??DEVICE_SERIAL);
   text('device-public-key',lab.devicePublicKey??lab.states.device?.public_key??'Not generated yet');
   text('server-public-key',lab.states.server?.public_key??'Starting…');
   text('device-private-key',lab.devicePublicKey||lab.states.device?'●●●● · Kept on device':'Not generated yet');

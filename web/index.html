@@ -36,7 +36,8 @@
 <p id="move-hint" class="move-hint" role="status">Drag a message box, or select one and activate a destination. Escape cancels selection.</p>
 <section class="lanes" aria-label="Device and server">
 <article class="endpoint" id="device-panel"><header><button class="show-tip" aria-label="Show step guidance for device">?</button><span class="node-icon" aria-hidden="true">◉</span><div><p class="eyebrow">01 / DEVICE</p><h2>Temperature sensor</h2></div><span id="device-status" class="badge">Starting</span></header>
-<p class="guided-state" id="device-summary"></p><div class="identity-card" aria-label="Device keys">
+<p class="guided-state" id="device-summary"></p><div class="identity-card" aria-label="Device identity and keys">
+<span class="key-label">Unique ID · serial number</span><code id="device-unique-id" class="device-unique-id">mcu-0001</code>
 <span class="key-label">Public key · Ed25519</span><code id="device-public-key">Not generated yet</code>
 <span class="key-label private-label">Private key</span><p id="device-private-key">Not generated yet</p>
 <div id="provisioning-details" hidden><span class="key-label">Pinned server public key</span><code id="pinned-server-key"></code></div></div><div class="readings" aria-live="polite"><div><span class="label">Measured temperature</span><strong id="device-temperature">—</strong><small id="device-temperature-state">Not measured</small></div><div><span class="label">Applied name</span><strong id="device-name" class="name">Not assigned</strong><small id="device-name-state">No name received</small></div></div>

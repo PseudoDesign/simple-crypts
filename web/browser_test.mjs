@@ -17,6 +17,7 @@ async function ready(page){await page.waitForFunction(()=>document.body.dataset.
 async function provision(page){
  assert.equal(await page.locator('.packet').count(),0);
  assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
+ assert(await page.locator('#device-unique-id').isVisible());assert.equal(await page.locator('#device-unique-id').textContent(),'mcu-0001');
  for(const role of ['device','server'])assert(await page.locator('#'+role+'-panel').isVisible());
  assert.match(await page.locator('#server-public-key').textContent(),/^[a-f0-9]{64}$/);
  assert.equal(await page.locator('#device-private-key').textContent(),'Not generated yet');
@@ -145,7 +146,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await x.locator('#sandbox').click();await update(x,'#name-form','#name','Freezer 3');await send(x,'server');
   await x.locator('.packet [data-select]').click();await x.locator('[data-destination="server"]').click();await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);
   await toolsOpen(x);await x.locator('#archive [data-replay]').first().click();await ready(x);await toolsClose(x);await x.locator('.packet [data-action="corrupt"]').click();await ready(x);await toolsClose(x);await action(x,'deliver');assert.match(await x.locator('#result-title').textContent(),/rejected/);
-  await toolsOpen(x);await x.locator('#archive [data-replay]').nth(1).click();await ready(x);await toolsClose(x);await action(x,'deliver');assert.equal(await x.locator('#device-name').textContent(),'Freezer 3');
+  await toolsOpen(x);await x.locator('#archive [data-replay]').nth(1).click();await ready(x);await toolsClose(x);await action(x,'deliver');assert.equal(await x.locator('#device-name').textContent(),'Freezer 3');assert.equal(await x.locator('#device-unique-id').textContent(),'mcu-0001');
   await toolsOpen(x);await x.locator('#archive [data-replay]').first().click();await ready(x);await toolsClose(x);await action(x,'deliver');assert.match(await x.locator('#result-title').textContent(),/no newer state/);
   await x.setViewportSize({width:390,height:844});await toolsOpen(x);await x.locator('#archive [data-replay]').first().click();await ready(x);await toolsClose(x);await x.locator('.packet [data-select]').click();await x.locator('[data-destination="server"]').click();await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);assert(await x.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await experiment.close();

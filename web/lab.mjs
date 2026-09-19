@@ -1,5 +1,7 @@
 import {hex} from './endpoint.mjs';
 export const MAX_QUEUE=64, MAX_EVENTS=200;
+// The demo device has a fixed serial before it generates keys or enrolls.
+export const DEVICE_SERIAL='mcu-0001';
 export class Lab {
   constructor(onChange=()=>{},workerFactory=url=>new Worker(url,{type:'module'})) {
     this.onChange=onChange;this.workerFactory=workerFactory;this.epoch=0;this.workers={};this.pending=new Map();this.sequence=0;
@@ -25,13 +27,13 @@ export class Lab {
         worker.onmessage=({data})=>{const p=this.pending.get(data.id);if(!p)return;this.pending.delete(data.id);data.error?p.reject(new Error(data.error)):p.resolve(data.result);};
         worker.onerror=()=>{for(const [id,p]of this.pending){if(p.role===role){this.pending.delete(id);p.reject(new Error(`${role} runtime failed to load or execute`));}}};
       }
-      const server=await this.raw('server','init',{role:'server',secret});
+      const server=await this.raw('server','init',{role:'server',serial:DEVICE_SERIAL,secret});
       if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
       if(server.code!==0)throw new Error(server.status);
       this.authorization=secret;
       const enabled=await this.raw('server','enrollment_enable');if(enabled.code!==0)throw new Error(enabled.status);
       if(deferDevice){this.states={server:enabled.state};this.ready=true;this.event('Server ready. Device key has not been generated.');return;}
-      const device=await this.raw('device','init',{role:'device',secret,server_public_key:server.state.public_key});
+      const device=await this.raw('device','init',{role:'device',serial:DEVICE_SERIAL,secret,server_public_key:server.state.public_key});
       if(device.code!==0)throw new Error(device.status);
       if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
       const enabledDevice=await this.raw('device','enrollment_enable');if(enabledDevice.code!==0)throw new Error(enabledDevice.status);this.states={server:enabled.state,device:enabledDevice.state};this.ready=true;
@@ -46,7 +48,7 @@ export class Lab {
     return result.public_key;
   }
   async provisionDevice(){
-    const epoch=this.epoch;const result=await this.raw('device','init',{role:'device',secret:this.authorization,server_public_key:this.states.server.public_key});
+    const epoch=this.epoch;const result=await this.raw('device','init',{role:'device',serial:DEVICE_SERIAL,secret:this.authorization,server_public_key:this.states.server.public_key});
     if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
     if(result.code!==0)throw new Error(result.status);
     const enabled=await this.raw('device','enrollment_enable');if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');if(enabled.code!==0)throw new Error(enabled.status);this.states.device=enabled.state;this.authorization=null;this.event('Device provisioned with its serial and pinned server Ed25519 public key.');

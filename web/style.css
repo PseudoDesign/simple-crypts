@@ -137,3 +137,5 @@ body[data-mode="sandbox"] .move-hint{display:none}
  .guide-popup{padding-top:31px}
  .guide-role{left:16px}
 }
+
+.identity-card .device-unique-id{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:10px}

@@ -13,8 +13,8 @@ export class Lab {
     this.workers={};for(const pending of this.pending.values())pending.reject(new DOMException('Session reset','AbortError'));
     this.pending.clear();
   }
-  async reset(){
-    this.stop();const epoch=this.epoch;this.queue=[];this.archive=[];this.events=[];this.states={};this.nextPacket=1;this.notify();
+  async reset({deferDevice=false}={}){
+    this.stop();const epoch=this.epoch;this.queue=[];this.archive=[];this.events=[];this.states={};this.devicePublicKey=null;this.authorization=null;this.nextPacket=1;this.notify();
     try{
       if(!globalThis.crypto?.getRandomValues)throw new Error('Secure browser randomness is unavailable. Open this demo over HTTPS or localhost.');
       const secretBytes=crypto.getRandomValues(new Uint8Array(32));const secret=hex(secretBytes);secretBytes.fill(0);
@@ -24,13 +24,29 @@ export class Lab {
         worker.onerror=()=>{for(const [id,p]of this.pending){if(p.role===role){this.pending.delete(id);p.reject(new Error(`${role} runtime failed to load or execute`));}}};
       }
       const server=await this.raw('server','init',{role:'server',secret});
+      if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
       if(server.code!==0)throw new Error(server.status);
+      this.authorization=secret;
+      if(deferDevice){this.states={server:server.state};this.ready=true;this.event('Server ready. Device key has not been generated.');return;}
       const device=await this.raw('device','init',{role:'device',secret,server_public_key:server.state.public_key});
       if(device.code!==0)throw new Error(device.status);
       if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
       this.states={server:server.state,device:device.state};this.ready=true;
       this.event('Fresh identities provisioned. The device holds the server’s public key. No frames have been sent.');
     }catch(error){if(epoch===this.epoch){this.stop();this.event(error.message,'error');}throw error;}
+  }
+  async generateDevice(){
+    const epoch=this.epoch;const result=await this.raw('device','generate');
+    if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
+    if(result.code!==0)throw new Error(result.status);
+    this.devicePublicKey=result.public_key;this.event('Device generated an X25519 key pair locally. No packet sent.');
+    return result.public_key;
+  }
+  async provisionDevice(){
+    const epoch=this.epoch;const result=await this.raw('device','init',{role:'device',secret:this.authorization,server_public_key:this.states.server.public_key});
+    if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
+    if(result.code!==0)throw new Error(result.status);
+    this.states.device=result.state;this.authorization=null;this.event('Device provisioned with its serial, enrollment code, and pinned server public key.');
   }
   raw(role,command,args={}){
     const worker=this.workers[role];if(!worker)return Promise.reject(new Error('Endpoint is unavailable'));

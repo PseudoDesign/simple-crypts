@@ -19,7 +19,7 @@ static struct {
     uint8_t pk[32], sk[32], token[32], record[SC_MAX_RECORD];
     size_t length;
     uint64_t generation, next[3];
-    int ready;
+    int ready, key_ready;
 #ifdef SC_ENABLE_TESTING
     int fail_commit, fail_reserve;
 #endif
@@ -62,14 +62,22 @@ API int scw_reboot(void) {
     sodium_memzero(&ctx,sizeof ctx);frame_length=0;
     return sc_init(&ctx,&config,&p);
 }
+/* Key generation is a distinct demo action; private bytes stay in this instance. */
+API int scw_generate(void) {
+    if(store.key_ready || store.ready)return SC_ERR_ARGUMENT;
+    if(sodium_init()<0)return SC_ERR_RANDOM;
+    if(crypto_box_keypair(store.pk,store.sk)!=0)return SC_ERR_CRYPTO;
+    store.key_ready=1;
+    return SC_OK;
+}
 /* Input: authorization[32], pinned server public key[32], NUL serial at 64.
  * Fresh keys only in production. Test seeds are a separate build/export. */
 static int initialize(int role,const uint8_t *seed) {
     if(store.ready || (role!=SC_DEVICE && role!=SC_SERVER))return SC_ERR_ARGUMENT;
     if(!memchr(input+64,0,SC_MAX_SERIAL+1))return SC_ERR_ARGUMENT;
     if(sodium_init()<0)return SC_ERR_RANDOM;
-    if(seed)crypto_box_seed_keypair(store.pk,store.sk,seed);
-    else crypto_box_keypair(store.pk,store.sk);
+    if(seed){if(store.key_ready)return SC_ERR_ARGUMENT;crypto_box_seed_keypair(store.pk,store.sk,seed);store.key_ready=1;}
+    else if(!store.key_ready){int status=scw_generate();if(status!=SC_OK)return status;}
     memcpy(store.token,input,32);memset(&config,0,sizeof config);
     config.role=(sc_role)role;config.identity_key=1;memcpy(config.peer_public_key,input+32,32);
     memcpy(config.serial,input+64,SC_MAX_SERIAL+1);

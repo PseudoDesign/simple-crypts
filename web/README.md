@@ -61,8 +61,11 @@ users can also select a box and activate a destination. A destination inbox
 always invokes that endpoint, including attempts to reflect a message back to
 its sender. State differences and rejection reasons come from the real library.
 
-The two-step enrollment tour shows one short instruction, one packet, and its
-intended drop target. The first request carries the enrollment claim and first
+The four-step enrollment tour shows one short instruction, one packet, and its
+intended drop target. First, an explicit action generates a device key pair inside its Wasm worker.
+Next, trusted provisioning initializes the device with that same key, its serial,
+the enrollment code, and pinned server public key. Neither step transmits a
+frame. The first request carries the enrollment claim and first
 temperature report; the server reply confirms enrollment and acknowledges that
 report. Each step shows a sender-side explanation of the fields, actual frame
 size, and expandable public keys/wire bytes. This teaching view is not host-side

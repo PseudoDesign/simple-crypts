@@ -14,6 +14,19 @@ const server=createServer(async(req,res)=>{try{
 }catch{res.writeHead(404);res.end('Not found');}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}/simple-crypts/`;
 async function ready(page){await page.waitForFunction(()=>document.body.dataset.ready==='true'&&document.body.dataset.busy==='false');}
+async function provision(page){
+ assert.equal(await page.locator('.packet').count(),0);
+ assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
+ await page.locator('#next').click();await ready(page);
+ const key=await page.locator('#device-public-key').textContent();assert.match(key,/^[a-f0-9]{64}$/);
+ assert.equal(await page.locator('.packet').count(),0);assert.equal(await page.locator('#device-details').textContent(),'');
+ await page.screenshot({path:'/tmp/simple-crypts-key-generation.png',fullPage:true});
+ await page.locator('#next').click();await ready(page);
+ assert.match(await page.locator('#device-details').textContent(),new RegExp(key));
+ const pinned=await page.locator('#pinned-server-key').textContent();assert.match(pinned,/^[a-f0-9]{64}$/);assert.match(await page.locator('#server-details').textContent(),new RegExp(pinned));
+ assert.equal(await page.locator('.packet').count(),0);assert.equal(await page.locator('#server-status').textContent(),'Not enrolled');
+ return key;
+}
 async function update(page,form,input,value){await page.locator(input).fill(value);await page.locator(form+' button').click();await ready(page);}
 async function send(page,role){await page.locator(`[data-transmit="${role}"]`).click();await ready(page);}
 async function action(page,action,index=0){
@@ -29,14 +42,14 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
  try{
   const context=await browser.newContext({viewport:{width:1440,height:1100},reducedMotion:'reduce'});const page=await context.newPage();const errors=[],outside=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(!r.url().startsWith(base))outside.push(r.url());});
-  await page.goto(base);await ready(page);
+  await page.goto(base);await ready(page);await provision(page);
   assert.equal(await page.locator('.packet').count(),0);
   const firstIdentity=await page.locator('#device-details').textContent();
   const destinations=['server','device'];
   for(let step=0;step<destinations.length;step++){
    await page.locator('#next').click();await ready(page);
    assert.equal(await page.locator('#error').isVisible(),false,await page.locator('#error').textContent());
-   assert.match(await page.locator('#tour-progress').textContent(),new RegExp(`STEP ${step+1} OF 2`));
+   assert.match(await page.locator('#tour-progress').textContent(),new RegExp(`STEP ${step+3} OF 4`));
    assert(await page.locator('#next').isDisabled());
    assert(await page.locator('#next').isHidden());
    assert.equal(await page.locator('[data-destination]:visible').count(),1);
@@ -70,8 +83,8 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   for(let i=1;i<64;i++)await action(page,'duplicate',0);
   assert.equal(await page.locator('.packet').count(),64);assert(await page.locator('[data-transmit="device"]').isDisabled());assert(await page.locator('[data-action="duplicate"]').first().isDisabled());
   await action(page,'drop');assert.equal(await page.locator('.packet').count(),63);assert(!(await page.locator('[data-transmit="device"]').isDisabled()));
-  await page.locator('#reset').click();await ready(page);assert.equal(await page.locator('.packet').count(),0);assert.notEqual(await page.locator('#device-details').textContent(),firstIdentity);
-  const resetIdentity=await page.locator('#device-details').textContent();await page.reload();await ready(page);assert.notEqual(await page.locator('#device-details').textContent(),resetIdentity);
+  await page.locator('#reset').click();await ready(page);await provision(page);assert.equal(await page.locator('.packet').count(),0);assert.notEqual(await page.locator('#device-details').textContent(),firstIdentity);
+  const resetIdentity=await page.locator('#device-details').textContent();await page.reload();await ready(page);await provision(page);assert.notEqual(await page.locator('#device-details').textContent(),resetIdentity);
   // Browser remains idle across rendering turns: initialization sends no frames.
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.equal(await page.locator('.packet').count(),0);
   await page.setViewportSize({width:390,height:844});await page.keyboard.press('Tab');assert(await page.evaluate(()=>document.activeElement!==document.body));
@@ -81,8 +94,8 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await context.close();
   // Hold a report command, reset, then release the stale command to a terminated worker.
   const resetContext=await browser.newContext();await resetContext.addInitScript(()=>{const Original=Worker;window.__held=[];window.Worker=class extends Original{postMessage(message,...rest){if(message.command==='report')window.__held.push(()=>super.postMessage(message,...rest));else super.postMessage(message,...rest);}};});
-  const p=await resetContext.newPage();await p.goto(base);await ready(p);await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/2 STEPS/);await resetContext.close();
-  const experiment=await browser.newContext();const x=await experiment.newPage();await x.goto(base);await ready(x);await x.locator('#next').click();await ready(x);
+  const p=await resetContext.newPage();await p.goto(base);await ready(p);await provision(p);await p.locator('#next').click();await p.waitForFunction(()=>window.__held.length===1);await p.locator('#reset').click();await ready(p);await p.evaluate(()=>window.__held.splice(0).forEach(fn=>fn()));assert.equal(await p.locator('.packet').count(),0);assert.equal(await p.locator('#device-temperature').textContent(),'—');assert.match(await p.locator('#tour-progress').textContent(),/STEP 1 OF 4/);await resetContext.close();
+  const experiment=await browser.newContext();const x=await experiment.newPage();await x.goto(base);await ready(x);await provision(x);await x.locator('#next').click();await ready(x);
   // The focused guide has only its intended destination. A wrong drop leaves the packet untouched.
   await x.locator('.tour-message [data-select]').dragTo(x.locator('#device-panel h2'));await ready(x);assert.equal(await x.locator('.packet').count(),1);assert.equal(await x.locator('#archive .archive-card').count(),0);
   await x.locator('.tour-message [data-select]').focus();await x.keyboard.press('Enter');await x.locator('[data-destination="server"]').focus();await x.keyboard.press('Enter');await ready(x);assert(!(await x.locator('#next').isDisabled()));
@@ -94,7 +107,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
   await x.setViewportSize({width:390,height:844});await x.locator('#archive [data-replay]').first().click();await ready(x);await x.locator('.packet [data-select]').click();await x.locator('[data-destination="server"]').click();await ready(x);assert.match(await x.locator('#result-title').textContent(),/rejected/);assert(await x.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await experiment.close();
   if(name==='chromium'){
-   const touchContext=await browser.newContext({viewport:{width:390,height:844},hasTouch:true});const t=await touchContext.newPage();await t.goto(base);await ready(t);await t.locator('#next').click();await ready(t);
+   const touchContext=await browser.newContext({viewport:{width:390,height:844},hasTouch:true});const t=await touchContext.newPage();await t.goto(base);await ready(t);await provision(t);await t.locator('#next').click();await ready(t);
    const cdp=await touchContext.newCDPSession(t);
    const center=box=>({x:box.x+box.width/2,y:box.y+box.height/2});
    async function touchMove(target,end='touchEnd'){
@@ -122,7 +135,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
     assert.equal(await t.locator('#archive .archive-card').count(),index+1);
    }
    // Tap/select remains a no-drag alternative and does not accidentally deliver on selection.
-   await t.locator('#reset').tap();await ready(t);await t.locator('#next').tap();await ready(t);
+   await t.locator('#reset').tap();await ready(t);await provision(t);await t.locator('#next').tap();await ready(t);
    await t.locator('.tour-message [data-select]').tap();assert.equal(await t.locator('.selected').count(),1);
    assert(await t.locator('#next').isDisabled());await t.locator('[data-destination="server"]').tap();await ready(t);assert(!(await t.locator('#next').isDisabled()));
    await touchContext.close();

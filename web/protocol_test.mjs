@@ -22,6 +22,17 @@ async function tx(e){return (await ok(e,'tx')).frame;}
 async function move(a,b){return ok(b,'rx',{frame:await tx(a)});}
 const nonce=f=>Buffer.from(f.slice(38,62)).toString('hex');
 async function scenario(name,fn){await fn();checks++;console.log('PASS '+name);}
+await scenario('separate production key generation and provisioning preserve identity',async()=>{
+ const module=await production();const d=new Endpoint(module);
+ assert.equal(d.state(),null);
+ const generated=await d.command('generate');assert.equal(generated.code,0);assert.match(generated.public_key,/^[a-f0-9]{64}$/);
+ assert.equal(d.state(),null);await assert.rejects(()=>d.command('tx'),/not initialized/);
+ assert((await d.command('generate')).code<0);
+ const server=await wasm('server');await ok(d,'init',{role:'device',secret,server_public_key:server.state().public_key});
+ assert.equal(d.state().public_key,generated.public_key);
+ await ok(d,'report',{temperature:1000});await move(d,server);await move(server,d);assert(d.state().registered);
+ await assert.rejects(()=>d.command('generate'),/Already initialized/);
+});
 await scenario('enrollment with useful data, lost first frame, confirmation, reboot',async()=>{
  const[d,s]=await pair();await ok(d,'report',{temperature:-18250});const lost=await tx(d);assert(!s.state().registered);
  await ok(d,'report',{temperature:-18125});const next=await tx(d);assert.notEqual(nonce(lost),nonce(next));await ok(s,'rx',{frame:next});assert.equal(s.state().temperature,-18125);

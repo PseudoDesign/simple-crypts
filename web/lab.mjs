@@ -17,7 +17,7 @@ export class Lab {
     this.pending.clear();
   }
   async reset({deferDevice=false}={}){
-    this.stop();const epoch=this.epoch;this.queue=[];this.archive=[];this.events=[];this.states={};this.devicePublicKey=null;this.authorization=null;this.nextPacket=1;this.notify();
+    this.stop();const epoch=this.epoch;this.queue=[];this.archive=[];this.events=[];this.states={};this.devicePublicKey=null;this.verifiedChallenge=null;this.authorization=null;this.nextPacket=1;this.notify();
     try{
       if(!globalThis.crypto?.getRandomValues)throw new Error('Secure browser randomness is unavailable. Open this demo over HTTPS or localhost.');
       // Compatibility slot only: signed enrollment uses no shared enrollment secret.
@@ -40,8 +40,8 @@ export class Lab {
       this.event('Fresh identities ready. The device holds the server’s public key. No frames have been sent.');
     }catch(error){if(epoch===this.epoch){this.stop();this.event(error.message,'error');}throw error;}
   }
-  async generateDevice(){
-    const epoch=this.epoch;const result=await this.raw('device','generate');
+  async generateDevice({fromChallenge=false}={}){
+    const epoch=this.epoch;const result=await this.raw('device',fromChallenge?'generate_from_challenge':'generate');
     if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
     if(result.code!==0)throw new Error(result.status);
     this.devicePublicKey=result.public_key;this.event('Device generated an Ed25519 key pair locally. No packet sent.');
@@ -51,7 +51,7 @@ export class Lab {
     const epoch=this.epoch;const result=await this.raw('device','init',{role:'device',serial:DEVICE_SERIAL,secret:this.authorization,server_public_key:this.states.server.public_key});
     if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
     if(result.code!==0)throw new Error(result.status);
-    const enabled=await this.raw('device','enrollment_enable');if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');if(enabled.code!==0)throw new Error(enabled.status);this.states.device=enabled.state;this.authorization=null;this.event('Device identity ready; its serial and trusted server public key are already available.');
+    const enabled=await this.raw('device','enrollment_enable');if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');if(enabled.code!==0)throw new Error(enabled.status);this.states.device=enabled.state;this.event('Device identity ready; its serial and trusted server public key are already available.');
   }
   raw(role,command,args={}){
     const worker=this.workers[role];if(!worker)return Promise.reject(new Error('Endpoint is unavailable'));
@@ -106,11 +106,14 @@ export class Lab {
   async deliver(id,target){
     const p=this.packet(id);target=target??p.to;if(!['device','server'].includes(target))throw new Error('Unknown recipient');const epoch=this.epoch;
     const before={...this.states[target]};
-    const result=await this.command(target,'rx',{frame:p.bytes.slice(),now:this.time});
+    const result=target==='device'&&!this.states.device
+      ?await this.raw('device','verify_challenge',{frame:p.bytes.slice(),server_public_key:this.states.server.public_key,serial:DEVICE_SERIAL})
+      :await this.command(target,'rx',{frame:p.bytes.slice(),now:this.time});
+    if(target==='device'&&!this.states.device&&result.code===0)this.verifiedChallenge=p.bytes.slice();
     if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
     this.queue=this.queue.filter(p=>p.id!==id);
     const fields=['registered','temperature','actual_name','desired_name','reported_revision','desired_revision','processed_desired_revision','acked_reported_revision','pending','challenge','candidate_key','candidate_revision'];
-    const changes=fields.filter(k=>before[k]!==result.state[k]).map(k=>({field:k,before:before[k],after:result.state[k]}));
+    const changes=fields.filter(k=>before[k]!==(result.state??{})[k]).map(k=>({field:k,before:before[k],after:(result.state??{})[k]}));
     result.changes=changes;
     this.remember({...p,result:{code:result.code,status:result.status,target,changed:changes.length}},result.code<0?'rejected by '+target:changes.length?'accepted by '+target:'accepted; no newer state');
     this.event(`Frame ${id} delivered to ${target}: ${result.code<0?'rejected — '+result.status:'authenticated and processed'}.`,result.code<0?'rejected':'success');
@@ -118,7 +121,7 @@ export class Lab {
   }
 }
 export const tour=[
-  {title:'Deliver the signed challenge.',text:'The server opens an authorized session. Drag its challenge to the device.',target:'device',success:'The device verified the server’s Ed25519 signature. It can now answer this challenge.',code:'sc_enrollment_begin(&server, now, expires);\nsc_receive(&device, frame, length);',prepare:async l=>{await l.beginEnrollment();return l.transmit('server');}},
-  {title:'Deliver the encrypted response.',text:'The device returns the challenge, its identity, and its first report.',target:'server',success:'The response authenticated. This proposed key is waiting for trusted approval; nothing is registered yet.',code:'sc_report_temperature(&device, -18125);\nsc_receive_at(&server, frame, length, now);',prepare:async l=>{await l.update('device','report',{temperature:-18125});return l.transmit('device');}},
+  {title:'Deliver the signed challenge.',text:'The server opens an authorized session. Drag its challenge to the device.',target:'device',success:'The signature is valid. Now generate a private identity using secure local randomness, with the public challenge mixed in as additional input.',code:'sc_enrollment_begin(&server, now, expires);\nsc_receive(&device, frame, length);',prepare:async l=>{await l.beginEnrollment();return l.transmit('server');}},
+  {title:'Deliver the encrypted response.',text:'The device returns the challenge, its identity, and its first report.',target:'server',success:'The response authenticated. This proposed key is waiting for trusted approval; nothing is registered yet.',code:'sc_report_temperature(&device, -18125);\nsc_receive_at(&server, frame, length, now);',prepare:async l=>{if(!l.states.device){await l.generateDevice({fromChallenge:true});await l.provisionDevice();const r=await l.command('device','rx',{frame:l.verifiedChallenge});if(r.code!==0)throw new Error(r.status);}await l.update('device','report',{temperature:-18125});return l.transmit('device');}},
   {title:'Deliver the enrollment confirmation.',text:'The approved server reply confirms this session and acknowledges the report.',target:'device',success:'The device authenticated the confirmation. Enrollment is complete.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')}
 ];

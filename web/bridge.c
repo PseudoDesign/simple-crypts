@@ -70,6 +70,38 @@ API int scw_generate(void) {
     store.key_ready=1;
     return SC_OK;
 }
+/* Before identity creation: verify with the pinned server key and fixed serial.
+ * Public challenge material supplements, never replaces, fresh secret randomness. */
+static uint8_t verified_challenge[172];
+static int challenge_ready;
+API int scw_verify_challenge(size_t n) {
+    if(store.ready)return SC_ERR_ARGUMENT;
+    if(n!=172)return SC_ERR_BOUNDS;
+    if(memcmp(input,"SCE2",4))return SC_ERR_PROTOCOL;
+    if(sodium_init()<0)return SC_ERR_RANDOM;
+    if(sodium_memcmp(input+4,input+512,32) ||
+       crypto_sign_verify_detached(input+108,input,108,input+512))return SC_ERR_AUTH;
+    if(memcmp(input+36,input+544,32) || sodium_is_zero(input+68,32) ||
+       sodium_is_zero(input+100,8))return SC_ERR_PROTOCOL;
+    memcpy(verified_challenge,input,172);challenge_ready=1;
+    return SC_OK;
+}
+API int scw_generate_from_challenge(void) {
+    uint8_t random[32], seed[32];crypto_generichash_state hash;
+    static const unsigned char domain[]="simple-crypts/demo/device-identity/v1";
+    if(!challenge_ready || store.key_ready || store.ready)return SC_ERR_ARGUMENT;
+    randombytes_buf(random,sizeof random);
+    crypto_generichash_init(&hash,random,sizeof random,sizeof seed);
+    crypto_generichash_update(&hash,domain,sizeof domain-1);
+    crypto_generichash_update(&hash,verified_challenge,sizeof verified_challenge);
+    crypto_generichash_final(&hash,seed,sizeof seed);
+    int result=crypto_sign_seed_keypair(store.pk,store.sk,seed);
+    sodium_memzero(random,sizeof random);sodium_memzero(seed,sizeof seed);
+    sodium_memzero(&hash,sizeof hash);sodium_memzero(verified_challenge,sizeof verified_challenge);
+    challenge_ready=0;
+    if(result)return SC_ERR_CRYPTO;
+    store.key_ready=1;return SC_OK;
+}
 /* Input: authorization[32], pinned server public key[32], NUL serial at 64.
  * Fresh keys only in production. Test seeds are a separate build/export. */
 static int initialize(int role,const uint8_t *seed) {

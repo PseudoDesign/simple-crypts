@@ -39,8 +39,8 @@ async function generate(page){
  assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
  assert.equal(await page.locator('#device-unique-id').textContent(),'mcu-0001');
  assert.equal(await page.locator('#pinned-server-key').textContent(),await page.locator('#server-public-key').textContent());
- await next(page);assert.match(await page.locator('#device-public-key').textContent(),/^[a-f0-9]{64}$/);
- await next(page);assert.equal(await pending(page).count(),1);
+ await next(page);assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
+ assert.equal(await pending(page).count(),1);
 }
 async function corrupt(packet){const button=packet.locator('[data-action="corrupt"]');await button.click();}
 try{
@@ -51,31 +51,29 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
   page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await ready(page);
   for(const chapter of ['trust','attack']){
    if(chapter==='attack'){await page.locator('#chapter-attack').click();await ready(page);}
-   assert(await page.locator('#message-log').isVisible());assert(await page.locator('#drop-target').isVisible());assert.equal(await page.locator('.inbox,#deliver,.show-tip').count(),0);
+   assert(await page.locator('#message-log').isVisible());assert.equal(await page.locator('#drop-target').count(),0);assert.equal(await page.locator('.inbox,#deliver,.show-tip').count(),0);
    await page.locator('#hide-tip').click();await page.locator('#chapter-'+chapter).click();assert(await page.locator('#guide-popup').isVisible());
    await generate(page);
-   // Drop calls no receiver and leaves the saved challenge draggable in the common log.
    const state=await page.locator('#device-details').textContent();
-   await dragPacket(page,pending(page),'#drop-target');
-   assert.match(await page.locator('#drop-result').textContent(),/No library error/);assert.equal(await page.locator('#device-details').textContent(),state);assert(await page.locator('#next').isDisabled());
-   const droppedId=await saved(page).getAttribute('data-packet');const dropped=page.locator(`[data-packet="${droppedId}"]`);
-   const original=await dropped.locator('pre').textContent();
-   await corrupt(dropped);assert.equal(await dropped.locator('[data-action="corrupt"]').getAttribute('aria-pressed'),'true');assert.notEqual(await dropped.locator('pre').textContent(),original);
-   await corrupt(dropped);assert.equal(await dropped.locator('pre').textContent(),original);
-   await corrupt(dropped);await dragPacket(page,dropped,'#device-panel');
-   assert.match(await page.locator('#device-result').textContent(),/authentication \(-3\)/);assert.equal(await page.locator('#device-details').textContent(),state);
+   const original=await pending(page).locator('pre').textContent();
+   await corrupt(pending(page));await corrupt(pending(page));assert.equal(await pending(page).locator('pre').textContent(),original);
+   await corrupt(pending(page));await dragPacket(page,pending(page),'#device-panel');
+   assert.match(await page.locator('#device-result').textContent(),/authentication \(-3\).*authentication failed/);
+   assert.equal(await page.locator('#device-details').textContent(),state);
+   assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
+   assert(await page.locator('#restart-enrollment').isVisible());
    // Turn corruption off on the rejected attempt; exact original bytes are restored.
    await corrupt(saved(page));await dragPacket(page,saved(page),'#device-panel');
    assert.match(await page.locator('#device-result').textContent(),/ok \(0\)/i);assert(!(await page.locator('#next').isDisabled()));
-   await next(page);await dragPacket(page,pending(page),'#server-panel');
+   await next(page);assert.match(await page.locator('#device-public-key').textContent(),/^[a-f0-9]{64}$/);await dragPacket(page,pending(page),'#server-panel');
    assert.match(await page.locator('#server-summary').textContent(),/Awaiting approval/);assert.equal(await page.locator('#server-temperature').textContent(),'—');
    // Replay is legitimate and idempotent here: expose success, not a fabricated error.
    await dragPacket(page,saved(page),'#server-panel');assert.match(await page.locator('#server-result').textContent(),/ok \(0\).*no newer state/i);
    assert.equal(await page.locator('#server-temperature').textContent(),'—');
    await next(page);assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');
-   await next(page);await dragPacket(page,pending(page),'#drop-target');
+   await next(page);
    assert.equal(await page.locator('#device-temperature-state').textContent(),'Awaiting server receipt');
-   await dragPacket(page,saved(page),'#device-panel');assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
+   await dragPacket(page,pending(page),'#device-panel');assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
    await dragPacket(page,saved(page),'#device-panel');assert.match(await page.locator('#device-result').textContent(),/ok \(0\).*no newer state/i);
    // Reflect the saved server confirmation back to the server and surface its actual error.
    await dragPacket(page,saved(page),'#server-panel');assert.match(await page.locator('#server-result').textContent(),/\(-\d+\).*Rejected/);
@@ -83,22 +81,28 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
   }
   // Advancing simulated server time alone does not call receive. A later response fails expiry.
   await page.locator('#reset').click();await ready(page);await generate(page);await dragPacket(page,pending(page),'#device-panel');await next(page);
-  await dragPacket(page,pending(page),'#drop-target');const beforeClock=await page.locator('#server-details').textContent();
+  const identity=await page.locator('#device-public-key').textContent();const beforeClock=await page.locator('#server-details').textContent();
   await page.locator('#advance-time').click();await ready(page);assert.equal(await page.locator('#server-details').textContent(),beforeClock);
-  await dragPacket(page,saved(page),'#server-panel');assert.match(await page.locator('#server-result').textContent(),/enrollment \(-10\)/);
+  await dragPacket(page,pending(page),'#server-panel');assert.match(await page.locator('#server-result').textContent(),/enrollment \(-10\)/);
   assert.equal(await page.locator('#server-temperature').textContent(),'—');
   for(let i=0;i<18;i++)await dragPacket(page,saved(page),'#server-panel');assert.equal(await page.locator('#message-log .packet').count(),16);
+  assert.match(await page.locator('#tour-text').textContent(),/expired/);
+  await page.locator('#restart-enrollment').click();await ready(page);
+  assert.equal(await page.locator('#device-public-key').textContent(),identity);
+  assert.equal(await page.locator('#message-log .packet').count(),0);
+  await next(page);await dragPacket(page,pending(page),'#device-panel');await next(page);await dragPacket(page,pending(page),'#server-panel');await next(page);await next(page);await dragPacket(page,pending(page),'#device-panel');
+  assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
   assert.equal((await page.request.get(base+'report/')).status(),200);assert.deepEqual(errors,[]);
   await context.close();
   if(name==='chromium'){
    const touch=await browser.newContext({viewport:{width:390,height:844},hasTouch:true}),t=await touch.newPage();await t.goto(base);await ready(t);await generate(t);
-   await dragPacket(t,pending(t),'#drop-target',true);await corrupt(saved(t));await dragPacket(t,saved(t),'#device-panel',true);assert.match(await t.locator('#device-result').textContent(),/\(-3\)/);
+   await corrupt(pending(t));await dragPacket(t,pending(t),'#device-panel',true);assert.match(await t.locator('#device-result').textContent(),/\(-3\)/);
    await corrupt(saved(t));await dragPacket(t,saved(t),'#device-panel',true);await next(t);await dragPacket(t,pending(t),'#server-panel',true);await next(t);await next(t);await dragPacket(t,pending(t),'#device-panel',true);
    assert.equal(await t.locator('#device-status').textContent(),'Confirmed');assert(await t.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    await t.screenshot({path:'/tmp/simple-crypts-touch-log.png',fullPage:true});await touch.close();
   }
   const unavailable=await browser.newContext();await unavailable.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const p=await unavailable.newPage();await p.goto(base);await p.locator('#error').waitFor({state:'visible'});assert.match(await p.locator('#error').textContent(),/randomness/);await unavailable.close();
-  console.log(`PASS ${name}: common log, reversible corruption, direct replay, real result codes, drops without fabricated errors, expiry, bounded history`);
+  console.log(`PASS ${name}: common log, reversible corruption, direct replay, real result codes, challenge before keygen, rejection recovery, expiry, bounded history`);
  }finally{await browser.close();}
 }
 }finally{server.close();}

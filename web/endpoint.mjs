@@ -24,10 +24,19 @@ export class Endpoint {
   state() { return JSON.parse(this.m.UTF8ToString(this.m._scw_state())); }
   async command(command, args = {}) {
     const m = this.m; let status = 0, frame;
-    if (command === 'generate') {
+    if(command==='verify_challenge') {
+      if(this.initialized)throw new Error('Already initialized');
+      if(!(args.frame instanceof Uint8Array)||args.frame.length>512)throw new Error('Frame must fit in 512 bytes');
+      this.put(args.frame);this.put(unhex(args.server_public_key),512);
+      const serial=validText(args.serial);if(serial.length>32)throw new Error('Serial too long');
+      m.HEAPU8.fill(0,m._scw_input()+544,m._scw_input()+576);this.put(serial,544);
+      status=m._scw_verify_challenge(args.frame.length);
+      return {code:status,status:m.UTF8ToString(m._scw_status(status)),state:null};
+    }
+    if (command === 'generate' || command === 'generate_from_challenge') {
       if(this.initialized)throw new Error('Already initialized');
       if(!globalThis.crypto?.getRandomValues)throw new Error('Secure browser randomness is unavailable');
-      status=m._scw_generate();
+      status=command==='generate'?m._scw_generate():m._scw_generate_from_challenge();
       return {code:status,status:m.UTF8ToString(m._scw_status(status)),public_key:status===0?hex(m.HEAPU8.slice(m._scw_public(),m._scw_public()+32)):null};
     }
     if (command === 'init') {

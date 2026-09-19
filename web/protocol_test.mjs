@@ -33,6 +33,25 @@ await scenario('separate production key generation and provisioning preserve ide
  await ok(d,'report',{temperature:1000});await move(d,server);await move(server,d);assert(d.state().registered);
  await assert.rejects(()=>d.command('generate'),/Already initialized/);
 });
+await scenario('verified public challenge supplements secret key-generation randomness',async()=>{
+ const server=await wasm('server');await ok(server,'enrollment_enable');await ok(server,'enrollment_begin',{now:100,expires:700});
+ const frame=await tx(server),args={frame,server_public_key:server.state().public_key,serial:'mcu-0001'};
+ const d=new Endpoint(await production());
+ assert((await d.command('generate_from_challenge')).code<0);
+ const bad=frame.slice();bad[171]^=1;
+ assert.equal((await d.command('verify_challenge',{...args,frame:bad})).code,-3);
+ assert((await d.command('generate_from_challenge')).code<0);assert.equal(d.state(),null);
+ assert.equal((await d.command('verify_challenge',{...args,serial:'wrong'})).code,-4);
+ await ok(d,'verify_challenge',args);
+ const rng=globalThis.crypto;globalThis.crypto=undefined;
+ await assert.rejects(()=>d.command('generate_from_challenge'),/randomness/);globalThis.crypto=rng;
+ const key=await d.command('generate_from_challenge');assert.equal(key.code,0);
+ const other=new Endpoint(await production());await ok(other,'verify_challenge',args);
+ assert.notEqual((await other.command('generate_from_challenge')).public_key,key.public_key);
+ await ok(d,'init',{role:'device',secret,server_public_key:server.state().public_key});await ok(d,'enrollment_enable');
+ await ok(d,'rx',{frame});await ok(d,'report',{temperature:123});await ok(server,'rx',{frame:await tx(d),now:101});
+ assert.equal(server.state().candidate_key,key.public_key);
+});
 await scenario('signed enrollment stages a key and requires explicit session-bound approval',async()=>{
  const[d,s]=await pair();for(const e of [d,s])await ok(e,'enrollment_enable');
  await ok(d,'report',{temperature:1234});assert.equal((await d.command('tx')).code,1);

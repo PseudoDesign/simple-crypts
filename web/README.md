@@ -28,11 +28,10 @@ bazel test //web:browser_test --test_output=errors
 The explicit `//web:browser_test` target is marked manual because browser
 engines are separate development prerequisites; `bazel test //...` runs the
 protocol, relay, and site-verification checks without them. Browser tests launch a loopback-only HTTP server and need permission to bind a
-local socket. They test `/simple-crypts/` URL resolution, both browsers, the tour,
-native drag/drop, touch dragging, keyboard selection, reflected/replayed messages,
-focused guide visibility and one-destination gating, tampering, reordered reports, queue limits, reset during pending work, refresh,
-UTF-8 validation, keyboard use, narrow layouts, and unavailable randomness.
-Screenshots are written to `/tmp/simple-crypts-{browser}-{tour,mobile}.png`.
+local socket. They test both chapters in Chromium and Firefox, corruption toggles,
+replays and reflections, delayed responses, rejection recovery, bounded history,
+and simulated touch dragging. Screenshots are written to
+`/tmp/simple-crypts-{browser}-{chapter}-log.png` and `/tmp/simple-crypts-touch-log.png`.
 The Node/Bazel protocol tests additionally check native C interoperability in
 both roles, byte-identical fixtures, full uint64 revisions, storage failures,
 nonce reservation/reboot, and the production build's absence of test exports.
@@ -44,8 +43,7 @@ only public state and copied frames cross the application boundary. Identity
 private keys stay inside the software provider. The common page is still a
 trusted demo orchestrator, not a hostile security boundary or hardware keystore.
 Initialization pins the server’s Ed25519 public key on the device. The demo
-enables signed, server-initiated enrollment; there is no shared enrollment code. Secure browser randomness is required at
-provisioning. Counter-based encryption and reboot use the retained keys without
+enables signed, server-initiated enrollment; there is no shared enrollment code. Secure browser randomness is required for identity generation. Counter-based encryption and reboot use the retained keys without
 requiring new random nonces.
 
 The C bridge owns bounded in-memory storage. Record commits atomically replace
@@ -55,38 +53,36 @@ Refresh/Reset destroys the session and generates new keys. Nothing is saved to
 localStorage or IndexedDB. Wasm memory sizing is a browser build setting, not an
 MCU resource estimate.
 
-The message board shows each signed or encrypted frame as a box in its source outbox.
-Drag its handle to either endpoint inbox, Hold, or Discard. Keyboard and touch
-users can also select a box and activate a destination. A destination inbox
-always invokes that endpoint, including attempts to reflect a message back to
-its sender. State differences and rejection reasons come from the real library.
+Both chapters use one draggable message log. Drag a packet onto either endpoint
+to deliver it; drag a saved attempt again to replay it. The corruption button
+flips/restores a wire byte. The page shows actual status codes and explains
+rejections. Duplicates may return success with no state change. Leaving a packet
+in the log withholds delivery; there is no receiver call or fabricated timeout.
+The explicit server-clock button advances simulated time by 601 seconds to cross
+the ten-minute session deadline. Expiry is checked when a response arrives.
 
-Device and server cards remain visible throughout the guide, showing their
-public keys and private-key status (private bytes remain in the worker).
-Provisioning adds the pinned server key to the device; successful enrollment
-adds the registered device key to the server.
+The guide starts with server authorization and a signed public challenge. Before
+creating a device identity, the demo's C bridge verifies the signature against the
+pinned server key, frame structure, serial, and nonzero challenge/expiry. The next
+action generates the device key and encrypted response. A domain-separated keyed
+BLAKE2b hash mixes the verified invitation with 32 fresh secret random bytes; its
+32-byte output seeds libsodium's Ed25519 keypair function. Temporary secret inputs
+are wiped. The public challenge adds session diversity, **not secret entropy**:
+it cannot repair predictable local randomness. Missing browser randomness fails
+closed. This is a demo provider extension, not a change to the C protocol API.
 
-The six-step enrollment tour generates a device Ed25519 key pair, prepares the
-pinned server identity, sends a signed server challenge, delivers an encrypted
-device response, explicitly approves the serial/session/key binding, and delivers
-the encrypted confirmation. X25519 keys are converted internally for NaCl box.
-The existing trusted user-authentication mechanism is outside the demo; only
-its authorize/approve decisions are shown. The response is staged and cannot
-register a device before that separate approval action.
+The server stages the response until a trusted user approves the exact
+serial/session/key binding, then emits an encrypted confirmation. X25519 keys
+are converted internally for NaCl box. User authentication is outside the demo.
+Device and server cards remain visible with public keys and private-key status.
+Packet details for ciphertext are the sender's teaching view, not host decryption.
 
-Each packet shows its actual size and wire bytes. The signed invitation is
-public; response/confirmation details are a sender-side teaching view, not host
-decryption. The server clock is virtual and held at 1000 during the guided tour;
-sessions expire at 1600. Automated tests advance trusted time to test expiry.
-Forms, history, and experiment controls
-are hidden until Sandbox is opened. A successful drop shows a short result and
-Continue; the next packet is generated only when Continue is activated. Wrong
-drops leave the current packet untouched. Mouse dragging, touch dragging, and
-keyboard selection all invoke the same delivery operation. On touchscreens, a
-floating packet follows the finger and the entire destination entity accepts
-the drop. Interrupted gestures leave the packet queued; tapping a packet and
-then its inbox is also supported.
-The latest 16 tried messages are retained for replay as independent copies.
+A rejection offers Restart enrollment. Before registration this cancels the
+server session and clears the message log, retaining any generated device key;
+the next authorization creates a fresh challenge. After registration it starts a
+fresh demo session, like Reset. The device does not regenerate an existing key
+on subsequent challenges. Mouse, touch, and pen use the same drag delivery path;
+tapping a recipient does not deliver a packet.
 
 The relay holds at most 64 copied frames. Full queues block new opportunities;
 endpoints retain their latest pending state. The history retains the latest 200

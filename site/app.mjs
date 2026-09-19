@@ -1,5 +1,5 @@
-import {Lab,tour} from './lab.mjs';
-import {hex} from './endpoint.mjs';
+import {Lab,tour} from './lab.mjs?v=6d0e4d6f624346cbae85';
+import {hex} from './endpoint.mjs?v=6d0e4d6f624346cbae85';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0;

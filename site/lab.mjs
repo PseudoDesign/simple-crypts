@@ -1,4 +1,4 @@
-import {hex} from './endpoint.mjs';
+import {hex} from './endpoint.mjs?v=6d0e4d6f624346cbae85';
 export const MAX_QUEUE=64, MAX_EVENTS=200;
 export class Lab {
   constructor(onChange=()=>{},workerFactory=url=>new Worker(url,{type:'module'})) {
@@ -19,7 +19,7 @@ export class Lab {
       if(!globalThis.crypto?.getRandomValues)throw new Error('Secure browser randomness is unavailable. Open this demo over HTTPS or localhost.');
       const secretBytes=crypto.getRandomValues(new Uint8Array(32));const secret=hex(secretBytes);secretBytes.fill(0);
       for(const role of ['device','server']){
-        const worker=this.workerFactory(new URL('./worker.mjs',import.meta.url));this.workers[role]=worker;
+        const worker=this.workerFactory(new URL('./worker.mjs?v=6d0e4d6f624346cbae85',import.meta.url));this.workers[role]=worker;
         worker.onmessage=({data})=>{const p=this.pending.get(data.id);if(!p)return;this.pending.delete(data.id);data.error?p.reject(new Error(data.error)):p.resolve(data.result);};
         worker.onerror=()=>{for(const [id,p]of this.pending){if(p.role===role){this.pending.delete(id);p.reject(new Error(`${role} runtime failed to load or execute`));}}};
       }

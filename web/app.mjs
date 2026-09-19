@@ -86,8 +86,8 @@ function render(){
   document.body.dataset.mode=mode;
   document.body.dataset.phase=step<0?'intro':completed?'complete':'deliver';
   document.body.dataset.target=mode==='tour'&&step>=0?tour[step].target:'';
-  $('provisioning-details').hidden=setup<2;
-  text('pinned-server-key',lab.states.device?.peer_public_key??'');
+  $('server-trust-details').hidden=!lab.states.server;
+  text('pinned-server-key',lab.states.device?.peer_public_key??lab.states.server?.public_key??'');
   text('device-unique-id',lab.states.device?.serial??DEVICE_SERIAL);
   text('device-public-key',lab.devicePublicKey??lab.states.device?.public_key??'Not generated yet');
   text('server-public-key',lab.states.server?.public_key??'Starting…');
@@ -148,7 +148,7 @@ function render(){
   positionTip();
   text('session-status',!lab.ready?'Initializing local endpoints…':busy?'Running the library…':mode==='sandbox'?'Sandbox · every message may be tried against either endpoint.':step<0?'Start the tour to generate the first message.':completed?'Action complete · continue when you are ready.':'Your turn · move the highlighted message.');
 }
-function intro(){showTip();$('packet-inspector').open=false;$('experiment-tools').open=false;setup=0;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','STEP 1 OF 6');text('tour-title','Generate the device’s key pair.');text('tour-text','Create a public identity and a private key inside the device.');text('next','Generate key pair →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}
+function intro(){showTip();$('packet-inspector').open=false;$('experiment-tools').open=false;setup=0;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','STEP 1 OF 5');text('tour-title','Generate the device’s key pair.');text('tour-text','Create a public identity and a private key inside the device.');text('next','Generate key pair →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An inbox receives only when you drop a message into it.');$('result-changes').replaceChildren();}
 async function run(fn){if(busy)return;const id=++operation;busy=true;$('error').hidden=true;render();try{await fn();}catch(error){if(id===operation&&error.name!=='AbortError'){text('error',error.message);$('error').hidden=false;}}finally{if(id===operation){busy=false;render();}}}
 async function place(id,target){
   if(mode==='tour'&&(step<0||completed||target!==tour[step].target))return;
@@ -163,7 +163,7 @@ async function place(id,target){
   }
   selected=null;hint();
   if(mode==='tour'&&step>=0&&!completed&&p.origin===expected&&target===tour[step].target&&(target==='discard'||result?.code===0)){
-    showTip();completed=true;text('tour-title',step===tour.length-1?'Enrollment complete.':target==='discard'?'Packet discarded.':'Delivered.');text('tour-text',tour[step].success);text('next',step===tour.length-1?'Start again ↺':step===1?'Approve this serial + key →':'Create encrypted response →');$('progress-fill').style.width=((step===2?6:step+3)/6*100)+'%';
+    showTip();completed=true;text('tour-title',step===tour.length-1?'Enrollment complete.':target==='discard'?'Packet discarded.':'Delivered.');text('tour-text',tour[step].success);text('next',step===tour.length-1?'Start again ↺':step===1?'Approve this serial + key →':'Create encrypted response →');$('progress-fill').style.width=((step===2?5:step+2)/5*100)+'%';
   }else if(mode==='tour'&&step>=0&&!completed&&target!=='relay'){
     text('tour-text',`You tried ${target==='discard'?'discarding it':`the ${target} inbox`}. The result below comes from the library. To continue this lesson, move the highlighted message to ${tour[step].target==='discard'?'Discard':`the ${tour[step].target} inbox`}. If it is gone or modified, use “Try this message again.”`);
   }
@@ -172,9 +172,8 @@ $('reset').onclick=()=>{cancelTouch();operation++;busy=false;intro();mode='tour'
 $('sandbox').onclick=()=>run(async()=>{cancelTouch();if(!lab.states.device){if(!lab.devicePublicKey)await lab.generateDevice();await lab.provisionDevice();setup=2;}mode='sandbox';text('tour-progress','EXPLORE · YOU MOVE THE MESSAGES');text('tour-title','Share state between the endpoints.');text('tour-text','The server chooses a name; the device measures temperature. Create and drag messages to see when the other side learns each change.');text('next','Restart guided tour →');render();});
 $('next').onclick=()=>run(async()=>{
   if(mode==='sandbox'||step===tour.length-1){mode='tour';intro();await lab.reset({deferDevice:true});return;}
-  if(setup===0){await lab.generateDevice();setup=1;text('tour-title','The device has its own identity.');text('tour-text','The public key can be shared. The private key stays with the device.');text('next','Provision device →');$('progress-fill').style.width='17%';return;}
-  if(setup===1){await lab.provisionDevice();setup=2;text('tour-progress','STEP 2 OF 6');text('tour-title','Prepare the device for enrollment.');text('tour-text','The device already knows the server’s Ed25519 public key and its own serial.');text('next','Authorize session & create challenge →');$('progress-fill').style.width='33%';return;}
-  if(step===1&&completed&&!lab.states.server.registered){await lab.approveEnrollment();text('tour-progress','STEP 5 OF 6');text('tour-title','The server approved this identity.');text('tour-text','Approval binds the serial and key, accepts the report, and consumes the session.');text('next','Create confirmation →');$('progress-fill').style.width='83%';return;}
+  if(setup===0){if(!lab.devicePublicKey)await lab.generateDevice();await lab.provisionDevice();setup=2;text('tour-title','The device has its own identity.');text('tour-text','Its private key stays on the device. The server can now authorize enrollment.');text('next','Authorize session & create challenge →');$('progress-fill').style.width='20%';return;}
+  if(step===1&&completed&&!lab.states.server.registered){await lab.approveEnrollment();text('tour-progress','STEP 4 OF 5');text('tour-title','The server approved this identity.');text('tour-text','Approval binds the serial and key, accepts the report, and consumes the session.');text('next','Create confirmation →');$('progress-fill').style.width='80%';return;}
   const next=step+1;const id=await tour[next].prepare(lab);if(id===null)throw new Error('No message generated. Reset the tour to start a fresh exchange.');
   step=next;completed=false;expected=lab.packet(id).origin;original={...lab.packet(id),bytes:lab.packet(id).bytes.slice()};
   const sender=lab.states[original.from];
@@ -185,7 +184,7 @@ $('next').onclick=()=>run(async()=>{
   $('packet-fields').replaceChildren();for(const [name,value]of fields){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;dd.textContent=value;$('packet-fields').append(dt,dd);}
   text('packet-wire',`Sender public key: ${sender.public_key}\nRecipient public key: ${lab.states[original.to].public_key}\n\nActual wire frame:\n${hex(original.bytes).match(/.{1,48}/g).join('\n')}`);
   $('enrollment-packet').querySelector('details').open=false;
-  text('tour-progress',`STEP ${step===2?6:step+3} OF 6`);text('tour-title',tour[step].title);text('tour-text',tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
+  text('tour-progress',`STEP ${step===2?5:step+2} OF 5`);text('tour-title',tour[step].title);text('tour-text',tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
 });
 $('begin-enrollment').onclick=()=>run(()=>lab.beginEnrollment());
 $('approve-enrollment').onclick=()=>run(()=>lab.approveEnrollment());

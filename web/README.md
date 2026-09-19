@@ -2,7 +2,7 @@
 
 The production C99 protocol core, nanopb, and libsodium 1.0.20 compile to a
 WebAssembly module with checksum-pinned Emscripten 4.0.10. Vanilla ES modules
-render the tour and sandbox. No server application, CDN, analytics, or runtime
+render the guided chapters and shared message log. No server application, CDN, analytics, or runtime
 package downloads are used. Only static assets are requested.
 
 ```sh
@@ -71,7 +71,7 @@ are wiped. The public challenge adds session diversity, **not secret entropy**:
 it cannot repair predictable local randomness. Missing browser randomness fails
 closed. This is a demo provider extension, not a change to the C protocol API.
 
-The server stages the response until a trusted user approves the exact
+The server stages the response until the application authorizes the exact
 serial/session/key binding, then emits an encrypted confirmation. X25519 keys
 are converted internally for NaCl box. User authentication is outside the demo.
 Device and server cards remain visible with public keys and private-key status.
@@ -87,7 +87,7 @@ tapping a recipient does not deliver a packet.
 The relay holds at most 64 copied frames. Full queues block new opportunities;
 endpoints retain their latest pending state. The history retains the latest 200
 events. No pings, retries, clock callbacks, or animation events transmit frames.
-The guided tour explicitly invokes the same operations as the sandbox. Delivery
+The guided tour and message log invoke the same endpoint operations. Delivery
 of an authenticated duplicate or stale snapshot can succeed without changing
 application state. Transport acceptance alone does not establish convergence.
 

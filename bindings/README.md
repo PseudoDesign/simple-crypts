@@ -43,7 +43,7 @@ Private keys never cross the SDK boundary. Call `enrollment_enable()` on fresh
 Python/Rust endpoints (`EnrollmentEnable` in Go, `sc_host_enrollment_enable` in C)
 before sending traffic. Begin an authorized session, deliver its signed challenge,
 and deliver the encrypted response. Inspect `candidate_key` and approve the exact
-challenge/key pair through the existing trusted enrollment mechanism.
+challenge/key pair through the application's enrollment authorization policy.
 
 `enrollment_begin(now, expires)`, `enrollment_approve(challenge, key, now)`, and
 `enrollment_cancel()` are trusted control-plane calls; they are not relay inputs.

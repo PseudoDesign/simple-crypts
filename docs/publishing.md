@@ -3,7 +3,7 @@
 The [GitHub Pages homepage](https://pseudodesign.github.io/simple-crypts/) runs the
 live C/WebAssembly demo. The [test report](https://pseudodesign.github.io/simple-crypts/report/)
 is a separately attributed snapshot of tested source. Existing resource and log
-URLs remain available. Further hardware measurement is deferred.
+URLs remain available. Hardware measurements are maintained separately from demo publication.
 
 `web/` contains editable demo sources. Bazel generates a preview site under
 `bazel-bin/web/site`; committed `site/` contains the published static assets.

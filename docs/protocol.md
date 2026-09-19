@@ -41,8 +41,8 @@ diagnostics encode them as decimal strings.
 The core API accepts one complete envelope. UART delimiter framing, COBS,
 checksums, and partial-byte assembly are transport responsibilities. The caller
 must bound that assembly buffer; serial noise must never create an unbounded
-allocation. At 115200 baud with 8N1 framing, an envelope of N bytes requires
-`10*N/115200` seconds of serialization, excluding any transport framing or
+allocation. As an optional UART example, at 115200 baud with 8N1 framing an
+envelope of N bytes requires `10*N/115200` seconds of serialization, excluding any transport framing or
 processing time. A 512-byte envelope takes about 44.4 ms.
 
 ## Nonces and durable state
@@ -80,7 +80,7 @@ explicit legacy sample callers/tests that do not enable signed enrollment.
 It does not prove hardware provenance. New demos and examples enable signed
 enrollment and use no shared enrollment secret.
 
-1. The existing trusted server mechanism calls `sc_enrollment_begin(now, expires)`
+1. The application's enrollment authorization policy calls `sc_enrollment_begin(now, expires)`
    for the context's serial. The server needs cryptographic randomness for a
    fresh 32-byte session challenge; signing and encryption need no fresh RNG.
 2. On a transmission opportunity the server emits a **public, signed** invitation.
@@ -90,17 +90,17 @@ enrollment and use no shared enrollment secret.
    identity. The server uses `sc_receive_at(..., now)` to validate the response
    against the active, unexpired session. The response stages a candidate key
    and first report; it does not register a device or accept application state.
-4. The trusted mechanism calls `sc_enrollment_approve(challenge, key, now)`.
+4. The application authorizes approval and calls `sc_enrollment_approve(challenge, key, now)`.
    It must authorize this **exact serial, session, and key**. Registration,
    initial state acceptance, and session consumption commit atomically.
 5. An encrypted confirmation echoes the challenge and acknowledges the report.
    A duplicate authenticated response regenerates a lost confirmation.
 
-No mTLS or user authentication is implemented here. Those are inputs to the
-trusted approval operation, never actions authorized by a relay packet.
+Authentication and authorization are supplied by the application. Enrollment
+approval is a control-plane operation, never an action authorized by a relay packet.
 `sc_enrollment_cancel()` and session replacement invalidate pending responses.
 Pending candidates survive reboot. Only one candidate is retained per session;
-a different key is rejected until the trusted mechanism replaces the session.
+a different key is rejected until the application authorizes a replacement session.
 The first candidate may include a temperature report but may not claim prior
 name application. The current reporting API creates that first report with
 `sc_report_temperature()`.
@@ -140,7 +140,7 @@ Each identity uses one Ed25519 key pair. The software keystore stores the
 libsodium 64-byte secret representation; temporary X25519 secret scalars are
 wiped after each box operation. Public keys, pins, wire identity fields, and
 approvals are all Ed25519. The raw-X25519 helper functions remain available
-only for independent primitive tests and the deferred hardware probe.
+only for independent primitive tests and the optional hardware probe.
 
 This is a wire/storage break from version 1. Old envelopes and `SCSTORE1`
 stores are rejected; existing keys are not silently reinterpreted or overwritten.

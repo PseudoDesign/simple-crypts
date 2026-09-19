@@ -1,12 +1,14 @@
 # Simple Crypts
 
-A sample device/server library for encrypted state synchronization through an
-untrusted, intermittently connected relay. The device reports its temperature;
-the server requests a name. Applications work with state and opaque frames.
+Simple Crypts is an open-source library and interactive demonstration of
+authenticated device/server messaging. It provides a bounded-memory C core,
+language bindings, and replaceable cryptography and storage providers. The
+current example synchronizes a device-reported temperature and server-requested
+name through an untrusted relay.
 
 Try the [live browser demo](https://pseudodesign.github.io/simple-crypts/): follow
 the guided exchange by dragging message boxes yourself, then try reflected,
-reordered, replayed, or corrupted messages in the sandbox. The actual C
+reordered, replayed, or corrupted messages in the shared message log. The actual C
 library and NaCl box run locally through WebAssembly. View the
 [test evidence](https://pseudodesign.github.io/simple-crypts/report/) separately.
 See [web build and browser tests](web/README.md) to run the demo locally.
@@ -58,8 +60,8 @@ caller-owned C context and supplies platform callbacks; it needs no filesystem,
 heap, sockets, wall clock, or background thread in the protocol engine.
 
 Devices hold an Ed25519 identity, their serial, and the server's pinned Ed25519
-public key. Enable signed enrollment on both endpoints. The trusted server
-mechanism opens a session; the device verifies its signed challenge and sends
+public key. Enable signed enrollment on both endpoints. The application's enrollment
+authorization policy opens a session; the device verifies its signed challenge and sends
 an encrypted response. Registration occurs only after explicit approval of the
 exact serial/session/key binding. The protected reply confirms enrollment.
 See [the enrollment and key-format contract](docs/protocol.md#enrollment).
@@ -92,7 +94,8 @@ durability contracts.
 ## Scope
 
 The host provider is an inspectable reference implementation, with software
-keys in a private file store. It is not the hypothetical protected MCU keystore.
+keys in a private file store. Platform integrations can replace it with a
+provider appropriate to their key-protection requirements.
 Counter storage must survive ordinary reboot and must not be rolled back or
 cloned under an existing identity. Weak entropy cannot create a safe new key;
 preprovisioned keys allow the protocol to use durable counters instead of fresh
@@ -105,7 +108,7 @@ qualifying a physical board remain separate work.
 [Upstream MCU guidance](https://doc.libsodium.org/installation#cross-compiling-to-arm-microcontrollers).
 
 Physical-board qualification, key rotation, fleet registry integration, and
-telemetry history are later milestones.
-The earlier [planning notes](PLAN.md) and [MCU feasibility discussion](MCU_FEASIBILITY.md)
-retain the alternatives considered; the implementation and protocol documents
-define this milestone's selected profile.
+telemetry history are outside the current implementation.
+The [design notes](PLAN.md) summarize architecture choices and historical
+alternatives. [Embedded evaluation notes](MCU_FEASIBILITY.md) describe optional
+platform integrations; the protocol documents define the implemented profile.

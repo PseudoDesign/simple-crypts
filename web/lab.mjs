@@ -74,13 +74,13 @@ export class Lab {
   async beginEnrollment(){
     const r=await this.command('server','enrollment_begin',{now:this.time,expires:this.time+600});
     if(r.code!==0)throw new Error(r.status);
-    this.event('Trusted server mechanism authorized a 10-minute enrollment session.');
+    this.event('Application policy authorized a 10-minute enrollment session.');
   }
   async approveEnrollment(){
     const s=this.states.server;
     const r=await this.command('server','enrollment_approve',{challenge:s.challenge,key:s.candidate_key,now:this.time});
     if(r.code!==0)throw new Error(r.status);
-    this.event('Trusted server mechanism approved this exact serial, session, and Ed25519 key. Device registered.');
+    this.event('Application policy approved this exact serial, session, and Ed25519 key. Device registered.');
   }
   async transmit(role,budget=512){
     if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue is full (64 frames). Deliver or drop a frame before another opportunity.');

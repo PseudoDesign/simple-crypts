@@ -12,12 +12,12 @@ synchronization. The core is C99 and does not allocate heap memory.
 | Keystore / public key | Resolve an opaque key handle; reveal only its public key to the core. |
 | Crypto seal/open | Use the fixed NaCl box profile, with the handle and peer public key. Authenticate before publishing plaintext to application logic. |
 | Randomness | Return cryptographically trustworthy random bytes or an error. Never substitute serials, clocks, counters, or predictable sensor samples for entropy. |
-| Enrollment secret | Retrieve the provisioned authorization inside the trusted endpoint boundary. |
+| Enrollment secret (legacy mode) | Retrieve the authorization secret inside the endpoint boundary; unused by signed enrollment. |
 | Durable load | Return a bounded complete record and its generation, or an explicit not-found result. |
 | Durable commit | Atomically compare the expected generation and replace the entire record. A failure must not expose a partially applied record. |
 | Durable reserve | Persistently burn a nonoverlapping counter range before returning it. Scope the namespace to key identity and direction. |
 
-“Good keystore” remains abstract. It may use hardware key slots, secure-world
+The keystore interface supports hardware key slots, secure-world
 software, or protected external storage. A hardware backend must implement
 the actual selected cryptographic operation; a generic ECDH-capable key slot
 does not by itself provide NaCl box. The reference libsodium backend is a
@@ -45,9 +45,10 @@ rollback or rewriting by an attacker who controls the endpoint's storage.
 The on-disk reference format is local to the host ABI, not a portable backup
 or fleet database format.
 
-Keep the server and device stores outside the relay's authority. Secure boot
-alone does not provide key secrecy, state anti-rollback, or safe manufacturing
-provisioning. A hardware-specific implementation must supply those properties.
+Keep the server and device stores outside the relay's authority. Platform
+implementations must protect private-key confidentiality and prevent rollback
+or cloning of counters under an existing identity. Atomic writes alone do not
+establish these properties.
 
 ## Memory evidence
 

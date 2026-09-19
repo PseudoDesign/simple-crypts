@@ -1,4 +1,4 @@
-import {hex} from './endpoint.mjs?v=4f10519cfc0138fce0a8';
+import {hex} from './endpoint.mjs?v=4e4c0e38c70d5c307712';
 export const MAX_QUEUE=64, MAX_EVENTS=200;
 // The demo device has a fixed serial before it generates keys or enrolls.
 export const DEVICE_SERIAL='mcu-0001';
@@ -23,7 +23,7 @@ export class Lab {
       // Compatibility slot only: signed enrollment uses no shared enrollment secret.
       const secret='00'.repeat(32);
       for(const role of ['device','server']){
-        const worker=this.workerFactory(new URL('./worker.mjs?v=4f10519cfc0138fce0a8',import.meta.url));this.workers[role]=worker;
+        const worker=this.workerFactory(new URL('./worker.mjs?v=4e4c0e38c70d5c307712',import.meta.url));this.workers[role]=worker;
         worker.onmessage=({data})=>{const p=this.pending.get(data.id);if(!p)return;this.pending.delete(data.id);data.error?p.reject(new Error(data.error)):p.resolve(data.result);};
         worker.onerror=()=>{for(const [id,p]of this.pending){if(p.role===role){this.pending.delete(id);p.reject(new Error(`${role} runtime failed to load or execute`));}}};
       }
@@ -102,14 +102,14 @@ export class Lab {
     if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue is full (64 frames).');
     const p=this.packet(id);const copy={...p,id:this.nextPacket++,bytes:p.bytes.slice()};this.queue.push(copy);this.event(`Host duplicated frame ${id} as frame ${copy.id}.`);return copy.id;
   }
-  corrupt(id){const p=this.packet(id);p.bytes[p.bytes.length-1]^=1;p.corrupted=!p.corrupted;this.event(`Host flipped the final ciphertext byte of frame ${id}.`);}
+  corrupt(id){const p=this.packet(id);p.bytes[p.bytes.length-1]^=1;p.corrupted=!p.corrupted;this.event(`Host flipped the final wire byte of frame ${id}.`);}
   async deliver(id,target){
     const p=this.packet(id);target=target??p.to;if(!['device','server'].includes(target))throw new Error('Unknown recipient');const epoch=this.epoch;
     const before={...this.states[target]};
     const result=await this.command(target,'rx',{frame:p.bytes.slice(),now:this.time});
     if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
     this.queue=this.queue.filter(p=>p.id!==id);
-    const fields=['registered','temperature','actual_name','desired_name','reported_revision','desired_revision','processed_desired_revision','acked_reported_revision','pending'];
+    const fields=['registered','temperature','actual_name','desired_name','reported_revision','desired_revision','processed_desired_revision','acked_reported_revision','pending','challenge','candidate_key','candidate_revision'];
     const changes=fields.filter(k=>before[k]!==result.state[k]).map(k=>({field:k,before:before[k],after:result.state[k]}));
     result.changes=changes;
     this.remember(p,result.code<0?'rejected by '+target:changes.length?'accepted by '+target:'accepted; no newer state');

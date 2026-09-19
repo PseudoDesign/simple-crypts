@@ -192,3 +192,18 @@ body[data-mode="tour"] .guide-popup>details{margin-top:6px}
 
 .endpoint.suggested{border:2px dashed #88ac80}
 .endpoint.drag-over{background:#eef7eb!important;border:2px solid var(--green)!important;box-shadow:0 0 0 4px #22684e22!important}
+
+/* Enrollment attack chapter keeps the same compact endpoint stage. */
+body[data-chapter="attack"] .packet-actions{display:flex;gap:4px;padding:5px 0 0;justify-content:center}
+body[data-chapter="attack"] .packet-actions button{padding:5px 7px;font-size:10px}
+body[data-chapter="attack"] #experiment-tools .relay{display:none}
+body[data-chapter="attack"] .archive-panel,body[data-chapter="attack"] .result-panel{display:block}
+body[data-chapter="attack"] .guide-popup:has(#experiment-tools[open]){max-height:180px}
+body[data-chapter="attack"] .message-tray{display:flex;gap:8px;overflow:auto;max-height:245px}
+body[data-chapter="attack"] .packet{flex:0 0 min(210px,100%);min-width:0}
+body[data-chapter="attack"] .packet.corrupted .drag-handle{border-color:var(--red);background:#fbe9e1}
+.packet-result{margin:0;padding:4px 6px;border-radius:5px;background:var(--mint);font-size:10px;color:var(--green)}
+.packet-result[data-rejected="true"]{background:#fbe9e1;color:var(--red)}
+@media(max-width:500px){.chapter-banner a{padding:5px;font-size:10px}}
+
+body[data-dragging="true"] .guide-popup{pointer-events:none;opacity:.35}

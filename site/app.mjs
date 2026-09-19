@@ -1,8 +1,8 @@
-import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=4f10519cfc0138fce0a8';
-import {hex} from './endpoint.mjs?v=4f10519cfc0138fce0a8';
+import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=4e4c0e38c70d5c307712';
+import {hex} from './endpoint.mjs?v=4e4c0e38c70d5c307712';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
-let expected=null,completed=false,original=null,setup=0;
+let expected=null,completed=false,original=null,setup=0,attackChapter=false;
 const lab=new Lab(render);
 let sandboxRole='device';
 function guideRole(){return mode==='sandbox'?sandboxRole:step<0?(setup<2?'device':'server'):completed?tour[step].target:original?.from??'server';}
@@ -27,7 +27,7 @@ function datetime(seconds){
 }
 function hint(){text('move-hint',mode==='tour'?'Drag the packet onto the highlighted recipient.':'Drag a message onto an endpoint, Hold here, or Discard.');}
 function card(p){
-  const article=document.createElement('article');article.className='packet'+(p.corrupted?' corrupted':'');article.dataset.packet=p.id;article.dataset.origin=p.origin;
+  const article=document.createElement('article');article.className='packet'+(p.corrupted?' corrupted':'');article.dataset.packet=p.id;article.dataset.origin=p.origin;article.dataset.from=p.from;
   const handle=document.createElement('div');handle.className='drag-handle';handle.draggable=true;handle.tabIndex=0;handle.setAttribute('role','group');handle.dataset.select=p.id;
   handle.setAttribute('aria-label',`Move message ${p.id} from ${p.from}`);
   const title=document.createElement('span');title.className='packet-title';handle.append(title);
@@ -68,20 +68,19 @@ function card(p){
   }
   const meta=document.createElement('p');meta.className='packet-meta';meta.textContent=`${p.bytes.length} bytes · ${p.corrupted?'modified packet':p.signed?'signed public challenge':'sealed message'}`;
   const actions=document.createElement('div');actions.className='packet-actions';
-  for(const [action,label]of [['duplicate','Duplicate'],['corrupt','Corrupt']]){const b=document.createElement('button');b.textContent=label;b.dataset.action=action;b.dataset.packet=p.id;b.setAttribute('aria-label',`${label} message ${p.id}`);actions.append(b);}
+  for(const [action,label]of [['duplicate','Duplicate'],['corrupt','Corrupt'],['drop','Drop']]){const b=document.createElement('button');b.textContent=label;b.dataset.action=action;b.dataset.packet=p.id;b.setAttribute('aria-label',`${label} message ${p.id}`);actions.append(b);}
   const details=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent=p.signed?'Inspect signed bytes':'Inspect opaque bytes';pre.textContent=hex(p.bytes).match(/.{1,48}/g).join('\n');details.append(summary,pre);
   article.append(handle,meta,actions,details);return article;
 }
-$('chapter-trust').onclick=e=>{e.preventDefault();if(mode==='tour'){showTip();return;}$('reset').click();};
-$('chapter-state').onclick=e=>{e.preventDefault();if(busy)return;if(!lab.states.device?.registered||!lab.states.server?.registered){showTip();return;}if(mode!=='sandbox')enterSharedState();showTip();};
+async function startChapter(attacks){
+  cancelTouch();operation++;busy=false;attackChapter=attacks;mode='tour';intro();
+  await run(()=>lab.reset({deferDevice:true}));
+}
+$('chapter-trust').onclick=e=>{e.preventDefault();if(!attackChapter){showTip();return;}startChapter(false);};
+$('chapter-attack').onclick=e=>{e.preventDefault();if(attackChapter){showTip();return;}startChapter(true);};
 function render(){
-  const enrolled=!!lab.states.device?.registered&&!!lab.states.server?.registered;
-  const sharing=mode==='sandbox'&&enrolled;
-  for(const [id,current]of [['chapter-trust',!sharing],['chapter-state',sharing]]){if(current)$(id).setAttribute('aria-current','step');else $(id).removeAttribute('aria-current');}
-  $('chapter-state').setAttribute('aria-disabled',String(!enrolled||busy));
-  $('chapter-state').title=enrolled?'Change the name, report temperature, and drag messages between endpoints':'Complete enrollment to share state';
-  $('chapter-trust').title=mode==='tour'?'Current enrollment chapter':'Restart enrollment with fresh keys';
-
+  for(const [id,current]of [['chapter-trust',!attackChapter],['chapter-attack',attackChapter]]){if(current)$(id).setAttribute('aria-current','step');else $(id).removeAttribute('aria-current');}
+  document.body.dataset.chapter=attackChapter?'attack':'trust';
   document.body.dataset.mode=mode;
   document.body.dataset.phase=step<0?'intro':completed?'complete':'deliver';
   document.body.dataset.target=mode==='tour'&&step>=0?tour[step].target:'';
@@ -136,40 +135,42 @@ function render(){
   for(const el of document.querySelectorAll('.endpoint form button,.endpoint form input,[data-transmit],[data-reboot],#budget'))el.disabled=locked||mode!=='sandbox';
   for(const el of document.querySelectorAll('[data-transmit],[data-action="duplicate"],[data-replay]'))el.disabled=el.disabled||lab.queue.length>=64;
   for(const el of document.querySelectorAll('[data-select]')){el.querySelector('.packet-title').textContent=mode==='tour'?(lab.packet(Number(el.dataset.select)).signed?'⠿  Signed challenge':'⠿  Encrypted packet'):`⠿  Message ${el.dataset.select} · ${lab.packet(Number(el.dataset.select)).from==='device'?'Device → Server':'Server → Device'}`;el.draggable=!locked;el.setAttribute('aria-disabled',String(locked));el.tabIndex=locked?-1:0;el.closest('.packet').classList.toggle('selected',Number(el.dataset.select)===selected);el.closest('.packet').classList.toggle('tour-message',mode==='tour'&&!completed&&Number(el.closest('.packet').dataset.origin)===expected);}
-  for(const zone of document.querySelectorAll('[data-destination]')){zone.disabled=locked||(mode==='tour'&&(step<0||completed||zone.dataset.destination!==tour[step].target));zone.dataset.dropEnabled=String(!zone.disabled);zone.classList.toggle('suggested',mode==='tour'&&step>=0&&!completed&&zone.dataset.destination===tour[step].target);zone.setAttribute('aria-describedby','move-hint');}
+  for(const zone of document.querySelectorAll('[data-destination]')){zone.disabled=locked||(!attackChapter&&mode==='tour'&&(step<0||completed||zone.dataset.destination!==tour[step].target));zone.dataset.dropEnabled=String(!zone.disabled);zone.classList.toggle('suggested',mode==='tour'&&step>=0&&!completed&&zone.dataset.destination===tour[step].target);zone.setAttribute('aria-describedby','move-hint');}
   $('begin-enrollment').disabled=locked||mode!=='sandbox'||!!lab.states.server?.registered;
   $('approve-enrollment').disabled=locked||mode!=='sandbox'||!lab.states.server||lab.states.server.candidate_revision==='0';
-  $('packet-inspector').hidden=mode!=='tour'||step<0;
-  $('experiment-tools').hidden=mode!=='sandbox';
+  $('packet-inspector').hidden=attackChapter||mode!=='tour'||step<0;
+  $('experiment-tools').hidden=!attackChapter;
   $('next').hidden=mode==='tour'&&step>=0&&!completed;
   $('next').disabled=locked||(mode==='tour'&&step>=0&&!completed);
-  $('retry').hidden=mode!=='tour'||step<0||completed||lab.queue.some(p=>p.origin===expected&&!p.corrupted);$('retry').disabled=locked||lab.queue.length>=64;
+  $('retry').hidden=mode!=='tour'||step<0||completed||lab.queue.some(p=>p.origin===expected&&!p.corrupted);$('retry').textContent='Replay saved original';$('retry').disabled=locked||lab.queue.length>=64;
   document.body.dataset.busy=String(busy);document.body.dataset.ready=String(lab.ready);
   positionTip();
   text('session-status',!lab.ready?'Initializing local endpoints…':busy?'Running the library…':mode==='sandbox'?'Sandbox · every message may be tried against either endpoint.':step<0?'Start the tour to generate the first message.':completed?'Action complete · continue when you are ready.':'Your turn · move the highlighted message.');
 }
-function intro(){showTip();$('packet-inspector').open=false;$('experiment-tools').open=false;setup=0;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','STEP 1 OF 5');text('tour-title','Generate the device’s key pair.');text('tour-text','Create a public identity and a private key inside the device.');text('next','Generate key pair →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An endpoint receives only when you drop a message onto it.');$('result-changes').replaceChildren();}
+function intro(){for(const role of ['device','server'])$(role+'-result').hidden=true;showTip();$('packet-inspector').open=false;$('experiment-tools').open=false;setup=0;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress','STEP 1 OF 5');text('tour-title','Generate the device’s key pair.');text('tour-text',attackChapter?'Try disrupting enrollment. You control delivery and bytes, but cannot sign as either endpoint.':'Create a public identity and a private key inside the device.');text('next','Generate key pair →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An endpoint receives only when you drop a message onto it.');$('result-changes').replaceChildren();}
 async function run(fn){if(busy)return;const id=++operation;busy=true;$('error').hidden=true;render();try{await fn();}catch(error){if(id===operation&&error.name!=='AbortError'){text('error',error.message);$('error').hidden=false;}}finally{if(id===operation){busy=false;render();}}}
 async function place(id,target){
-  if(mode==='tour'&&(step<0||completed||target!==tour[step].target))return;
+  if(!attackChapter&&mode==='tour'&&(step<0||completed||target!==tour[step].target))return;
   const p=lab.packet(id);let result;
   if(target==='relay'){lab.move(id,'relay');}
   else if(target==='discard'){lab.drop(id);text('result-title',`Message ${id} discarded`);text('result-text','No endpoint received this message. Pending work remains pending.');$('result-changes').replaceChildren();}
   else{
     result=await lab.deliver(id,target);
+    if(attackChapter){text(target+'-result',result.code<0?`Rejected · ${result.status}`:result.changes.length?'Authenticated · state updated':'Authenticated · no newer state');$(target+'-result').hidden=false;$(target+'-result').dataset.rejected=String(result.code<0);}
     text('result-title',`Message ${id}: ${result.code<0?'rejected':result.changes.length?'accepted':'accepted; no newer state'}`);
-    text('result-text',result.code<0?`${target==='device'?'Device':'Server'} rejected this attempt (${result.status}). Its state did not change.`:result.changes.length?`${target==='device'?'Device':'Server'} authenticated the message. Its state changes are shown below.`:'The message authenticated, but it supplied no newer application state. Duplicates and stale snapshots cannot roll state back.');
+    text('result-text',result.code<0?`${target==='device'?'Device':'Server'} rejected this attempt (${result.status}). Its state did not change.`:result.changes.length?`${target==='device'?'Device':'Server'} authenticated the message. Its state changes are shown below.`:'The packet authenticated without changing enrollment or application state.');
     $('result-changes').replaceChildren();for(const change of result.changes){const li=document.createElement('li');li.textContent=`${change.field}: ${JSON.stringify(change.before)} → ${JSON.stringify(change.after)}`;$('result-changes').append(li);}
   }
   selected=null;hint();
   if(mode==='tour'&&step>=0&&!completed&&p.origin===expected&&target===tour[step].target&&(target==='discard'||result?.code===0)){
     showTip();completed=true;text('tour-title',step===tour.length-1?'Enrollment complete.':target==='discard'?'Packet discarded.':'Delivered.');text('tour-text',tour[step].success);text('next',step===tour.length-1?'Start again ↺':step===1?'Approve this serial + key →':'Create encrypted response →');$('progress-fill').style.width=((step===2?5:step+2)/5*100)+'%';
+  }else if(attackChapter){
+    showTip();text('tour-text',target==='discard'?'Delivery was withheld. Enrollment cannot advance without messages. Replay a saved copy to try again.':$('result-text').textContent);
   }else if(mode==='tour'&&step>=0&&!completed&&target!=='relay'){
     text('tour-text',`You tried ${target==='discard'?'discarding it':`the ${target}`}. The result below comes from the library. To continue this lesson, move the highlighted message to ${tour[step].target==='discard'?'Discard':`the ${tour[step].target}`}. If it is gone or modified, use “Try this message again.”`);
   }
 }
-$('reset').onclick=()=>{cancelTouch();operation++;busy=false;intro();mode='tour';run(()=>lab.reset({deferDevice:true}));};
-function enterSharedState(){return run(async()=>{cancelTouch();if(!lab.states.device){if(!lab.devicePublicKey)await lab.generateDevice();await lab.provisionDevice();setup=2;}mode='sandbox';text('tour-progress','EXPLORE · YOU MOVE THE MESSAGES');text('tour-title','Share state between the endpoints.');text('tour-text','The server chooses a name; the device measures temperature. Create and drag messages to see when the other side learns each change.');text('next','Restart guided tour →');render();});}
+$('reset').onclick=()=>startChapter(attackChapter);
 $('next').onclick=()=>run(async()=>{
   if(mode==='sandbox'||step===tour.length-1){mode='tour';intro();await lab.reset({deferDevice:true});return;}
   if(setup===0){if(!lab.devicePublicKey)await lab.generateDevice();await lab.provisionDevice();setup=2;text('tour-title','The device has its own identity.');text('tour-text','Its private key stays on the device. The server can now authorize enrollment.');text('next','Authorize session & create challenge →');$('progress-fill').style.width='20%';return;}
@@ -184,11 +185,11 @@ $('next').onclick=()=>run(async()=>{
   $('packet-fields').replaceChildren();for(const [name,value]of fields){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;dd.textContent=value;$('packet-fields').append(dt,dd);}
   text('packet-wire',`Sender public key: ${sender.public_key}\nRecipient public key: ${lab.states[original.to].public_key}\n\nActual wire frame:\n${hex(original.bytes).match(/.{1,48}/g).join('\n')}`);
   $('enrollment-packet').querySelector('details').open=false;
-  text('tour-progress',`STEP ${step===2?5:step+2} OF 5`);text('tour-title',tour[step].title);text('tour-text',tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
+  text('tour-progress',`STEP ${step===2?5:step+2} OF 5`);text('tour-title',tour[step].title);text('tour-text',attackChapter?['Drop or corrupt the signed challenge. The device must verify who is asking before answering.','Duplicate, corrupt, or misdeliver this response. A valid response still requires trusted approval.','Withhold confirmation: the server has enrolled the device, but the device does not know yet.'][step]:tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
 });
 $('begin-enrollment').onclick=()=>run(()=>lab.beginEnrollment());
 $('approve-enrollment').onclick=()=>run(()=>lab.approveEnrollment());
-$('retry').onclick=()=>run(()=>lab.replay(original));
+$('retry').onclick=()=>run(()=>{const id=lab.replay(original);lab.move(id,original.from+'-outbox');});
 $('temperature-form').onsubmit=e=>{e.preventDefault();run(()=>lab.update('device','report',{temperature:Math.round(Number($('temperature').value)*1000)}));};
 $('name-form').onsubmit=e=>{e.preventDefault();run(()=>lab.update('server','name',{name:$('name').value}));};
 for(const b of document.querySelectorAll('[data-transmit]'))b.onclick=()=>run(()=>lab.transmit(b.dataset.transmit,Number($('budget').value)));
@@ -197,7 +198,12 @@ let suppressClick=false;
 document.addEventListener('click',e=>{
   if(suppressClick){suppressClick=false;e.preventDefault();return;}
   const b=e.target.closest('button,[data-select]');if(!b||b.disabled||b.getAttribute('aria-disabled')==='true'||busy)return;
-  if(b.dataset.action)run(()=>lab[b.dataset.action](Number(b.dataset.packet)));
+  if(b.dataset.action)run(async()=>{
+    const id=Number(b.dataset.packet);
+    if(b.dataset.action==='drop'){await place(id,'discard');return;}
+    lab[b.dataset.action](id);
+    if(attackChapter){showTip();text('tour-text',b.dataset.action==='duplicate'?'Both copies contain identical bytes. Drag them in either order; repeating a claim does not approve a device.':'One wire byte was flipped. Drag the packet to see whether its recipient accepts it.');}
+  });
   if(b.dataset.replay)run(()=>{const packet=lab.archive.find(p=>p.id===Number(b.dataset.replay));const id=lab.replay(packet);lab.move(id,packet.from+'-outbox');$('experiment-tools').open=false;});
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){cancelTouch();selected=null;dragged=null;clearHighlights();hint();render();}});
@@ -220,6 +226,7 @@ function touchZone(x,y){
   return zone&&!zone.disabled&&zone.getClientRects().length?zone:null;
 }
 function cancelTouch(){
+  delete document.body.dataset.dragging;
   const t=touch;touch=null;
   if(t){
     t.preview?.remove();t.handle.classList.remove('touch-source');
@@ -240,7 +247,7 @@ document.addEventListener('pointermove',e=>{
   if(!t.active&&Math.hypot(e.clientX-t.x,e.clientY-t.y)<=8)return;
   e.preventDefault();
   if(!t.active){
-    t.active=true;
+    t.active=true;document.body.dataset.dragging='true';
     t.preview=document.createElement('div');t.preview.className='touch-packet';
     t.preview.textContent=t.handle.querySelector('.packet-title').textContent;t.preview.setAttribute('aria-hidden','true');
     document.body.append(t.preview);t.handle.classList.add('touch-source');

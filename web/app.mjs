@@ -74,7 +74,7 @@ function card(p){
   article.append(handle,meta,actions,details);return article;
 }
 $('chapter-trust').onclick=e=>{e.preventDefault();if(mode==='tour'){showTip();return;}$('reset').click();};
-$('chapter-state').onclick=e=>{e.preventDefault();if(busy)return;if(!lab.states.device?.registered||!lab.states.server?.registered){showTip();return;}if(mode!=='sandbox')$('sandbox').click();showTip();};
+$('chapter-state').onclick=e=>{e.preventDefault();if(busy)return;if(!lab.states.device?.registered||!lab.states.server?.registered){showTip();return;}if(mode!=='sandbox')enterSharedState();showTip();};
 function render(){
   const enrolled=!!lab.states.device?.registered&&!!lab.states.server?.registered;
   const sharing=mode==='sandbox'&&enrolled;
@@ -143,7 +143,7 @@ function render(){
   $('packet-inspector').hidden=mode!=='tour'||step<0;
   $('experiment-tools').hidden=mode!=='sandbox';
   $('next').hidden=mode==='tour'&&step>=0&&!completed;
-  $('next').disabled=locked||(mode==='tour'&&step>=0&&!completed);$('sandbox').disabled=locked||mode==='sandbox';
+  $('next').disabled=locked||(mode==='tour'&&step>=0&&!completed);
   $('retry').hidden=mode!=='tour'||step<0||completed||lab.queue.some(p=>p.origin===expected&&!p.corrupted);$('retry').disabled=locked||lab.queue.length>=64;
   document.body.dataset.busy=String(busy);document.body.dataset.ready=String(lab.ready);
   positionTip();
@@ -170,7 +170,7 @@ async function place(id,target){
   }
 }
 $('reset').onclick=()=>{cancelTouch();operation++;busy=false;intro();mode='tour';run(()=>lab.reset({deferDevice:true}));};
-$('sandbox').onclick=()=>run(async()=>{cancelTouch();if(!lab.states.device){if(!lab.devicePublicKey)await lab.generateDevice();await lab.provisionDevice();setup=2;}mode='sandbox';text('tour-progress','EXPLORE · YOU MOVE THE MESSAGES');text('tour-title','Share state between the endpoints.');text('tour-text','The server chooses a name; the device measures temperature. Create and drag messages to see when the other side learns each change.');text('next','Restart guided tour →');render();});
+function enterSharedState(){return run(async()=>{cancelTouch();if(!lab.states.device){if(!lab.devicePublicKey)await lab.generateDevice();await lab.provisionDevice();setup=2;}mode='sandbox';text('tour-progress','EXPLORE · YOU MOVE THE MESSAGES');text('tour-title','Share state between the endpoints.');text('tour-text','The server chooses a name; the device measures temperature. Create and drag messages to see when the other side learns each change.');text('next','Restart guided tour →');render();});}
 $('next').onclick=()=>run(async()=>{
   if(mode==='sandbox'||step===tour.length-1){mode='tour';intro();await lab.reset({deferDevice:true});return;}
   if(setup===0){if(!lab.devicePublicKey)await lab.generateDevice();await lab.provisionDevice();setup=2;text('tour-title','The device has its own identity.');text('tour-text','Its private key stays on the device. The server can now authorize enrollment.');text('next','Authorize session & create challenge →');$('progress-fill').style.width='20%';return;}

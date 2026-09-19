@@ -1,5 +1,5 @@
-import createModule from './endpoint.wasm.mjs?v=d99d1b60566567e048c6';
-import { Endpoint } from './endpoint.mjs?v=d99d1b60566567e048c6';
+import createModule from './endpoint.wasm.mjs?v=2668d0bdd2ffe29da29f';
+import { Endpoint } from './endpoint.mjs?v=2668d0bdd2ffe29da29f';
 const ready = createModule().then(module => new Endpoint(module));
 let serial = Promise.resolve();
 self.onmessage = ({data}) => {

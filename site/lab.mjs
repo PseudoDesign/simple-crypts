@@ -1,4 +1,4 @@
-import {hex} from './endpoint.mjs?v=d99d1b60566567e048c6';
+import {hex} from './endpoint.mjs?v=2668d0bdd2ffe29da29f';
 export const MAX_QUEUE=64, MAX_EVENTS=200;
 // The demo device has a fixed serial before it generates keys or enrolls.
 export const DEVICE_SERIAL='mcu-0001';
@@ -23,7 +23,7 @@ export class Lab {
       // Compatibility slot only: signed enrollment uses no shared enrollment secret.
       const secret='00'.repeat(32);
       for(const role of ['device','server']){
-        const worker=this.workerFactory(new URL('./worker.mjs?v=d99d1b60566567e048c6',import.meta.url));this.workers[role]=worker;
+        const worker=this.workerFactory(new URL('./worker.mjs?v=2668d0bdd2ffe29da29f',import.meta.url));this.workers[role]=worker;
         worker.onmessage=({data})=>{const p=this.pending.get(data.id);if(!p)return;this.pending.delete(data.id);data.error?p.reject(new Error(data.error)):p.resolve(data.result);};
         worker.onerror=()=>{for(const [id,p]of this.pending){if(p.role===role){this.pending.delete(id);p.reject(new Error(`${role} runtime failed to load or execute`));}}};
       }
@@ -74,13 +74,13 @@ export class Lab {
   async beginEnrollment(){
     const r=await this.command('server','enrollment_begin',{now:this.time,expires:this.time+600});
     if(r.code!==0)throw new Error(r.status);
-    this.event('Trusted server mechanism authorized a 10-minute enrollment session.');
+    this.event('Application policy authorized a 10-minute enrollment session.');
   }
   async approveEnrollment(){
     const s=this.states.server;
     const r=await this.command('server','enrollment_approve',{challenge:s.challenge,key:s.candidate_key,now:this.time});
     if(r.code!==0)throw new Error(r.status);
-    this.event('Trusted server mechanism approved this exact serial, session, and Ed25519 key. Device registered.');
+    this.event('Application policy approved this exact serial, session, and Ed25519 key. Device registered.');
   }
   async transmit(role,budget=512){
     if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue is full (64 frames). Deliver or drop a frame before another opportunity.');

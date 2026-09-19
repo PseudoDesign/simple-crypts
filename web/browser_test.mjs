@@ -17,8 +17,12 @@ async function ready(page){await page.waitForFunction(()=>document.body.dataset.
 async function provision(page){
  assert.equal(await page.locator('.packet').count(),0);
  assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
+ for(const role of ['device','server'])assert(await page.locator('#'+role+'-panel').isVisible());
+ assert.match(await page.locator('#server-public-key').textContent(),/^[a-f0-9]{64}$/);
+ assert.equal(await page.locator('#device-private-key').textContent(),'Not generated yet');
+ assert.match(await page.locator('#server-private-key').textContent(),/Kept on server/);
  await page.locator('#next').click();await ready(page);
- const key=await page.locator('#device-public-key').textContent();assert.match(key,/^[a-f0-9]{64}$/);
+ const key=await page.locator('#device-public-key').textContent();assert.match(key,/^[a-f0-9]{64}$/);assert.match(await page.locator('#device-private-key').textContent(),/Kept on device/);
  assert.equal(await page.locator('.packet').count(),0);assert.equal(await page.locator('#device-details').textContent(),'');
  await page.screenshot({path:'/tmp/simple-crypts-key-generation.png',fullPage:true});
  await page.locator('#next').click();await ready(page);
@@ -57,13 +61,15 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    assert((await page.locator('#tour-text').textContent()).split(/\s+/).length<=12);
 
    assert.equal(await page.locator('.tour-message').count(),1);
+   for(const role of ['device','server']){assert(await page.locator('#'+role+'-public-key').isVisible());assert(await page.locator('#'+role+'-private-key').isVisible());}
+
    assert(await page.locator('#enrollment-packet').isVisible());
    assert.match(await page.locator('#packet-fields').textContent(),step===0?/Enrollment code.*encryption.*-18125.*Report revision1/:/Enrollment confirmedtrue.*Acknowledged report revision1/);
    assert.match(await page.locator('#packet-wire').textContent(),/Sender public key: [a-f0-9]{64}/);
    assert.equal(await page.locator('#archive .archive-card').count(),step);
    if(step===0)await page.screenshot({path:`/tmp/simple-crypts-${name}-messages.png`,fullPage:true});
    await drag(page,destinations[step]);assert(!(await page.locator('#next').isDisabled()));
-   if(step===0){assert.equal(await page.locator('#device-status').textContent(),'Pending');assert.match(await page.locator('#server-summary').textContent(),/registered/);}
+   if(step===0){assert.equal(await page.locator('#device-status').textContent(),'Pending');assert.match(await page.locator('#server-summary').textContent(),/registered/);assert.equal(await page.locator('#registered-device-key').textContent(),await page.locator('#device-public-key').textContent());}
   }
   assert.equal(await page.locator('#device-status').textContent(),'Confirmed');assert.equal(await page.locator('#server-status').textContent(),'Confirmed');
   assert.equal(await page.locator('.packet').count(),0);assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');

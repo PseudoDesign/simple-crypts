@@ -20,17 +20,19 @@ function render(){
   document.body.dataset.mode=mode;
   document.body.dataset.phase=step<0?'intro':completed?'complete':'deliver';
   document.body.dataset.target=mode==='tour'&&step>=0?tour[step].target:'';
-  $('key-setup').hidden=mode!=='tour'||step>=0;
   $('provisioning-details').hidden=setup<2;
   text('pinned-server-key',lab.states.device?.peer_public_key??'');
-  text('device-public-key',lab.devicePublicKey??'Not generated yet');
-  text('setup-status',setup===0?'Private key: not generated.':setup===1?'Private key: stays inside the device’s simulated keystore. Nothing sent.':'Provisioned: serial mcu-0001, one-time enrollment code, and server public key. Nothing sent.');
+  text('device-public-key',lab.devicePublicKey??lab.states.device?.public_key??'Not generated yet');
+  text('server-public-key',lab.states.server?.public_key??'Starting…');
+  text('device-private-key',lab.devicePublicKey||lab.states.device?'●●●● · Kept on device':'Not generated yet');
+  text('server-private-key',lab.states.server?'●●●● · Kept on server':'Starting…');
+  $('registered-key-details').hidden=!lab.states.server?.registered;
+  text('registered-device-key',lab.states.server?.registered?lab.states.server.peer_public_key:'');
   $('enrollment-packet').hidden=mode!=='tour'||step<0;
   for(const role of ['device','server']){
     document.querySelector('#'+role+'-panel h2').textContent=mode==='tour'?(role==='device'?'Device':'Server'):(role==='device'?'Temperature sensor':'Device registry');
     const state=lab.states[role];
-    const temperature=state?.has_temperature?(state.temperature/1000).toFixed(3)+' °C':'';
-    text(role+'-summary',state?(state.registered?(role==='device'?'Enrollment confirmed':'Serial + key registered'):(role==='device'?'Awaiting confirmation':'Not enrolled')):'');
+    text(role+'-summary',state?(state.registered?(role==='device'?'Enrollment confirmed':'Serial + key registered'):(role==='device'?'Ready to enroll':'Not enrolled')):role==='device'?(lab.devicePublicKey?'Key pair generated':'No key pair yet'):'Starting…');
   }
   for(const role of ['device','server']){
     const s=lab.states[role];

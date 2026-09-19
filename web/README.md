@@ -61,6 +61,11 @@ users can also select a box and activate a destination. A destination inbox
 always invokes that endpoint, including attempts to reflect a message back to
 its sender. State differences and rejection reasons come from the real library.
 
+Device and server cards remain visible throughout the guide, showing their
+public keys and private-key status (private bytes remain in the worker).
+Provisioning adds the pinned server key to the device; successful enrollment
+adds the registered device key to the server.
+
 The four-step enrollment tour shows one short instruction, one packet, and its
 intended drop target. First, an explicit action generates a device key pair inside its Wasm worker.
 Next, trusted provisioning initializes the device with that same key, its serial,

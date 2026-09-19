@@ -1,5 +1,5 @@
-import {Lab,tour} from './lab.mjs?v=fb2f29c90c742e45f675';
-import {hex} from './endpoint.mjs?v=fb2f29c90c742e45f675';
+import {Lab,tour} from './lab.mjs?v=f5e7b960356801be21ec';
+import {hex} from './endpoint.mjs?v=f5e7b960356801be21ec';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0;
@@ -9,7 +9,19 @@ function hint(){if(mode==='tour'){text('move-hint',selected===null?'Drag the pac
 function card(p){
   const article=document.createElement('article');article.className='packet'+(p.corrupted?' corrupted':'');article.dataset.packet=p.id;article.dataset.origin=p.origin;
   const handle=document.createElement('div');handle.className='drag-handle';handle.draggable=true;handle.tabIndex=0;handle.setAttribute('role','button');handle.dataset.select=p.id;
-  handle.setAttribute('aria-label',`Move message ${p.id} from ${p.from}`);handle.textContent=`⠿  Message ${p.id} · ${p.from === 'device'?'Device → Server':'Server → Device'}`;
+  handle.setAttribute('aria-label',`Move message ${p.id} from ${p.from}`);
+  const title=document.createElement('span');title.className='packet-title';handle.append(title);
+  if(p.signed&&p.bytes.length===172){
+    handle.classList.add('has-summary');
+    const summary=document.createElement('span');summary.className='packet-summary';
+    const serial=new TextDecoder().decode(p.bytes.slice(36,68)).replace(/\0+$/,'');
+    const challenge=hex(p.bytes.slice(68,100));
+    const expires=new DataView(p.bytes.buffer,p.bytes.byteOffset,p.bytes.byteLength).getBigUint64(100).toString();
+    for(const value of [`For ${serial}`,`Challenge ${challenge.slice(0,8)}…`,`Expires ${expires} · server time`,'Ed25519 signature · public']){
+      const line=document.createElement('span');line.textContent=value;summary.append(line);
+    }
+    handle.append(summary);
+  }
   const meta=document.createElement('p');meta.className='packet-meta';meta.textContent=`${p.bytes.length} bytes · ${p.corrupted?'modified packet':p.signed?'signed public challenge':'sealed message'}`;
   const actions=document.createElement('div');actions.className='packet-actions';
   for(const [action,label]of [['duplicate','Duplicate'],['corrupt','Corrupt']]){const b=document.createElement('button');b.textContent=label;b.dataset.action=action;b.dataset.packet=p.id;b.setAttribute('aria-label',`${label} message ${p.id}`);actions.append(b);}
@@ -64,7 +76,7 @@ function render(){
   for(const el of document.querySelectorAll('.lanes button,.lanes input,#archive button'))el.disabled=locked;
   for(const el of document.querySelectorAll('.endpoint form button,.endpoint form input,[data-transmit],[data-reboot],#budget'))el.disabled=locked||mode!=='sandbox';
   for(const el of document.querySelectorAll('[data-transmit],[data-action="duplicate"],[data-replay]'))el.disabled=el.disabled||lab.queue.length>=64;
-  for(const el of document.querySelectorAll('[data-select]')){el.textContent=mode==='tour'?(lab.packet(Number(el.dataset.select)).signed?'⠿  Signed challenge':'⠿  Encrypted packet'):`⠿  Message ${el.dataset.select} · ${lab.packet(Number(el.dataset.select)).from==='device'?'Device → Server':'Server → Device'}`;el.draggable=!locked;el.setAttribute('aria-disabled',String(locked));el.tabIndex=locked?-1:0;el.setAttribute('aria-pressed',String(Number(el.dataset.select)===selected));el.closest('.packet').classList.toggle('selected',Number(el.dataset.select)===selected);el.closest('.packet').classList.toggle('tour-message',mode==='tour'&&!completed&&Number(el.closest('.packet').dataset.origin)===expected);}
+  for(const el of document.querySelectorAll('[data-select]')){el.querySelector('.packet-title').textContent=mode==='tour'?(lab.packet(Number(el.dataset.select)).signed?'⠿  Signed challenge':'⠿  Encrypted packet'):`⠿  Message ${el.dataset.select} · ${lab.packet(Number(el.dataset.select)).from==='device'?'Device → Server':'Server → Device'}`;el.draggable=!locked;el.setAttribute('aria-disabled',String(locked));el.tabIndex=locked?-1:0;el.setAttribute('aria-pressed',String(Number(el.dataset.select)===selected));el.closest('.packet').classList.toggle('selected',Number(el.dataset.select)===selected);el.closest('.packet').classList.toggle('tour-message',mode==='tour'&&!completed&&Number(el.closest('.packet').dataset.origin)===expected);}
   for(const zone of document.querySelectorAll('[data-destination]')){zone.disabled=locked||(mode==='tour'&&(step<0||completed||zone.dataset.destination!==tour[step].target));zone.classList.toggle('suggested',mode==='tour'&&step>=0&&!completed&&zone.dataset.destination===tour[step].target);zone.setAttribute('aria-describedby','move-hint');}
   $('begin-enrollment').disabled=locked||mode!=='sandbox'||!!lab.states.server?.registered;
   $('approve-enrollment').disabled=locked||mode!=='sandbox'||!lab.states.server||lab.states.server.candidate_revision==='0';
@@ -171,7 +183,7 @@ document.addEventListener('pointermove',e=>{
   if(!t.active){
     t.active=true;
     t.preview=document.createElement('div');t.preview.className='touch-packet';
-    t.preview.textContent=t.handle.textContent;t.preview.setAttribute('aria-hidden','true');
+    t.preview.textContent=t.handle.querySelector('.packet-title').textContent;t.preview.setAttribute('aria-hidden','true');
     document.body.append(t.preview);t.handle.classList.add('touch-source');
   }
   // Offset above the finger so the moving packet and destination remain visible.

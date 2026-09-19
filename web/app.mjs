@@ -5,6 +5,10 @@ let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selecte
 let expected=null,completed=false,original=null,setup=0;
 const lab=new Lab(render);
 const text=(id,value)=>{$(id).textContent=value;};
+function datetime(seconds){
+  const value=BigInt(seconds);
+  return value<=8640000000000n?new Date(Number(value)*1000).toISOString().replace('T',' ').replace('.000Z',' UTC'):'Outside date range';
+}
 function hint(){if(mode==='tour'){text('move-hint',selected===null?'Drag the packet, or select it and activate the highlighted destination.':`Packet selected. Activate ${tour[step]?.target==='discard'?'Discard':`the ${tour[step]?.target??'highlighted'} inbox`}.`);return;}text('move-hint',selected===null?'Drag a message box, or select one and activate a destination. Escape cancels selection.':`Message ${selected} selected. Choose Device inbox, Server inbox, Hold here, or Discard.`);}
 function card(p){
   const article=document.createElement('article');article.className='packet'+(p.corrupted?' corrupted':'');article.dataset.packet=p.id;article.dataset.origin=p.origin;
@@ -17,8 +21,11 @@ function card(p){
     const serial=new TextDecoder().decode(p.bytes.slice(36,68)).replace(/\0+$/,'');
     const challenge=hex(p.bytes.slice(68,100));
     const expires=new DataView(p.bytes.buffer,p.bytes.byteOffset,p.bytes.byteLength).getBigUint64(100).toString();
-    for(const value of [`For ${serial}`,`Challenge ${challenge.slice(0,8)}…`,`Expires ${expires} · server time`,'Ed25519 signature · public']){
-      const line=document.createElement('span');line.textContent=value;summary.append(line);
+    for(const [key,value] of [['Serial',serial],['Challenge',`${challenge.slice(0,8)}…`],['Expires',datetime(expires)],['Signature','Ed25519'],['Visibility','Public']]){
+      const line=document.createElement('span');
+      const label=document.createElement('strong');label.textContent=key+': ';
+      const content=document.createElement('span');content.textContent=value;
+      line.append(label,content);summary.append(line);
     }
     handle.append(summary);
   }
@@ -119,7 +126,7 @@ $('next').onclick=()=>run(async()=>{
   text('packet-label',`${original.from.toUpperCase()} → ${original.to.toUpperCase()} · ${original.bytes.length} BYTES`);
   text('packet-title',step===0?'Signed enrollment challenge':step===1?'Encrypted enrollment response':'Enrollment confirmation');
   document.querySelector('.packet-perspective').textContent=step===0?'Public packet. The device verifies the signature using its pinned server key.':'Sender’s view before encryption. The host forwards opaque bytes.';
-  const fields=step===0?[['Serial',sender.serial],['Session challenge',sender.challenge],['Expires at',sender.enrollment_expires+' · server clock'],['Signature','Ed25519 · 64 bytes'],['Authorization','Session open; no device key approved yet']]:step===1?[['Serial',sender.serial],['Session challenge',sender.challenge],['First report',`${sender.temperature} millidegrees Celsius`],['Report revision',sender.reported_revision],['Approval','Required before registration']]:[['Serial',sender.serial],['Session challenge',sender.challenge],['Enrollment confirmed','true'],['Acknowledged report revision',sender.reported_revision]];
+  const fields=step===0?[['Serial',sender.serial],['Session challenge',sender.challenge],['Expires at',datetime(sender.enrollment_expires)],['Signature','Ed25519 · 64 bytes'],['Authorization','Session open; no device key approved yet']]:step===1?[['Serial',sender.serial],['Session challenge',sender.challenge],['First report',`${sender.temperature} millidegrees Celsius`],['Report revision',sender.reported_revision],['Approval','Required before registration']]:[['Serial',sender.serial],['Session challenge',sender.challenge],['Enrollment confirmed','true'],['Acknowledged report revision',sender.reported_revision]];
   $('packet-fields').replaceChildren();for(const [name,value]of fields){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;dd.textContent=value;$('packet-fields').append(dt,dd);}
   text('packet-wire',`Sender public key: ${sender.public_key}\nRecipient public key: ${lab.states[original.to].public_key}\n\nActual wire frame:\n${hex(original.bytes).match(/.{1,48}/g).join('\n')}`);
   $('enrollment-packet').querySelector('details').open=false;

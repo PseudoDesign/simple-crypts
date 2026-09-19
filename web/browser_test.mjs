@@ -70,7 +70,7 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
    assert((await page.locator('#tour-text').textContent()).split(/\s+/).length<=14);
 
    assert.equal(await page.locator('.tour-message').count(),1);
-   if(step===0){assert(await page.locator('.tour-message .packet-summary').isVisible());assert.match(await page.locator('.tour-message .packet-summary').textContent(),/For mcu-0001Challenge [0-9a-f]{8}…Expires 1600 · server timeEd25519 signature · public/);}
+   if(step===0){assert(await page.locator('.tour-message .packet-summary').isVisible());assert.match(await page.locator('.tour-message .packet-summary').textContent(),/Serial: mcu-0001Challenge: [0-9a-f]{8}…Expires: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTCSignature: Ed25519Visibility: Public/);}
    for(const role of ['device','server']){assert(await page.locator('#'+role+'-public-key').isVisible());assert(await page.locator('#'+role+'-private-key').isVisible());}
 
    assert(await page.locator('#enrollment-packet').isVisible());

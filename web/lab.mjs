@@ -3,7 +3,8 @@ export const MAX_QUEUE=64, MAX_EVENTS=200;
 export class Lab {
   constructor(onChange=()=>{},workerFactory=url=>new Worker(url,{type:'module'})) {
     this.onChange=onChange;this.workerFactory=workerFactory;this.epoch=0;this.workers={};this.pending=new Map();this.sequence=0;
-    this.queue=[];this.archive=[];this.events=[];this.states={};this.nextPacket=1;this.ready=false;this.time=1000;
+    this.queue=[];this.archive=[];this.events=[];this.states={};this.nextPacket=1;this.ready=false;// Freeze the simulated server clock at a real date for readable packet timestamps.
+    this.time=Math.floor(Date.now()/1000);
   }
   notify(){this.onChange(this);}
   event(message,kind='info'){this.events.push({message,kind});if(this.events.length>MAX_EVENTS)this.events.shift();this.notify();}

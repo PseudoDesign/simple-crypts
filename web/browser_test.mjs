@@ -46,7 +46,15 @@ for(const [name,browserType]of [['chromium',chromium],['firefox',firefox]]){
  try{
   const context=await browser.newContext({viewport:{width:1440,height:1100},reducedMotion:'reduce'});const page=await context.newPage();const errors=[],outside=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(!r.url().startsWith(base))outside.push(r.url());});
-  await page.goto(base);await ready(page);await provision(page);
+  // Model a returning browser with the old unversioned stylesheet cached.
+  // The old pre-enrollment rule must never be requested by this release.
+  let staleStyleRequests=0;
+  await page.route('**/style.css',route=>{staleStyleRequests++;return route.fulfill({contentType:'text/css',body:'body[data-phase="intro"] .lanes{display:none!important}'});});
+  await page.goto(base);await ready(page);
+  assert.equal(staleStyleRequests,0);
+  for(const role of ['device','server'])assert(await page.locator('#'+role+'-panel').isVisible());
+  await page.screenshot({path:`/tmp/simple-crypts-${name}-pre-enrollment.png`,fullPage:true});
+  await provision(page);
   assert.equal(await page.locator('.packet').count(),0);
   const firstIdentity=await page.locator('#device-details').textContent();
   const destinations=['server','device'];

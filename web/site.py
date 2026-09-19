@@ -17,6 +17,18 @@ def copy_asset(source,destination):
         temporary.replace(destination)
     finally:
         temporary.unlink(missing_ok=True)
+def version_assets(root):
+    # One content-derived version for the entire graph, including workers/Wasm.
+    # Stable between a tested preview and publication; independent of commit metadata.
+    names=(*FILES,'endpoint.wasm.mjs','endpoint.wasm.wasm')
+    version=hashlib.sha256(''.join(digest(root/name) for name in names).encode()).hexdigest()[:20]
+    pattern=re.compile(r"(['\"])(\./)?("+'|'.join(re.escape(n) for n in names if n!='index.html')+r")\1")
+    for name in names:
+        if name.endswith(('.html','.mjs')):
+            path=root/name
+            path.write_text(pattern.sub(lambda m:m[1]+(m[2] or '')+m[3]+'?v='+version+m[1],path.read_text()))
+    return version
+
 def verify(root,require_commit=True):
     root=Path(root).resolve();m=json.loads((root/'demo.json').read_text())
     if require_commit and not re.fullmatch('[0-9a-f]{40}',m['source_commit']):raise ValueError('Demo needs an immutable source commit')
@@ -46,6 +58,7 @@ def assemble(output,module,source_commit):
     for name in FILES:copy_asset(Path('web')/name,root/name)
     copy_asset(module,root/'endpoint.wasm.mjs')
     copy_asset(module.with_suffix('.wasm'),root/'endpoint.wasm.wasm')
+    version_assets(root)
     (root/'.nojekyll').write_text('')
     manifest={'source_commit':source_commit,'runtime':'C core + nanopb + libsodium 1.0.20 / Emscripten 4.0.10','storage':'temporary; simulated durable storage across reboot control only','assets':{name:digest(root/name) for name in (*FILES,'endpoint.wasm.mjs','endpoint.wasm.wasm')}}
     (root/'demo.json').write_text(json.dumps(manifest,indent=2)+'\n')

@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 import json
+import re
 import shutil
 import tempfile
 import unittest
@@ -19,6 +20,15 @@ class SiteTest(unittest.TestCase):
             site.copy_asset(source,destination)
             self.assertEqual(destination.read_bytes(),b'new')
             self.assertFalse((Path(tmp)/'published.wasm.tmp').exists())
+
+    def test_asset_graph_is_versioned(self):
+        root=Path('web/site')
+        versions=[]
+        for file,asset in [('index.html','style.css'),('index.html','app.mjs'),('app.mjs','lab.mjs'),('lab.mjs','worker.mjs'),('worker.mjs','endpoint.wasm.mjs'),('endpoint.wasm.mjs','endpoint.wasm.wasm')]:
+            match=re.search(re.escape(asset)+r'\?v=([0-9a-f]{20})', (root/file).read_text())
+            self.assertIsNotNone(match,(file,asset))
+            versions.append(match[1])
+        self.assertEqual(len(set(versions)),1)
 
     def test_published_assets_and_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:

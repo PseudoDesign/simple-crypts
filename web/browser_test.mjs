@@ -44,6 +44,16 @@ async function generate(page){
 }
 async function corrupt(packet){const button=packet.locator('[data-action="corrupt"]');await button.click();}
 async function creditFlow(page,touch=false){
+ if(await page.locator('body').getAttribute('data-chapter')!=='credits'){
+  assert.equal(await page.locator('#device-issued').textContent(),'0');
+  const key=await page.locator('#device-public-key').textContent();
+  await next(page);
+  assert.equal(await page.locator('#device-public-key').textContent(),key);
+ }
+ assert.equal(await page.locator('body').getAttribute('data-chapter'),'credits');
+ assert.equal(await page.locator('#chapter-credits').getAttribute('aria-current'),'step');
+ assert.equal(await page.locator('#message-log .packet').count(),0);
+ assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
  await next(page);const grantId=await pending(page).getAttribute('data-packet');
  await dragPacket(page,pending(page),'#device-panel',touch);assert.equal(await page.locator('#device-issued').textContent(),'100');
  const grant=page.locator(`[data-packet="-${grantId}"]`);
@@ -86,12 +96,21 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    await next(page);assert.equal(await page.locator('#server-consumed').textContent(),'Not reported');
    await next(page);
    await dragPacket(page,pending(page),'#device-panel');assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
+   assert.match(await page.locator('#tour-title').textContent(),/Enrollment complete/);
+   assert.equal(await page.locator('#next').textContent(),'Continue to credits →');
    await dragPacket(page,saved(page),'#device-panel');assert.match(await page.locator('#device-result').textContent(),/ok \(0\).*no newer state/i);
    // Reflect the saved server confirmation back to the server and surface its actual error.
    await dragPacket(page,saved(page),'#server-panel');assert.match(await page.locator('#server-result').textContent(),/\(-\d+\).*Rejected/);
    await creditFlow(page);
    await page.screenshot({path:`/tmp/simple-crypts-${name}-${chapter}-log.png`,fullPage:true});console.log('PASS',name,chapter,'log workflow');
   }
+  // Credits is independently accessible, with actual enrollment completed as setup.
+  await page.locator('#chapter-trust').click();await ready(page);
+  await page.locator('#chapter-credits').click();await ready(page);
+  await creditFlow(page);
+  await next(page);assert.equal(await page.locator('#device-issued').textContent(),'0');
+  assert.equal(await page.locator('#message-log .packet').count(),0);
+  await page.locator('#chapter-attack').click();await ready(page);
   // Advancing simulated server time alone does not call receive. A later response fails expiry.
   await page.locator('#reset').click();await ready(page);await generate(page);await dragPacket(page,pending(page),'#device-panel');await next(page);
   const identity=await page.locator('#device-public-key').textContent();const beforeClock=await page.locator('#server-details').textContent();

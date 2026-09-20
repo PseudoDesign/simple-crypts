@@ -1,6 +1,6 @@
-import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=4898acf944ea08fa0660';
-import {resources} from './resources.mjs?v=4898acf944ea08fa0660';
-import {hex} from './endpoint.mjs?v=4898acf944ea08fa0660';
+import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=8198a95c23b0a250b8e9';
+import {resources} from './resources.mjs?v=8198a95c23b0a250b8e9';
+import {hex} from './endpoint.mjs?v=8198a95c23b0a250b8e9';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0,chapter='trust',consumedLocally=false;
@@ -102,6 +102,7 @@ function card(p){
 }
 function chapterEnd(){return chapter==='credits'?tour.length-1:2;}
 async function prepareChapter(){
+  history.replaceState(null,'',chapter==='credits'?'#credits':'#establish-trust');
   if(chapter==='credits'){
     // A direct chapter jump starts from an actually enrolled, empty-credit pair.
     if(!lab.states.device?.registered||!lab.states.server?.registered||(chapter==='credits'&&lab.states.server.credits_issued!=='0')){
@@ -410,4 +411,5 @@ for(const event of ['pointercancel','lostpointercapture'])document.addEventListe
 document.addEventListener('contextmenu',e=>{if(e.target.closest('[data-select]'))e.preventDefault();});
 window.addEventListener('blur',cancelTouch);
 window.addEventListener('pagehide',()=>{cancelTouch();lab.stop();});
-intro();run(()=>lab.reset({deferDevice:true}));
+chapter=location.hash==='#credits'?'credits':'trust';
+intro();run(prepareChapter);

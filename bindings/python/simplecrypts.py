@@ -14,14 +14,18 @@ _ffi.cdef("""
 typedef struct sc_host sc_host;
 int sc_host_initialize(int,const char*,const char*,const unsigned char*,
  const unsigned char*,const unsigned char*,int,sc_host**);
+int sc_host_update_group(sc_host*,unsigned short,const unsigned char*,size_t);
+int sc_host_request_group(sc_host*,unsigned short);
+int sc_host_inspect_group(sc_host*,unsigned short,char*,size_t);
 void sc_host_close(sc_host*);
 int sc_host_enrollment_enable(sc_host*);
 int sc_host_enrollment_begin(sc_host*,unsigned long long,unsigned long long);
 int sc_host_enrollment_approve(sc_host*,const unsigned char*,const unsigned char*,unsigned long long);
 int sc_host_enrollment_cancel(sc_host*);
 int sc_host_receive_at(sc_host*,const unsigned char*,size_t,unsigned long long);
-int sc_host_name(sc_host*,const char*);
-int sc_host_report(sc_host*,int);
+int sc_host_set_credits_issued(sc_host*,unsigned long long);
+int sc_host_consume_credits(sc_host*,unsigned long long);
+int sc_host_request_credit_status(sc_host*);
 int sc_host_receive(sc_host*,const unsigned char*,size_t);
 int sc_host_outbound(sc_host*,size_t,unsigned char*,size_t,size_t*);
 int sc_host_inspect(sc_host*,char*,size_t);
@@ -114,15 +118,55 @@ class Endpoint:
             raise ValueError("frame must be bytes")
         _check(_lib.sc_host_receive_at(self._open(), frame, len(frame), now))
 
-    def name(self, value):
-        if "\0" in value:
-            raise ValueError("NUL in name")
-        _check(_lib.sc_host_name(self._open(), value.encode()))
+    @staticmethod
+    def _uint64(value):
+        if isinstance(value,bool) or not isinstance(value,int) or not 0<=value<2**64:
+            raise ValueError("value must be a uint64")
+        return value
 
-    def report(self, temperature_mC):
-        if isinstance(temperature_mC, bool) or not isinstance(temperature_mC, int) or not -2**31 <= temperature_mC < 2**31:
-            raise ValueError("temperature must be an int32 millidegree value")
-        _check(_lib.sc_host_report(self._open(), temperature_mC))
+    def set_credits_issued(self, total):
+        _check(_lib.sc_host_set_credits_issued(self._open(), self._uint64(total)))
+
+    def consume_credits(self, amount):
+        _check(_lib.sc_host_consume_credits(self._open(), self._uint64(amount)))
+
+    def request_credit_status(self):
+        _check(_lib.sc_host_request_credit_status(self._open()))
+
+    def update_group(self, group_id, updates):
+        """Atomically apply [(field_id, type, value)], validated by the schema."""
+        types={"uint64":1,"int64":2,"bool":3,"text":4,"bytes":5}
+        data=bytearray()
+        for field,kind,value in updates:
+            tag=types[kind]
+            if tag in (1,2):
+                if isinstance(value,bool) or not isinstance(value,int):raise ValueError("integer required")
+                raw=value.to_bytes(8,"big",signed=tag==2)
+            elif tag==3:
+                if not isinstance(value,bool):raise ValueError("Boolean required")
+                raw=bytes([value])
+            elif tag==4:raw=value.encode("utf-8")
+            else:
+                if not isinstance(value,bytes):raise ValueError("bytes required")
+                raw=value
+            if len(raw)>64:raise ValueError("resource exceeds value bound")
+            data+=int(field).to_bytes(2,"big")+bytes([tag,len(raw)])+raw
+        if not 0<group_id<65536:raise ValueError("invalid group")
+        _check(_lib.sc_host_update_group(self._open(),group_id,bytes(data),len(data)))
+
+    def request_group(self, group_id):
+        if not 0<group_id<65536:raise ValueError("invalid group")
+        _check(_lib.sc_host_request_group(self._open(),group_id))
+
+    def inspect_group(self, group_id):
+        if not 0<group_id<65536:raise ValueError("invalid group")
+        out=_ffi.new("char[1024]");_check(_lib.sc_host_inspect_group(self._open(),group_id,out,1024))
+        result=json.loads(_ffi.string(out));data=bytes.fromhex(result.pop("data"));values={}
+        while data:
+            field=int.from_bytes(data[:2],"big");tag,n=data[2:4];raw=data[4:4+n];data=data[4+n:]
+            values[field]=int.from_bytes(raw,"big",signed=tag==2) if tag in (1,2) else bool(raw[0]) if tag==3 else raw.decode("utf-8") if tag==4 else raw
+        result["values"]=values
+        return result
 
     def receive(self, frame):
         if not isinstance(frame, bytes):

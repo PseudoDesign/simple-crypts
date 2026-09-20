@@ -58,6 +58,7 @@ error from that fixture helper. SDK status strings are stable lowercase names:
 `crypto`, `conflict`, `exhausted`, `role`, `enrollment`, `utf8`, `not_found`.
 
 Host state inspection uses diagnostic JSON with all uint64 values as decimal
-strings. `temperature_mC` and compatibility alias `temperature` are integer
-millidegrees Celsius. JSON/base64 are only the test control interface; actual
+strings. `credits_issued` and `credits_consumed` are cumulative uint64 totals.
+Version 3 replaces the former name/temperature APIs; SCSTORE1/SCSTORE2 stores
+are rejected. JSON/base64 are only the test control interface; actual
 protected messages carry bounded protobuf snapshots.

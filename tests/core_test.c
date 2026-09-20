@@ -107,185 +107,49 @@ static size_t rewrite_packet(uint8_t frame[SC_MAX_FRAME], const simplecrypts_Pac
     pb_ostream_t output = pb_ostream_from_buffer(frame + 78, SC_MAX_FRAME - 78);
     CHECK(pb_encode(&output, simplecrypts_Packet_fields, p)); return 78 + output.bytes_written;
 }
-static void unchanged(const sc_context *ctx, const sc_state *before) {
-    sc_state after;
-    OK(sc_inspect(ctx, &after)); CHECK(memcmp(&after, before, sizeof after) == 0);
+#include "schema/test_resources.h"
+static void transfer(sc_context *from,sc_context *to){uint8_t f[512];size_t n=outbound(from,f);OK(sc_receive(to,f,n));}
+static void enroll(sc_context *d,sc_context *s){transfer(d,s);transfer(s,d);CHECK(d->state.registered&&s->state.registered);}
+static void credits(void){
+ sc_context d,s;memory_store dm,sm;uint8_t f[512],old[512];size_t n,on;sc_state before;sc_group_state g;simplecrypts_Packet p;
+ pair(&d,&dm,&s,&sm);CHECK(sc_consume_credits(&d,1)==SC_ERR_ENROLLMENT);enroll(&d,&s);
+ OK(sc_set_credits_issued(&s,100));on=outbound(&s,old);OK(sc_receive(&d,old,on));
+ OK(sc_consume_credits(&d,25));n=outbound(&d,f);OK(sc_receive(&s,f,n));CHECK(s.state.data.groups[0].values[1].u64==0);
+ transfer(&s,&d);CHECK(!d.state.pending);OK(sc_receive(&d,old,on));transfer(&d,&s);CHECK(s.state.data.groups[0].values[1].u64==0);transfer(&s,&d);
+ before=d.state;CHECK(sc_consume_credits(&d,76)==SC_ERR_CONFLICT);CHECK(!memcmp(&before,&d.state,sizeof before));CHECK(sc_consume_credits(&d,0)==SC_ERR_ARGUMENT);
+ OK(sc_request_credit_status(&s));transfer(&s,&d);n=outbound(&d,f);
+ start(&d,&dm,SC_DEVICE,sm.key);CHECK(d.state.data.groups[0].values[1].u64==25);transfer(&d,&s);CHECK(s.state.data.groups[0].values[1].u64==25);transfer(&s,&d);
+ CHECK(sc_set_credits_issued(&s,99)==SC_ERR_CONFLICT);CHECK(sc_set_credits_issued(&d,200)==SC_ERR_ROLE);
+ OK(sc_request_credit_status(&s));on=outbound(&s,old);OK(sc_request_credit_status(&s));transfer(&s,&d);OK(sc_receive(&d,old,on));transfer(&d,&s);transfer(&s,&d);
+ dm.fail_commit=1;before=d.state;CHECK(sc_consume_credits(&d,1)==SC_ERR_STORAGE);CHECK(!memcmp(&before,&d.state,sizeof before));dm.fail_commit=0;
+ OK(sc_set_credits_issued(&s,UINT64_MAX));transfer(&s,&d);transfer(&d,&s);transfer(&s,&d);OK(sc_consume_credits(&d,UINT64_MAX-25));CHECK(sc_consume_credits(&d,1)==SC_ERR_EXHAUSTED);
+ OK(sc_request_credit_status(&s));on=outbound(&s,old);n=0;CHECK(sc_outbound(&s,1,f,sizeof f,&n)==SC_ERR_BOUNDS&&n==0);
+ before=d.state;p=decode_packet(old,on);p.schema_hash.bytes[0]^=1;n=rewrite_packet(f,&p);memcpy(f,old,78);CHECK(sc_receive(&d,f,n)==SC_ERR_PROTOCOL);CHECK(!memcmp(&before,&d.state,sizeof before));
+ memcpy(f,old,on);f[2]=2;CHECK(sc_receive(&d,f,on)==SC_ERR_PROTOCOL);
+ OK(sc_data_inspect(&d,1,&g));CHECK(g.values[1].u64==UINT64_MAX);
+ puts("PASS credits: ownership, frozen responses, receipts, restart, bounds, failure atomicity, exact uint64, schema/version rejection");
 }
-
-static void synchronization(void) {
-    sc_context d, s, reboot;
-    memory_store dm, sm;
-    uint8_t old[512], frame[512], nonce[24];
-    size_t old_n, n;
-    uint64_t generation;
-    pair(&d, &dm, &s, &sm);
-    CHECK(!d.state.pending && !s.state.pending);
-    OK(sc_set_name(&s, "Freezer \xe2\x98\x83"));
-    CHECK(s.state.pending);
-    CHECK(sc_outbound(&s, 512, frame, 512, &n) == SC_NO_OUTPUT);
-    OK(sc_report_temperature(&d, -1000)); old_n = outbound(&d, old);
-    OK(sc_report_temperature(&d, -18250)); n = outbound(&d, frame);
-    OK(sc_receive(&s, frame, n));
-    CHECK(s.state.registered && s.state.reported_revision == 2 && s.state.temperature_mC == -18250);
-    generation = sm.generation;
-    sm.fail_secret = 1;
-    OK(sc_receive(&s, frame, n)); CHECK(sm.generation == generation);
-    OK(sc_receive(&s, old, old_n)); CHECK(sm.generation == generation);
-    n = outbound(&s, frame); OK(sc_receive(&d, frame, n));
-    CHECK(d.state.registered && d.state.applied_desired_revision == 1);
-    CHECK(strcmp(d.state.actual_name, "Freezer \xe2\x98\x83") == 0);
-    n = outbound(&d, frame); memcpy(nonce, frame + 38, 24);
-    OK(sc_receive(&s, frame, n)); CHECK(!s.state.pending);
-    n = outbound(&s, frame); OK(sc_receive(&d, frame, n));
-    CHECK(!d.state.pending);
-    start(&reboot, &dm, SC_DEVICE, sm.key);
-    CHECK(reboot.state.applied_desired_revision == 1 && reboot.state.temperature_mC == -18250);
-    OK(sc_report_temperature(&reboot, 42)); n = outbound(&reboot, frame);
-    CHECK(memcmp(nonce, frame + 38, 24) != 0);
-    CHECK(frame[61] >= SC_NONCE_RESERVATION);
-    OK(sc_receive(&s, frame, n));
-    CHECK(dm.random_calls == 0 && sm.random_calls == 0);
-    CHECK(s.state.temperature_mC == 42);
+static void generic(void){
+ sc_context d,s;memory_store dm,sm;sc_config dc,sc;sc_provider dp,sp;sc_data_update u[3];sc_state before;
+ pair(&d,&dm,&s,&sm);dc=d.config;sc=s.config;dc.data_schema=&sc_example_schema;sc.data_schema=&sc_example_schema;
+ dm.generation=0;sm.generation=0;dp=provider(&dm);sp=provider(&sm);OK(sc_init(&d,&dc,&dp));OK(sc_init(&s,&sc,&sp));enroll(&d,&s);
+ memset(u,0,sizeof u);u[0].field_id=2;u[0].value.i64=INT64_MIN;u[1].field_id=3;u[1].value.boolean=1;u[2].field_id=4;u[2].value.length=5;memcpy(u[2].value.bytes,"hello",5);
+ OK(sc_data_update_group(&s,7,u,3));transfer(&s,&d);CHECK(d.state.data.groups[0].values[1].i64==INT64_MIN);CHECK(d.state.data.groups[0].values[2].boolean==1);transfer(&d,&s);transfer(&s,&d);
+ u[0].field_id=5;u[0].value.length=3;memcpy(u[0].value.bytes,"\0\xffx",3);OK(sc_data_update_group(&d,7,u,1));CHECK(!d.state.pending);OK(sc_data_request(&s,7));transfer(&s,&d);transfer(&d,&s);CHECK(s.state.data.groups[0].values[4].length==3);transfer(&s,&d);
+ before=s.state;u[0].field_id=4;u[0].value.length=1;u[0].value.bytes[0]=0xff;CHECK(sc_data_update_group(&s,7,u,1)==SC_ERR_UTF8);CHECK(!memcmp(&before,&s.state,sizeof before));
+ u[0].value.length=17;CHECK(sc_data_update_group(&s,7,u,1)==SC_ERR_BOUNDS);u[0].field_id=1;CHECK(sc_data_update_group(&s,7,u,1)==SC_ERR_ROLE);
+ OK(sc_init(&d,&dc,&dp));CHECK(d.state.data.groups[0].values[4].length==3);
+ OK(sc_data_request(&s,7));OK(sc_data_request(&s,8));
+ {uint8_t a[512],b[512];size_t an=outbound(&s,a),bn=outbound(&s,b);simplecrypts_Packet ap=decode_packet(a,an),bp=decode_packet(b,bn);CHECK(ap.group_id!=bp.group_id);OK(sc_receive(&d,a,an));OK(sc_receive(&d,b,bn));transfer(&d,&s);transfer(&d,&s);transfer(&s,&d);transfer(&s,&d);}
+ dc.data_schema=NULL;CHECK(sc_init(&d,&dc,&dp)==SC_ERR_STORAGE);
+ puts("PASS generic resources: alternate schema, int64, Boolean, UTF-8, bytes, atomic validation, durable schema binding");
 }
-
-static void transactional_failures(void) {
-    sc_context d, s;
-    memory_store dm, sm;
-    sc_state before;
-    uint8_t frame[512];
-    size_t n;
-    uint64_t counter;
-    pair(&d, &dm, &s, &sm);
-    before = d.state; dm.fail_commit = 1;
-    CHECK(sc_report_temperature(&d, 10) == SC_ERR_STORAGE); unchanged(&d, &before);
-    dm.fail_commit = 0; OK(sc_report_temperature(&d, 10)); before = d.state;
-    CHECK(sc_outbound(&d, 1, frame, sizeof frame, &n) == SC_ERR_BOUNDS);
-    CHECK(n == 0 && dm.counters[1] == 0); unchanged(&d, &before);
-    dm.fail_reserve = 1;
-    CHECK(sc_outbound(&d, 512, frame, 512, &n) == SC_ERR_STORAGE);
-    CHECK(n == 0); unchanged(&d, &before);
-    dm.fail_reserve = 0; dm.fail_seal = 1;
-    CHECK(sc_outbound(&d, 512, frame, 512, &n) == SC_ERR_CRYPTO);
-    CHECK(n == 0); unchanged(&d, &before);
-    dm.fail_seal = 0; dm.fail_commit = 1; counter = d.nonce_next;
-    CHECK(sc_outbound(&d, 512, frame, 512, &n) == SC_ERR_STORAGE);
-    CHECK(n == 0 && d.nonce_next > counter); unchanged(&d, &before);
-    dm.fail_commit = 0; n = outbound(&d, frame);
-    before = s.state; sm.fail_commit = 1;
-    CHECK(sc_receive(&s, frame, n) == SC_ERR_STORAGE); unchanged(&s, &before);
-    CHECK(!s.state.registered);
-    sm.fail_commit = 0; OK(sc_receive(&s, frame, n)); CHECK(s.state.registered);
-    OK(sc_set_name(&s, "new")); n = outbound(&s, frame);
-    before = d.state; dm.fail_commit = 1;
-    CHECK(sc_receive(&d, frame, n) == SC_ERR_STORAGE); unchanged(&d, &before);
-    dm.fail_commit = 0; OK(sc_receive(&d, frame, n)); CHECK(strcmp(d.state.actual_name, "new") == 0);
+static void exhaustion(void){
+ sc_context d,s;memory_store dm,sm;uint8_t f[512];size_t n;sc_state before;
+ pair(&d,&dm,&s,&sm);OK(sc_test_seed_revision(&s,UINT64_MAX));enroll(&d,&s);before=s.state;
+ CHECK(sc_request_credit_status(&s)==SC_ERR_EXHAUSTED);CHECK(!memcmp(&before,&s.state,sizeof before));
+ pair(&d,&dm,&s,&sm);OK(sc_test_seed_revision(&d,UINT64_MAX));enroll(&d,&s);OK(sc_set_credits_issued(&s,10));transfer(&s,&d);before=d.state;CHECK(sc_consume_credits(&d,1)==SC_ERR_EXHAUSTED);CHECK(!memcmp(&before,&d.state,sizeof before));
+ d.nonce_next=d.nonce_limit;dm.fail_reserve=1;n=0;CHECK(sc_outbound(&d,512,f,512,&n)==SC_ERR_STORAGE&&n==0);dm.fail_reserve=0;transfer(&d,&s);transfer(&s,&d);
+ puts("PASS revision exhaustion and failed nonce reservations preserve state");
 }
-
-static void malformed_and_conflicting(void) {
-    sc_context d, s;
-    memory_store dm, sm;
-    sc_state before;
-    uint8_t original[512], frame[512];
-    size_t n, mutated_n, i;
-    simplecrypts_Packet packet;
-    pair(&d, &dm, &s, &sm);
-    OK(sc_report_temperature(&d, 123)); n = outbound(&d, original);
-    before = s.state;
-    memcpy(frame, original, n); frame[62] ^= 1;
-    CHECK(sc_receive(&s, frame, n) == SC_ERR_AUTH); unchanged(&s, &before);
-    for (i = 0; i < sizeof s.work; ++i) CHECK(s.work[i] == 0);
-    memcpy(frame, original, n); packet = decode_packet(frame, n); packet.serial.bytes[0] ^= 1;
-    mutated_n = rewrite_packet(frame, &packet);
-    CHECK(sc_receive(&s, frame, mutated_n) == SC_ERR_PROTOCOL); unchanged(&s, &before);
-    packet = decode_packet(original, n); packet.enrollment_token.bytes[0] ^= 1;
-    memcpy(frame, original, n); mutated_n = rewrite_packet(frame, &packet);
-    CHECK(sc_receive(&s, frame, mutated_n) == SC_ERR_ENROLLMENT); unchanged(&s, &before);
-    packet = decode_packet(original, n); packet.name.size = 2;
-    packet.name.bytes[0] = 0xc0; packet.name.bytes[1] = 0x80;
-    memcpy(frame, original, n); mutated_n = rewrite_packet(frame, &packet);
-    CHECK(sc_receive(&s, frame, mutated_n) == SC_ERR_UTF8); unchanged(&s, &before);
-    OK(sc_receive(&s, original, n)); before = s.state;
-    packet = decode_packet(original, n); ++packet.temperature_mC;
-    memcpy(frame, original, n); mutated_n = rewrite_packet(frame, &packet);
-    CHECK(sc_receive(&s, frame, mutated_n) == SC_ERR_CONFLICT); unchanged(&s, &before);
-    packet = decode_packet(original, n); packet.revision = UINT64_MAX;
-    packet.processed_desired_revision = 123;
-    memcpy(frame, original, n); mutated_n = rewrite_packet(frame, &packet);
-    CHECK(sc_receive(&s, frame, mutated_n) == SC_ERR_PROTOCOL); unchanged(&s, &before);
-    CHECK(sc_set_name(&s, "\xed\xa0\x80") == SC_ERR_UTF8);
-    CHECK(sc_set_name(&s, "\xf4\x90\x80\x80") == SC_ERR_UTF8);
-    CHECK(sc_set_name(&s, "\xe2") == SC_ERR_UTF8);
-}
-
-static void rejection_and_old_receipt(void) {
-    sc_context d, s;
-    memory_store dm, sm;
-    uint8_t frame[512], old[512];
-    size_t n, old_n;
-    sc_state before;
-    simplecrypts_Packet p;
-    pair(&d, &dm, &s, &sm);
-    OK(sc_report_temperature(&d, 1)); n = outbound(&d, frame); OK(sc_receive(&s, frame, n));
-    old_n = outbound(&s, old); OK(sc_receive(&d, old, old_n));
-    OK(sc_set_name(&s, "")); n = outbound(&s, frame); OK(sc_receive(&d, frame, n));
-    CHECK(d.state.apply_status == SC_APPLY_REJECTED && d.state.processed_desired_revision == 1);
-    CHECK(d.state.applied_desired_revision == 0 && d.state.reported_revision == 2);
-    before = d.state; OK(sc_receive(&d, old, old_n)); unchanged(&d, &before);
-    n = outbound(&d, frame); OK(sc_receive(&s, frame, n)); CHECK(!s.state.pending);
-    n = outbound(&s, frame); p = decode_packet(frame, n); p.acked_reported_revision = 99;
-    n = rewrite_packet(frame, &p); before = d.state;
-    CHECK(sc_receive(&d, frame, n) == SC_ERR_PROTOCOL); unchanged(&d, &before);
-}
-
-static void revision_limits_and_storage_identity(void) {
-    sc_context d, s, reboot;
-    memory_store dm, sm;
-    sc_state before;
-    uint8_t frame[512];
-    size_t n;
-    sc_provider p;
-    sc_config cfg;
-    pair(&d, &dm, &s, &sm);
-    OK(sc_test_seed_revision(&d, UINT64_C(9007199254740992)));
-    OK(sc_report_temperature(&d, 8)); n = outbound(&d, frame); OK(sc_receive(&s, frame, n));
-    CHECK(s.state.reported_revision == UINT64_C(9007199254740993));
-    pair(&d, &dm, &s, &sm);
-    OK(sc_test_seed_revision(&d, UINT64_MAX)); before = d.state;
-    CHECK(sc_report_temperature(&d, 9) == SC_ERR_EXHAUSTED); unchanged(&d, &before);
-    OK(sc_test_seed_revision(&s, UINT64_MAX)); before = s.state;
-    CHECK(sc_set_name(&s, "x") == SC_ERR_EXHAUSTED); unchanged(&s, &before);
-    p = provider(&dm); cfg = d.config; strcpy(cfg.serial, "OTHER");
-    CHECK(sc_init(&reboot, &cfg, &p) == SC_ERR_STORAGE);
-    cfg = d.config; dm.key[0] ^= 1;
-    CHECK(sc_init(&reboot, &cfg, &p) == SC_ERR_STORAGE);
-}
-
-static void deterministic_parser_fuzz(void) {
-    sc_context d, s;
-    memory_store dm, sm;
-    uint8_t frame[512], valid[512];
-    size_t i, j, n;
-    uint32_t rng = 0xc0decafeu;
-    sc_state before;
-    pair(&d, &dm, &s, &sm);
-    OK(sc_report_temperature(&d, 12)); n = outbound(&d, valid);
-    before = s.state;
-    for (i = 0; i < 3000; ++i) {
-        size_t fuzz_len;
-        rng = rng * 1664525u + 1013904223u; fuzz_len = rng % sizeof frame;
-        for (j = 0; j < fuzz_len; ++j) { rng = rng * 1664525u + 1013904223u; frame[j] = (uint8_t)(rng >> 24); }
-        if ((i & 1u) && fuzz_len >= 78) {
-            /* Reach the protobuf parser behind the test authentication gate. */
-            memcpy(frame, valid, 78);
-        }
-        CHECK(sc_receive(&s, frame, fuzz_len) != SC_OK); unchanged(&s, &before);
-    }
-    OK(sc_receive(&s, valid, n));
-}
-
-int main(void) {
-    synchronization(); transactional_failures(); malformed_and_conflicting();
-    rejection_and_old_receipt(); revision_limits_and_storage_identity(); deterministic_parser_fuzz();
-    printf("core state/parser/provider contract tests passed\n");
-    return 0;
-}
+int main(void){credits();generic();exhaustion();return 0;}

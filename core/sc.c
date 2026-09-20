@@ -13,7 +13,11 @@
 typedef char sc_packet_fits_frame[(simplecrypts_Packet_size + SC_HEADER + SC_TAG_BYTES <= SC_MAX_FRAME) ? 1 : -1];
 typedef char sc_record_fits_storage[(simplecrypts_Record_size <= SC_MAX_RECORD) ? 1 : -1];
 typedef char sc_serial_bound_matches[(sizeof(((simplecrypts_Packet *)0)->serial.bytes) == SC_MAX_SERIAL) ? 1 : -1];
-typedef char sc_name_bound_matches[(sizeof(((simplecrypts_Packet *)0)->name.bytes) == SC_MAX_NAME) ? 1 : -1];
+static const sc_data_schema *data_schema(const sc_context *);
+static int group_index(const sc_context *,uint16_t);
+static sc_status schema_valid(const sc_data_schema *);
+static size_t values_encode(const sc_group_definition *,const sc_value *,uint8_t *);
+static sc_status values_decode(const sc_group_definition *,const uint8_t *,size_t,sc_value *);
 
 static void wipe(void *p, size_t n) {
     volatile uint8_t *v = (volatile uint8_t *)p;
@@ -70,10 +74,10 @@ static int valid_serial(const char *s) {
 }
 
 static void refresh_pending(sc_context *ctx) {
-    if (ctx->config.role == SC_DEVICE)
-        ctx->state.pending = (uint8_t)(ctx->state.reported_revision > ctx->state.acked_reported_revision);
-    else
-        ctx->state.pending = (uint8_t)(ctx->state.desired_revision > ctx->state.processed_desired_revision);
+    unsigned i;ctx->state.pending=0;
+    if(!ctx->state.registered){ctx->state.pending=(uint8_t)(ctx->config.role==SC_DEVICE&&(!ctx->state.enrollment_mode||!zero_key(ctx->state.challenge)));return;}
+    for(i=0;i<data_schema(ctx)->count;i++){sc_group_state *g=&ctx->state.data.groups[i];if(g->request_pending||g->response_pending||g->receipt_pending)ctx->state.pending=1;}
+
 }
 
 #define SET_BYTES(field, ptr, len) do { \
@@ -93,26 +97,23 @@ static sc_status save(sc_context *ctx, const sc_state *next) {
     SET_BYTES(record.local_key, ctx->local_public_key, SC_KEY_BYTES);
     SET_BYTES(record.peer_key, next->peer_public_key, SC_KEY_BYTES);
     record.registered = next->registered != 0;
-    SET_BYTES(record.desired_name, next->desired_name, strlen(next->desired_name));
-    SET_BYTES(record.actual_name, next->actual_name, strlen(next->actual_name));
-    record.has_temperature_mC = next->has_temperature != 0;
-    record.temperature_mC = next->temperature_mC;
-    record.desired_revision = next->desired_revision;
+    SET_BYTES(record.schema_hash,data_schema(ctx)->hash,32);
+    record.groups_count=data_schema(ctx)->count;
+    {unsigned i;for(i=0;i<record.groups_count;i++){
+      simplecrypts_GroupRecord *r=&record.groups[i];const sc_group_state *g=&next->data.groups[i];const sc_group_definition *d=&data_schema(ctx)->groups[i];
+      r->values.size=(pb_size_t)values_encode(d,g->values,r->values.bytes);r->snapshot.size=(pb_size_t)values_encode(d,g->snapshot,r->snapshot.bytes);
+      r->local_revision=g->local_revision;r->request_id=g->request_id;r->snapshot_id=g->snapshot_id;r->acknowledged_id=g->acknowledged_id;r->last_sent_id=g->last_sent_id;
+      r->request_pending=g->request_pending;r->response_pending=g->response_pending;r->receipt_pending=g->receipt_pending;r->has_snapshot=g->has_snapshot;
+    }}
     record.reported_revision = next->reported_revision;
-    record.processed_desired_revision = next->processed_desired_revision;
-    record.applied_desired_revision = next->applied_desired_revision;
     record.acked_reported_revision = next->acked_reported_revision;
     record.last_sent_reported_revision = next->last_sent_reported_revision;
-    record.last_sent_desired_revision = next->last_sent_desired_revision;
-    record.apply_status = next->apply_status;
     if(next->enrollment_mode){
         record.has_enrollment_mode=true;record.enrollment_mode=1;
         record.has_challenge=true;SET_BYTES(record.challenge,next->challenge,32);
         record.has_enrollment_expires=true;record.enrollment_expires=next->enrollment_expires;
         record.has_candidate_key=true;SET_BYTES(record.candidate_key,next->candidate_key,32);
         record.has_candidate_revision=true;record.candidate_revision=next->candidate_revision;
-        record.has_candidate_temperature=true;record.candidate_temperature=next->candidate_temperature;
-        record.has_candidate_has_temperature=true;record.candidate_has_temperature=next->candidate_has_temperature!=0;
     }
     if (!pb_encode(&stream, simplecrypts_Record_fields, &record)) return SC_ERR_BOUNDS;
     status = ctx->provider.commit(ctx->provider.user, ctx->state.storage_generation, bytes, stream.bytes_written);
@@ -139,39 +140,30 @@ static sc_status restore(sc_context *ctx, const uint8_t *bytes, size_t n, uint64
         !equal_secret(r.local_key.bytes, ctx->local_public_key, SC_KEY_BYTES) ||
         (!zero_key(ctx->config.peer_public_key) &&
          !equal_secret(r.peer_key.bytes, ctx->config.peer_public_key, SC_KEY_BYTES)) ||
-        !valid_utf8(r.desired_name.bytes, r.desired_name.size) ||
-        !valid_utf8(r.actual_name.bytes, r.actual_name.size) ||
-        r.apply_status > SC_APPLY_REJECTED ||
-        r.applied_desired_revision > r.processed_desired_revision ||
-        r.processed_desired_revision > r.desired_revision ||
+        r.schema_hash.size!=32||!equal_secret(r.schema_hash.bytes,data_schema(ctx)->hash,32)||r.groups_count!=data_schema(ctx)->count||
         r.last_sent_reported_revision > r.reported_revision ||
-        r.last_sent_desired_revision > r.desired_revision ||
         r.acked_reported_revision > r.last_sent_reported_revision ||
         (r.registered && zero_key(r.peer_key.bytes))) return SC_ERR_STORAGE;
     memset(s, 0, sizeof *s);
+    {unsigned i;for(i=0;i<r.groups_count;i++){
+     const simplecrypts_GroupRecord *g=&r.groups[i];sc_group_state *t=&s->data.groups[i];const sc_group_definition *d=&data_schema(ctx)->groups[i];
+     if(values_decode(d,g->values.bytes,g->values.size,t->values)!=SC_OK||values_decode(d,g->snapshot.bytes,g->snapshot.size,t->snapshot)!=SC_OK||g->snapshot_id>g->request_id||g->last_sent_id>g->request_id||g->acknowledged_id>g->last_sent_id)return SC_ERR_STORAGE;
+     t->local_revision=g->local_revision;t->request_id=g->request_id;t->snapshot_id=g->snapshot_id;t->acknowledged_id=g->acknowledged_id;t->last_sent_id=g->last_sent_id;
+     t->request_pending=g->request_pending;t->response_pending=g->response_pending;t->receipt_pending=g->receipt_pending;t->has_snapshot=g->has_snapshot;
+    }}
     s->role = ctx->config.role;
     memcpy(s->serial, r.serial.bytes, r.serial.size);
-    memcpy(s->desired_name, r.desired_name.bytes, r.desired_name.size);
-    memcpy(s->actual_name, r.actual_name.bytes, r.actual_name.size);
     memcpy(s->peer_public_key, r.peer_key.bytes, SC_KEY_BYTES);
     s->registered = (uint8_t)r.registered;
-    s->has_temperature = (uint8_t)r.has_temperature_mC;
-    s->temperature_mC = r.has_temperature_mC ? r.temperature_mC : 0;
-    s->desired_revision = r.desired_revision;
     s->reported_revision = r.reported_revision;
-    s->processed_desired_revision = r.processed_desired_revision;
-    s->applied_desired_revision = r.applied_desired_revision;
     s->acked_reported_revision = r.acked_reported_revision;
     s->last_sent_reported_revision = r.last_sent_reported_revision;
-    s->last_sent_desired_revision = r.last_sent_desired_revision;
-    s->apply_status = (uint8_t)r.apply_status;
     s->storage_generation = generation;
     if(r.enrollment_mode>1)return SC_ERR_STORAGE;
     if(r.enrollment_mode){
         if(!r.has_challenge||r.challenge.size!=32||!r.has_candidate_key||r.candidate_key.size!=32)return SC_ERR_STORAGE;
         s->enrollment_mode=1;memcpy(s->challenge,r.challenge.bytes,32);memcpy(s->candidate_key,r.candidate_key.bytes,32);
         s->enrollment_expires=r.enrollment_expires;s->candidate_revision=r.candidate_revision;
-        s->candidate_temperature=r.candidate_temperature;s->candidate_has_temperature=r.candidate_has_temperature;
     }
     return SC_OK;
 }
@@ -189,6 +181,7 @@ sc_status sc_init(sc_context *ctx, const sc_config *config, const sc_provider *p
     memset(ctx, 0, sizeof *ctx);
     ctx->provider = *provider;
     ctx->config = *config;
+    if(schema_valid(data_schema(ctx))!=SC_OK)return SC_ERR_ARGUMENT;
     status = provider->public_key(provider->user, config->identity_key, ctx->local_public_key);
     if (status != SC_OK) return status < 0 ? status : SC_ERR_CRYPTO;
     if (zero_key(ctx->local_public_key)) return SC_ERR_ARGUMENT;
@@ -221,7 +214,7 @@ sc_status sc_enrollment_enable(sc_context *ctx){
     sc_state next;
     if(!ctx||!ctx->initialized)return SC_ERR_ARGUMENT;
     if(ctx->state.enrollment_mode)return SC_OK;
-    if(ctx->state.registered||ctx->state.reported_revision||ctx->state.desired_revision)return SC_ERR_CONFLICT;
+    if(ctx->state.registered||ctx->state.reported_revision)return SC_ERR_CONFLICT;
     if(!ctx->provider.verify||(ctx->config.role==SC_SERVER&&!ctx->provider.sign))return SC_ERR_ARGUMENT;
     next=ctx->state;next.enrollment_mode=1;return save(ctx,&next);
 }
@@ -235,7 +228,7 @@ sc_status sc_enrollment_begin(sc_context *ctx,uint64_t now,uint64_t expires){
     if(status!=SC_OK)return status<0?status:SC_ERR_RANDOM;
     if(zero_key(next.challenge)||equal_secret(next.challenge,ctx->state.challenge,32))return SC_ERR_RANDOM;
     next.enrollment_expires=expires;memset(next.candidate_key,0,32);next.candidate_revision=0;
-    next.candidate_temperature=0;next.candidate_has_temperature=0;
+
     return save(ctx,&next);
 }
 sc_status sc_enrollment_cancel(sc_context *ctx){
@@ -244,7 +237,7 @@ sc_status sc_enrollment_cancel(sc_context *ctx){
     if(ctx->config.role!=SC_SERVER)return SC_ERR_ROLE;
     if(!ctx->state.enrollment_mode||ctx->state.registered)return SC_ERR_ENROLLMENT;
     next=ctx->state;memset(next.challenge,0,32);memset(next.candidate_key,0,32);
-    next.enrollment_expires=0;next.candidate_revision=0;next.candidate_temperature=0;next.candidate_has_temperature=0;
+    next.enrollment_expires=0;next.candidate_revision=0;
     return save(ctx,&next);
 }
 sc_status sc_enrollment_approve(sc_context *ctx,const uint8_t challenge[32],const uint8_t key[32],uint64_t now){
@@ -256,9 +249,8 @@ sc_status sc_enrollment_approve(sc_context *ctx,const uint8_t challenge[32],cons
     if(next.registered){if(!equal_secret(next.peer_public_key,key,32))return SC_ERR_ENROLLMENT;ctx->receipt_pending=1;return SC_OK;}
     if(!next.enrollment_expires||now>=next.enrollment_expires||!next.candidate_revision||!equal_secret(next.candidate_key,key,32))return SC_ERR_ENROLLMENT;
     memcpy(next.peer_public_key,key,32);next.registered=1;next.enrollment_expires=0;
-    next.reported_revision=next.candidate_revision;next.has_temperature=next.candidate_has_temperature;
-    next.temperature_mC=next.candidate_temperature;
-    memset(next.candidate_key,0,32);next.candidate_revision=0;next.candidate_temperature=0;next.candidate_has_temperature=0;
+    next.reported_revision=1;
+    memset(next.candidate_key,0,32);next.candidate_revision=0;
     status=save(ctx,&next);if(status==SC_OK)ctx->receipt_pending=1;return status;
 }
 static sc_status invitation(sc_context *ctx,uint8_t *frame,size_t cap,size_t budget,size_t *length){
@@ -266,7 +258,7 @@ static sc_status invitation(sc_context *ctx,uint8_t *frame,size_t cap,size_t bud
     if(zero_key(ctx->state.challenge)||!ctx->state.enrollment_expires)return SC_NO_OUTPUT;
     if(cap<SC_INVITATION_SIZE||budget<SC_INVITATION_SIZE)return SC_ERR_BOUNDS;
     if(!ctx->provider.sign)return SC_ERR_CRYPTO;
-    memset(frame,0,SC_INVITATION_SIZE);memcpy(frame,"SCE2",4);memcpy(frame+4,ctx->local_public_key,32);
+    memset(frame,0,SC_INVITATION_SIZE);memcpy(frame,"SCE3",4);memcpy(frame+4,ctx->local_public_key,32);
     memcpy(frame+36,ctx->state.serial,strlen(ctx->state.serial));memcpy(frame+68,ctx->state.challenge,32);
     put64(frame+100,ctx->state.enrollment_expires);
     status=ctx->provider.sign(ctx->provider.user,ctx->config.identity_key,frame,108,frame+108);
@@ -287,77 +279,66 @@ static sc_status receive_invitation(sc_context *ctx,const uint8_t *frame,size_t 
     return save(ctx,&next);
 }
 
-sc_status sc_set_name(sc_context *ctx, const char *name) {
-    sc_state next;
-    size_t n;
-    if (!ctx || !ctx->initialized || !name) return SC_ERR_ARGUMENT;
-    if (ctx->config.role != SC_SERVER) return SC_ERR_ROLE;
-    n = bounded_length(name, SC_MAX_NAME);
-    if (n > SC_MAX_NAME) return SC_ERR_BOUNDS;
-    if (!valid_utf8((const uint8_t *)name, n)) return SC_ERR_UTF8;
-    if (ctx->state.desired_revision != 0 && strcmp(name, ctx->state.desired_name) == 0) return SC_OK;
-    if (ctx->state.desired_revision == UINT64_MAX) return SC_ERR_EXHAUSTED;
-    next = ctx->state;
-    memset(next.desired_name, 0, sizeof next.desired_name);
-    memcpy(next.desired_name, name, n);
-    ++next.desired_revision;
-    return save(ctx, &next);
-}
-
-sc_status sc_report_temperature(sc_context *ctx, int32_t temperature_mC) {
-    sc_state next;
-    if (!ctx || !ctx->initialized) return SC_ERR_ARGUMENT;
-    if (ctx->config.role != SC_DEVICE) return SC_ERR_ROLE;
-    if (ctx->state.has_temperature && ctx->state.temperature_mC == temperature_mC) return SC_OK;
-    if (ctx->state.reported_revision == UINT64_MAX) return SC_ERR_EXHAUSTED;
-    next = ctx->state;
-    next.has_temperature = 1;
-    next.temperature_mC = temperature_mC;
-    ++next.reported_revision;
-    return save(ctx, &next);
-}
+#include "core/data.inc"
+#include "modules/credits/credits.inc"
 
 static sc_status make_packet(sc_context *ctx, simplecrypts_Packet *p) {
-    const sc_state *s = &ctx->state;
-    sc_status status;
-    *p = (simplecrypts_Packet)simplecrypts_Packet_init_zero;
-    p->version = SC_VERSION;
-    p->profile = SC_PROFILE_NACL_BOX;
-    p->direction = (uint32_t)ctx->config.role;
-    p->kind = ctx->config.role == SC_DEVICE ? SC_REPORT : SC_DESIRED;
-    p->key_generation = 1;
-    SET_BYTES(p->serial, s->serial, strlen(s->serial));
-    SET_BYTES(p->sender_key, ctx->local_public_key, SC_KEY_BYTES);
-    SET_BYTES(p->recipient_key, s->peer_public_key, SC_KEY_BYTES);
-    if (ctx->config.role == SC_DEVICE) {
-        p->revision = s->reported_revision;
-        SET_BYTES(p->name, s->actual_name, strlen(s->actual_name));
-        p->has_temperature_mC = s->has_temperature != 0;
-        p->temperature_mC = s->temperature_mC;
-        p->has_processed_desired_revision = true;
-        p->processed_desired_revision = s->processed_desired_revision;
-        p->has_applied_desired_revision = true;
-        p->applied_desired_revision = s->applied_desired_revision;
-        p->has_apply_status = true;
-        p->apply_status = s->apply_status;
-        if (s->enrollment_mode) {
-            p->has_enrollment_token=true;SET_BYTES(p->enrollment_token,s->challenge,32);
-        } else if (!s->registered) {
-            p->has_enrollment_token = true;
-            p->enrollment_token.size = SC_TOKEN_BYTES;
-            status = ctx->provider.enrollment_secret(ctx->provider.user, p->enrollment_token.bytes);
-            if (status != SC_OK) { wipe(p->enrollment_token.bytes, SC_TOKEN_BYTES); return status < 0 ? status : SC_ERR_ENROLLMENT; }
-        }
-    } else {
-        p->revision = s->desired_revision;
-        SET_BYTES(p->name, s->desired_name, strlen(s->desired_name));
-        p->has_acked_reported_revision = true;
-        p->acked_reported_revision = s->reported_revision;
-        if(s->enrollment_mode){p->has_enrollment_token=true;SET_BYTES(p->enrollment_token,s->challenge,32);}
-        p->has_enrollment_confirmed = true;
-        p->enrollment_confirmed = true;
-    }
-    return SC_OK;
+ const sc_state *s=&ctx->state;unsigned i,offset;
+ *p=(simplecrypts_Packet)simplecrypts_Packet_init_zero;
+ p->version=SC_VERSION;p->profile=SC_PROFILE_NACL_BOX;p->direction=ctx->config.role;p->kind=ctx->config.role==SC_DEVICE?SC_REPORT:SC_DESIRED;p->key_generation=1;p->revision=1;
+ SET_BYTES(p->serial,s->serial,strlen(s->serial));SET_BYTES(p->sender_key,ctx->local_public_key,32);SET_BYTES(p->recipient_key,s->peer_public_key,32);SET_BYTES(p->schema_hash,data_schema(ctx)->hash,32);
+ if(s->enrollment_mode){p->has_enrollment_token=true;SET_BYTES(p->enrollment_token,s->challenge,32);}
+ else if(!s->registered&&ctx->config.role==SC_DEVICE){sc_status st;p->has_enrollment_token=true;p->enrollment_token.size=32;st=ctx->provider.enrollment_secret(ctx->provider.user,p->enrollment_token.bytes);if(st!=SC_OK)return st<0?st:SC_ERR_ENROLLMENT;}
+ if(ctx->config.role==SC_SERVER){p->has_enrollment_confirmed=true;p->enrollment_confirmed=true;p->has_acked_reported_revision=true;p->acked_reported_revision=1;}
+ if(!s->registered)return SC_OK;
+ /* Send an enrollment confirmation alone before application traffic. */
+ if(ctx->receipt_pending)return SC_OK;
+ for(offset=0;offset<data_schema(ctx)->count;offset++){
+  i=(ctx->data_cursor+offset)%data_schema(ctx)->count;
+  const sc_group_state *g=&s->data.groups[i];const sc_group_definition *d=&data_schema(ctx)->groups[i];
+  if(!g->request_pending&&!g->response_pending&&!g->receipt_pending)continue;
+  p->has_group_id=true;p->group_id=d->id;p->has_request_id=true;p->has_data_kind=true;p->request_id=g->request_id;
+  p->data_kind=ctx->config.role==SC_DEVICE?2:g->request_pending?1:3;
+  if(p->data_kind==3)p->request_id=g->snapshot_id;
+  else{p->has_data=true;p->data.size=(pb_size_t)values_encode(d,p->data_kind==2?g->snapshot:g->values,p->data.bytes);}
+  p->revision=p->request_id;return SC_OK;
+ }
+ return SC_NO_OUTPUT;
+}
+
+static sc_status receive_data(sc_context *ctx,const simplecrypts_Packet *p){
+ int index;unsigned j;sc_state next=ctx->state;sc_group_state *g;const sc_group_definition *d;sc_value incoming[SC_DATA_MAX_FIELDS];sc_status status;
+ if(!p->has_group_id||!p->has_request_id||!p->request_id||!p->has_data_kind||p->group_id>UINT16_MAX||p->revision!=p->request_id)return SC_ERR_PROTOCOL;
+ index=group_index(ctx,(uint16_t)p->group_id);if(index<0)return SC_ERR_PROTOCOL;g=&next.data.groups[index];d=&data_schema(ctx)->groups[index];
+ if(p->data_kind==3){
+  if(ctx->config.role!=SC_DEVICE||p->has_data||p->request_id>g->last_sent_id)return SC_ERR_PROTOCOL;
+  if(p->request_id<g->request_id)return SC_OK;
+  if(p->request_id>g->acknowledged_id||g->response_pending){g->acknowledged_id=p->request_id;g->response_pending=0;return save(ctx,&next);}return SC_OK;
+ }
+ if(!p->has_data||(ctx->config.role==SC_DEVICE?p->data_kind!=1:p->data_kind!=2))return SC_ERR_PROTOCOL;
+ status=values_decode(d,p->data.bytes,p->data.size,incoming);if(status!=SC_OK)return status;
+ if(ctx->config.role==SC_DEVICE){
+  if(p->request_id<g->request_id)return SC_OK;
+  if(p->request_id==g->request_id){
+   for(j=0;j<d->count;j++)if(d->fields[j].owner==SC_SERVER&&!value_equal(&d->fields[j],&incoming[j],&g->snapshot[j]))return SC_ERR_CONFLICT;
+   if(g->response_pending)return SC_OK;
+   g->response_pending=1;return save(ctx,&next);
+  }
+  for(j=0;j<d->count;j++)if(d->fields[j].owner==SC_SERVER){if(d->fields[j].monotonic&&incoming[j].u64<g->values[j].u64)return SC_ERR_CONFLICT;g->values[j]=incoming[j];}
+  status=values_valid(d,g->values);if(status!=SC_OK)return status;
+  g->request_id=p->request_id;g->snapshot_id=p->request_id;g->has_snapshot=1;g->response_pending=1;memcpy(g->snapshot,g->values,sizeof g->snapshot);
+ }else{
+  if(p->request_id>g->last_sent_id)return SC_ERR_PROTOCOL;
+  if(p->request_id<g->request_id)return SC_OK;
+  if(g->has_snapshot&&p->request_id==g->snapshot_id){for(j=0;j<d->count;j++)if(!value_equal(&d->fields[j],&incoming[j],&g->snapshot[j]))return SC_ERR_CONFLICT;}
+  for(j=0;j<d->count;j++){
+   if(d->fields[j].owner==SC_SERVER&&!value_equal(&d->fields[j],&incoming[j],&g->values[j]))return SC_ERR_CONFLICT;
+   if(d->fields[j].monotonic&&incoming[j].u64<g->values[j].u64)return SC_ERR_CONFLICT;
+   g->values[j]=incoming[j];
+  }
+  g->snapshot_id=p->request_id;g->has_snapshot=1;g->request_pending=0;g->receipt_pending=1;memcpy(g->snapshot,incoming,sizeof g->snapshot);
+ }
+ return memcmp(&next,&ctx->state,sizeof next)?save(ctx,&next):SC_OK;
 }
 
 static sc_status next_nonce(sc_context *ctx, uint8_t out[SC_NONCE_BYTES]) {
@@ -400,9 +381,8 @@ sc_status sc_outbound(sc_context *ctx, size_t byte_budget, uint8_t *frame,
         (!ctx->state.pending && !ctx->receipt_pending))) return SC_NO_OUTPUT;
     status = make_packet(ctx, &packet);
     if (status != SC_OK) return status;
-    stream = pb_ostream_from_buffer(ctx->work, sizeof ctx->work - SC_HEADER - SC_TAG_BYTES);
+    stream = pb_ostream_from_buffer(ctx->work, SC_MAX_FRAME - SC_HEADER - SC_TAG_BYTES);
     if (!pb_encode(&stream, simplecrypts_Packet_fields, &packet)) status = SC_ERR_BOUNDS;
-    wipe(&packet, sizeof packet);
     total = SC_HEADER + stream.bytes_written + SC_TAG_BYTES;
     if (status == SC_OK && (total > capacity || total > byte_budget || total > SC_MAX_FRAME)) status = SC_ERR_BOUNDS;
     if (status == SC_OK) status = next_nonce(ctx, nonce);
@@ -414,13 +394,11 @@ sc_status sc_outbound(sc_context *ctx, size_t byte_budget, uint8_t *frame,
     }
     if (status == SC_OK) {
         next = ctx->state;
-        if (ctx->config.role == SC_DEVICE) next.last_sent_reported_revision = next.reported_revision;
-        else next.last_sent_desired_revision = next.desired_revision;
-        /* A frame must not leave this function before sent revision state is
-         * durable. Failed commits burn only the independently reserved nonce. */
-        if (next.last_sent_reported_revision != ctx->state.last_sent_reported_revision ||
-            next.last_sent_desired_revision != ctx->state.last_sent_desired_revision)
-            status = save(ctx, &next);
+        if(ctx->config.role==SC_DEVICE){next.last_sent_reported_revision=1;next.reported_revision=1;}
+        if(packet.has_group_id){int index=group_index(ctx,(uint16_t)packet.group_id);sc_group_state *g=&next.data.groups[index];
+          if(packet.data_kind!=3)g->last_sent_id=packet.request_id;else g->receipt_pending=0;
+        }
+        if(memcmp(&next,&ctx->state,sizeof next))status=save(ctx,&next);
     }
     if (status == SC_OK) {
         frame[0] = 'S'; frame[1] = 'C'; frame[2] = SC_VERSION;
@@ -429,127 +407,50 @@ sc_status sc_outbound(sc_context *ctx, size_t byte_budget, uint8_t *frame,
         memcpy(frame + 6, ctx->local_public_key, SC_KEY_BYTES);
         memcpy(frame + 38, nonce, SC_NONCE_BYTES);
         *length = total;
+        if(packet.has_group_id)ctx->data_cursor=(uint8_t)((group_index(ctx,(uint16_t)packet.group_id)+1)%data_schema(ctx)->count);
         ctx->receipt_pending = 0;
         refresh_pending(ctx);
     } else if (capacity) {
         wipe(frame, capacity < SC_MAX_FRAME ? capacity : SC_MAX_FRAME);
     }
+    wipe(&packet,sizeof packet);
     wipe(nonce, sizeof nonce);
     wipe(ctx->work, sizeof ctx->work);
     return status;
 }
 
-static int report_agrees(const sc_state *s, const simplecrypts_Packet *p) {
-    return s->has_temperature == (uint8_t)p->has_temperature_mC &&
-        (!s->has_temperature || s->temperature_mC == p->temperature_mC) &&
-        s->processed_desired_revision == p->processed_desired_revision &&
-        s->applied_desired_revision == p->applied_desired_revision &&
-        s->apply_status == p->apply_status && strlen(s->actual_name) == p->name.size &&
-        memcmp(s->actual_name, p->name.bytes, p->name.size) == 0;
+static sc_status receive_report(sc_context *ctx,const simplecrypts_Packet *p,uint64_t now){
+ sc_state next=ctx->state;sc_status status;uint8_t token[32];
+ if(p->has_enrollment_confirmed||p->has_acked_reported_revision)return SC_ERR_PROTOCOL;
+ if(next.enrollment_mode&&(!p->has_enrollment_token||p->enrollment_token.size!=32||zero_key(next.challenge)||!equal_secret(next.challenge,p->enrollment_token.bytes,32)))return SC_ERR_ENROLLMENT;
+ if(!next.registered){
+  if(p->has_group_id||p->has_data||p->has_request_id||p->has_data_kind||p->revision!=1)return SC_ERR_PROTOCOL;
+  if(next.enrollment_mode){
+   if(!next.enrollment_expires||now>=next.enrollment_expires)return SC_ERR_ENROLLMENT;
+   if(!zero_key(next.candidate_key)&&!equal_secret(next.candidate_key,p->sender_key.bytes,32))return SC_ERR_CONFLICT;
+   if(next.candidate_revision)return SC_OK;
+   memcpy(next.candidate_key,p->sender_key.bytes,32);next.candidate_revision=1;return save(ctx,&next);
+  }
+  if(!p->has_enrollment_token||p->enrollment_token.size!=32)return SC_ERR_ENROLLMENT;
+  status=ctx->provider.enrollment_secret(ctx->provider.user,token);if(status!=SC_OK){wipe(token,32);return status<0?status:SC_ERR_ENROLLMENT;}
+  status=equal_secret(token,p->enrollment_token.bytes,32)?SC_OK:SC_ERR_ENROLLMENT;wipe(token,32);if(status!=SC_OK)return status;
+  memcpy(next.peer_public_key,p->sender_key.bytes,32);next.registered=1;next.reported_revision=1;
+  status=save(ctx,&next);if(status!=SC_OK)return status;
+ }
+ if(!equal_secret(ctx->state.peer_public_key,p->sender_key.bytes,32))return SC_ERR_ENROLLMENT;
+ if(p->has_group_id)return receive_data(ctx,p);
+ if(p->has_data||p->has_request_id||p->has_data_kind||p->revision!=1)return SC_ERR_PROTOCOL;
+ ctx->receipt_pending=1;return SC_OK;
 }
-
-static sc_status receive_report(sc_context *ctx, const simplecrypts_Packet *p,uint64_t now) {
-    sc_state next = ctx->state;
-    sc_status status;
-    uint8_t token[SC_TOKEN_BYTES];
-    int changed = 0;
-    if (p->revision == 0 || !p->has_processed_desired_revision ||
-        !p->has_applied_desired_revision || !p->has_apply_status ||
-        p->has_acked_reported_revision || p->has_enrollment_confirmed ||
-        p->apply_status > SC_APPLY_REJECTED ||
-        p->applied_desired_revision > p->processed_desired_revision ||
-        p->processed_desired_revision > next.last_sent_desired_revision ||
-        (p->apply_status == SC_APPLY_OK && (!p->processed_desired_revision ||
-            p->applied_desired_revision != p->processed_desired_revision)) ||
-        (p->apply_status == SC_APPLY_REJECTED &&
-            p->applied_desired_revision >= p->processed_desired_revision) ||
-        (p->apply_status == SC_APPLY_NONE && (p->applied_desired_revision || p->processed_desired_revision)))
-        return SC_ERR_PROTOCOL;
-    if(next.enrollment_mode){
-        if(!p->has_enrollment_token||p->enrollment_token.size!=32||zero_key(next.challenge)||!equal_secret(next.challenge,p->enrollment_token.bytes,32))return SC_ERR_ENROLLMENT;
-        if(!next.registered){
-            if(!next.enrollment_expires||now>=next.enrollment_expires)return SC_ERR_ENROLLMENT;
-            if(p->name.size||p->processed_desired_revision||p->applied_desired_revision||p->apply_status)return SC_ERR_PROTOCOL;
-            if(!zero_key(next.candidate_key)&&!equal_secret(next.candidate_key,p->sender_key.bytes,32))return SC_ERR_CONFLICT;
-            if(p->revision<next.candidate_revision)return SC_OK;
-            if(p->revision==next.candidate_revision){
-                return next.candidate_has_temperature==(uint8_t)p->has_temperature_mC&&(!p->has_temperature_mC||next.candidate_temperature==p->temperature_mC)?SC_OK:SC_ERR_CONFLICT;
-            }
-            memcpy(next.candidate_key,p->sender_key.bytes,32);next.candidate_revision=p->revision;
-            next.candidate_has_temperature=p->has_temperature_mC;next.candidate_temperature=p->temperature_mC;
-            return save(ctx,&next);
-        }
-    }
-    if (!next.registered) {
-        if (!p->has_enrollment_token || p->enrollment_token.size != SC_TOKEN_BYTES) return SC_ERR_ENROLLMENT;
-        if (!zero_key(next.peer_public_key) && !equal_secret(next.peer_public_key, p->sender_key.bytes, SC_KEY_BYTES))
-            return SC_ERR_ENROLLMENT;
-        status = ctx->provider.enrollment_secret(ctx->provider.user, token);
-        if (status != SC_OK) { wipe(token, sizeof token); return status < 0 ? status : SC_ERR_ENROLLMENT; }
-        changed = equal_secret(token, p->enrollment_token.bytes, SC_TOKEN_BYTES);
-        wipe(token, sizeof token);
-        if (!changed) return SC_ERR_ENROLLMENT;
-        next.registered = 1;
-        memcpy(next.peer_public_key, p->sender_key.bytes, SC_KEY_BYTES);
-    } else if (!equal_secret(next.peer_public_key, p->sender_key.bytes, SC_KEY_BYTES)) return SC_ERR_ENROLLMENT;
-    if (p->revision == next.reported_revision && !report_agrees(&next, p)) return SC_ERR_CONFLICT;
-    if (p->revision > next.reported_revision) {
-        if (p->processed_desired_revision < next.processed_desired_revision ||
-            p->applied_desired_revision < next.applied_desired_revision) return SC_ERR_PROTOCOL;
-        next.reported_revision = p->revision;
-        next.has_temperature = (uint8_t)p->has_temperature_mC;
-        next.temperature_mC = p->has_temperature_mC ? p->temperature_mC : 0;
-        memset(next.actual_name, 0, sizeof next.actual_name);
-        memcpy(next.actual_name, p->name.bytes, p->name.size);
-        next.processed_desired_revision = p->processed_desired_revision;
-        next.applied_desired_revision = p->applied_desired_revision;
-        next.apply_status = (uint8_t)p->apply_status;
-        changed = 1;
-    }
-    if (changed) {
-        status = save(ctx, &next);
-        if (status != SC_OK) return status;
-    }
-    ctx->receipt_pending = 1;
-    refresh_pending(ctx);
-    return SC_OK;
-}
-
-static sc_status receive_desired(sc_context *ctx, const simplecrypts_Packet *p) {
-    sc_state next = ctx->state;
-    int changed = 0;
-    if(next.enrollment_mode){
-        if(!p->has_enrollment_token||p->enrollment_token.size!=32||zero_key(next.challenge)||!equal_secret(next.challenge,p->enrollment_token.bytes,32))return SC_ERR_ENROLLMENT;
-    } else if(p->has_enrollment_token)return SC_ERR_PROTOCOL;
-    if (p->has_temperature_mC ||
-        p->has_processed_desired_revision || p->has_applied_desired_revision ||
-        p->has_apply_status || !p->has_acked_reported_revision ||
-        !p->has_enrollment_confirmed || !p->enrollment_confirmed ||
-        p->acked_reported_revision > next.last_sent_reported_revision ||
-        (p->revision == 0 && p->name.size != 0)) return SC_ERR_PROTOCOL;
-    if (p->revision == next.desired_revision &&
-        (strlen(next.desired_name) != p->name.size || memcmp(next.desired_name, p->name.bytes, p->name.size)))
-        return SC_ERR_CONFLICT;
-    if (!next.registered) { next.registered = 1; changed = 1; }
-    if (p->acked_reported_revision > next.acked_reported_revision) {
-        next.acked_reported_revision = p->acked_reported_revision;
-        changed = 1;
-    }
-    if (p->revision > next.desired_revision) {
-        if (next.reported_revision == UINT64_MAX) return SC_ERR_EXHAUSTED;
-        next.desired_revision = p->revision;
-        next.processed_desired_revision = p->revision;
-        memset(next.desired_name, 0, sizeof next.desired_name);
-        memcpy(next.desired_name, p->name.bytes, p->name.size);
-        if (p->name.size != 0) {
-            memcpy(next.actual_name, next.desired_name, sizeof next.actual_name);
-            next.applied_desired_revision = p->revision;
-            next.apply_status = SC_APPLY_OK;
-        } else next.apply_status = SC_APPLY_REJECTED;
-        ++next.reported_revision;
-        changed = 1;
-    }
-    return changed ? save(ctx, &next) : SC_OK;
+static sc_status receive_desired(sc_context *ctx,const simplecrypts_Packet *p){
+ sc_state next=ctx->state;sc_status status;
+ if(next.enrollment_mode){if(!p->has_enrollment_token||p->enrollment_token.size!=32||zero_key(next.challenge)||!equal_secret(next.challenge,p->enrollment_token.bytes,32))return SC_ERR_ENROLLMENT;}
+ else if(p->has_enrollment_token)return SC_ERR_PROTOCOL;
+ if(!p->has_enrollment_confirmed||!p->enrollment_confirmed||!p->has_acked_reported_revision||p->acked_reported_revision!=1||next.last_sent_reported_revision!=1)return SC_ERR_PROTOCOL;
+ if(p->has_group_id){if(!next.registered)return SC_ERR_ENROLLMENT;return receive_data(ctx,p);}
+ if(p->has_data||p->has_request_id||p->has_data_kind||p->revision!=1)return SC_ERR_PROTOCOL;
+ if(next.registered)return SC_OK;
+ next.registered=1;next.acked_reported_revision=1;next.reported_revision=1;status=save(ctx,&next);return status;
 }
 
 sc_status sc_receive_at(sc_context *ctx, const uint8_t *frame, size_t length,uint64_t now) {
@@ -559,7 +460,7 @@ sc_status sc_receive_at(sc_context *ctx, const uint8_t *frame, size_t length,uin
     uint8_t direction;
     size_t i, plain_len;
     if (!ctx || !ctx->initialized || !frame) return SC_ERR_ARGUMENT;
-    if(length>=4&&!memcmp(frame,"SCE2",4))return receive_invitation(ctx,frame,length);
+    if(length>=4&&!memcmp(frame,"SCE3",4))return receive_invitation(ctx,frame,length);
     if (length < SC_HEADER + SC_TAG_BYTES || length > SC_MAX_FRAME) return SC_ERR_BOUNDS;
     direction = ctx->config.role == SC_DEVICE ? SC_SERVER : SC_DEVICE;
     if (frame[0] != 'S' || frame[1] != 'C' || frame[2] != SC_VERSION ||
@@ -584,8 +485,7 @@ sc_status sc_receive_at(sc_context *ctx, const uint8_t *frame, size_t length,uin
         memcmp(packet.serial.bytes, ctx->state.serial, packet.serial.size) ||
         packet.sender_key.size != SC_KEY_BYTES || packet.recipient_key.size != SC_KEY_BYTES ||
         !equal_secret(packet.sender_key.bytes, frame + 6, SC_KEY_BYTES) ||
-        !equal_secret(packet.recipient_key.bytes, ctx->local_public_key, SC_KEY_BYTES)) status = SC_ERR_PROTOCOL;
-    else if (!valid_utf8(packet.name.bytes, packet.name.size)) status = SC_ERR_UTF8;
+        !equal_secret(packet.recipient_key.bytes, ctx->local_public_key, SC_KEY_BYTES)||packet.schema_hash.size!=32||!equal_secret(packet.schema_hash.bytes,data_schema(ctx)->hash,32)) status = SC_ERR_PROTOCOL;
     else status = ctx->config.role == SC_DEVICE ? receive_desired(ctx, &packet) : receive_report(ctx, &packet,now);
     wipe(&packet, sizeof packet);
     wipe(ctx->work, sizeof ctx->work);
@@ -630,17 +530,10 @@ const char *sc_status_string(sc_status status) {
 sc_status sc_test_seed_revision(sc_context *ctx, uint64_t revision) {
     sc_state next;
     if (!ctx || !ctx->initialized) return SC_ERR_ARGUMENT;
-    if (ctx->state.registered || ctx->state.desired_revision || ctx->state.reported_revision)
-        return SC_ERR_CONFLICT;
-    next = ctx->state;
-    if (ctx->config.role == SC_DEVICE) {
-        next.reported_revision = revision;
-        next.last_sent_reported_revision = revision;
-        next.acked_reported_revision = revision;
-    } else {
-        next.desired_revision = revision;
-        next.last_sent_desired_revision = revision;
-    }
-    return save(ctx, &next);
+    if (ctx->state.registered || ctx->state.reported_revision)return SC_ERR_CONFLICT;
+    next=ctx->state;
+    next.data.groups[0].local_revision=revision;
+    if(ctx->config.role==SC_SERVER)next.data.groups[0].request_id=revision;
+    return save(ctx,&next);
 }
 #endif

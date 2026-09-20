@@ -1,0 +1,4 @@
+# Generated resource IDs
+CREDITS = 1
+CREDITS_ISSUED = 1
+CREDITS_CONSUMED = 2

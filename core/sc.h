@@ -8,16 +8,15 @@
 extern "C" {
 #endif
 
-#define SC_VERSION 2u
+#define SC_VERSION 3u
 #define SC_PROFILE_NACL_BOX 2u /* Ed25519 identities converted for NaCl box */
 #define SC_KEY_BYTES 32u
 #define SC_TOKEN_BYTES 32u
 #define SC_NONCE_BYTES 24u
 #define SC_TAG_BYTES 16u
 #define SC_MAX_SERIAL 32u
-#define SC_MAX_NAME 64u
 #define SC_MAX_FRAME 512u
-#define SC_MAX_RECORD 512u
+#define SC_MAX_RECORD (512u + SC_DATA_MAX_GROUPS * (2u * SC_DATA_MAX_PAYLOAD + 128u))
 #define SC_NONCE_RESERVATION 32u
 
 typedef enum {
@@ -39,8 +38,8 @@ typedef enum {
 } sc_status;
 
 typedef enum { SC_DEVICE = 1, SC_SERVER = 2 } sc_role;
-typedef enum { SC_APPLY_NONE = 0, SC_APPLY_OK = 1, SC_APPLY_REJECTED = 2 } sc_apply_status;
 typedef uint32_t sc_key_handle;
+#include "core/data.h"
 
 /* All callbacks are synchronous. Failed callbacks must not publish partial
  * results. `commit` is atomic compare-and-replace; generation 0 means absent.
@@ -71,6 +70,7 @@ typedef struct {
 } sc_provider;
 
 typedef struct {
+    const sc_data_schema *data_schema; /* NULL selects the generated credits schema. */
     sc_role role;
     sc_key_handle identity_key;
     char serial[SC_MAX_SERIAL + 1u];
@@ -82,26 +82,18 @@ typedef struct {
 typedef struct {
     sc_role role;
     char serial[SC_MAX_SERIAL + 1u];
-    char desired_name[SC_MAX_NAME + 1u];
-    char actual_name[SC_MAX_NAME + 1u];
-    int32_t temperature_mC;
-    uint64_t desired_revision;
+    sc_data_state data;
     uint64_t reported_revision;
-    uint64_t processed_desired_revision;
-    uint64_t applied_desired_revision;
     uint64_t acked_reported_revision;
     uint64_t last_sent_reported_revision;
-    uint64_t last_sent_desired_revision;
     uint64_t storage_generation;
     uint8_t peer_public_key[SC_KEY_BYTES];
     uint8_t enrollment_mode; /* 0=legacy token authorization, 1=signed challenge + approval */
     uint8_t challenge[32], candidate_key[32];
     uint64_t enrollment_expires, candidate_revision;
-    int32_t candidate_temperature;
-    uint8_t candidate_has_temperature;
+
     uint8_t registered;
-    uint8_t has_temperature;
-    uint8_t apply_status;
+
     uint8_t pending;
 } sc_state;
 
@@ -117,17 +109,23 @@ typedef struct {
     uint64_t nonce_limit;
     uint8_t initialized;
     uint8_t receipt_pending;
-    uint8_t work[SC_MAX_FRAME];
+    uint8_t data_cursor;
+    uint8_t work[SC_MAX_RECORD];
 } sc_context;
 
 /* init loads an existing record or atomically creates one on SC_NOT_FOUND.
- * Initial revisions are zero, and no synthetic temperature is reported.
- * report_temperature creates revision 1. In signed enrollment mode the first
- * report waits for a verified server challenge.
+ * Resource values start at zero/empty. Signed enrollment waits for a verified
+ * server challenge; application updates require confirmed enrollment.
  * Contexts are single-owner; callers supply external synchronization. */
 sc_status sc_init(sc_context *ctx, const sc_config *config, const sc_provider *provider);
-sc_status sc_set_name(sc_context *ctx, const char *name);
-sc_status sc_report_temperature(sc_context *ctx, int32_t temperature_mC);
+sc_status sc_data_inspect(const sc_context *,uint16_t group_id,sc_group_state *out);
+sc_status sc_data_update_group(sc_context *,uint16_t group_id,const sc_data_update *,size_t count);
+sc_status sc_data_update_encoded(sc_context *,uint16_t,const uint8_t *,size_t);
+sc_status sc_data_encode_values(const sc_context *,uint16_t,uint8_t *,size_t,size_t *);
+sc_status sc_data_request(sc_context *,uint16_t group_id);
+sc_status sc_set_credits_issued(sc_context *,uint64_t total);
+sc_status sc_consume_credits(sc_context *,uint64_t amount);
+sc_status sc_request_credit_status(sc_context *);
 sc_status sc_receive(sc_context *ctx, const uint8_t *frame, size_t length);
 /* One complete opaque object, excluding UART/COBS framing. No output if no
  * work is pending. Budget/capacity failure does not consume an output. */

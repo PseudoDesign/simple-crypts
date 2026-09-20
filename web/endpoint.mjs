@@ -23,7 +23,7 @@ export class Endpoint {
   }
   state() { return JSON.parse(this.m.UTF8ToString(this.m._scw_state())); }
   async command(command, args = {}) {
-    const m = this.m; let status = 0, frame;
+    const m = this.m; let status = 0, frame, messageKind;
     if(command==='verify_challenge') {
       if(this.initialized)throw new Error('Already initialized');
       if(!(args.frame instanceof Uint8Array)||args.frame.length>512)throw new Error('Frame must fit in 512 bytes');
@@ -63,10 +63,9 @@ export class Endpoint {
         case 'enrollment_approve': this.put(unhex(args.challenge));this.put(unhex(args.key),32);status=m._scw_enrollment_approve(uint64(args.now));break;
         case 'enrollment_cancel': status=m._scw_enrollment_cancel();break;
         case 'reboot': status=m._scw_reboot(); break;
-        case 'report':
-          if (!Number.isInteger(args.temperature) || args.temperature < -2147483648 || args.temperature > 2147483647) throw new Error('Temperature must be an int32 millidegree value');
-          status=m._scw_report(args.temperature);break;
-        case 'name': { const bytes=validText(args.name);if(bytes.length>64)throw new Error('Name must fit in 64 UTF-8 bytes');this.put(bytes);status=m._scw_name(bytes.length);break; }
+        case 'issue': status=m._scw_issue(uint64(args.total));break;
+        case 'consume': status=m._scw_consume(uint64(args.amount));break;
+        case 'request': status=m._scw_request();break;
         case 'rx':
           if (!(args.frame instanceof Uint8Array) || args.frame.length>512) throw new Error('Frame must fit in 512 bytes');
           this.put(args.frame);status=args.now===undefined?m._scw_receive(args.frame.length):m._scw_receive_at(args.frame.length,uint64(args.now));break;
@@ -74,11 +73,11 @@ export class Endpoint {
           const budget=args.budget ?? 512;
           if (!Number.isInteger(budget) || budget<0 || budget>512)throw new Error('Budget must be 0–512 bytes');
           status=m._scw_outbound(budget);
-          if(status===0)frame=m.HEAPU8.slice(m._scw_frame(),m._scw_frame()+m._scw_frame_length());break;
+          if(status===0){frame=m.HEAPU8.slice(m._scw_frame(),m._scw_frame()+m._scw_frame_length());messageKind=m._scw_frame_kind();}break;
         }
         default: throw new Error('Unknown endpoint command');
       }
     }
-    return {code:status,status:m.UTF8ToString(m._scw_status(status)),state:this.state(),...(frame?{frame}:{})};
+    return {code:status,status:m.UTF8ToString(m._scw_status(status)),state:this.state(),...(frame?{frame,messageKind}:{})};
   }
 }

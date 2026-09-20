@@ -12,4 +12,7 @@ PB_BIND(simplecrypts_Packet, simplecrypts_Packet, 2)
 PB_BIND(simplecrypts_Record, simplecrypts_Record, 2)
 
 
+PB_BIND(simplecrypts_GroupRecord, simplecrypts_GroupRecord, 2)
+
+
 

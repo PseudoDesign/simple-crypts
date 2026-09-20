@@ -18,8 +18,8 @@ successful outputs and restarts. Fixed test seeds and provisioning secrets are
 public fixtures, never production keys.
 
 Coverage includes first-packet loss, unauthorized/conflicting enrollment,
-lost receipts, duplicate claims, lost application reports, both snapshot
-orders, tampering and reflection, reboot, failed commits and reservations,
+lost receipts, duplicate claims, frozen credit snapshots, both snapshot
+orders, local consumption, insufficient credits, tampering and reflection, reboot, failed commits and reservations,
 buffer limits, unavailable randomness, uint64 boundaries, long withholding,
 and generated relay schedules. Direct binding tests cover ownership and
 argument conversion separately from the JSON adapters.
@@ -67,3 +67,9 @@ Any compiler error, sanitizer report, or failed subprocess fails the target;
 crashes are not retried. LeakSanitizer is disabled because the execution host
 uses ptrace, which LeakSanitizer does not support. Address and undefined-behavior
 checks remain enabled, and UBSan findings stop execution.
+
+The alternate resource schema tests uint64, int64, Boolean, UTF-8, and bytes,
+wrong-owner writes, bounds, atomic group validation, schema-bound persistence,
+and fair scheduling across two groups. `//tools:resource_schema_check` validates
+and compares generated descriptors and language metadata. Cross-language credit
+scenarios exercise the same signed enrollment and generic C state engine.

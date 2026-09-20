@@ -13,8 +13,9 @@
 typedef PB_BYTES_ARRAY_T(32) simplecrypts_Packet_serial_t;
 typedef PB_BYTES_ARRAY_T(32) simplecrypts_Packet_sender_key_t;
 typedef PB_BYTES_ARRAY_T(32) simplecrypts_Packet_recipient_key_t;
-typedef PB_BYTES_ARRAY_T(64) simplecrypts_Packet_name_t;
 typedef PB_BYTES_ARRAY_T(32) simplecrypts_Packet_enrollment_token_t;
+typedef PB_BYTES_ARRAY_T(32) simplecrypts_Packet_schema_hash_t;
+typedef PB_BYTES_ARRAY_T(160) simplecrypts_Packet_data_t;
 /* Authenticated inner object. Every semantic routing field is repeated here;
  the untrusted outer frame is only a bounded decoding/routing aid. */
 typedef struct _simplecrypts_Packet {
@@ -27,15 +28,6 @@ typedef struct _simplecrypts_Packet {
     simplecrypts_Packet_recipient_key_t recipient_key;
     uint64_t key_generation;
     uint64_t revision;
-    simplecrypts_Packet_name_t name;
-    bool has_temperature_mC;
-    int32_t temperature_mC;
-    bool has_processed_desired_revision;
-    uint64_t processed_desired_revision;
-    bool has_applied_desired_revision;
-    uint64_t applied_desired_revision;
-    bool has_apply_status;
-    uint32_t apply_status;
     bool has_acked_reported_revision;
     uint64_t acked_reported_revision;
     bool has_enrollment_confirmed;
@@ -43,15 +35,39 @@ typedef struct _simplecrypts_Packet {
     /* Legacy bearer token, or public session challenge in signed enrollment mode. */
     bool has_enrollment_token;
     simplecrypts_Packet_enrollment_token_t enrollment_token;
+    simplecrypts_Packet_schema_hash_t schema_hash;
+    bool has_group_id;
+    uint32_t group_id;
+    bool has_data;
+    simplecrypts_Packet_data_t data;
+    bool has_request_id;
+    uint64_t request_id;
+    bool has_data_kind;
+    uint32_t data_kind; /* 1=request, 2=response, 3=receipt */
 } simplecrypts_Packet;
+
+typedef PB_BYTES_ARRAY_T(160) simplecrypts_GroupRecord_values_t;
+typedef PB_BYTES_ARRAY_T(160) simplecrypts_GroupRecord_snapshot_t;
+typedef struct _simplecrypts_GroupRecord {
+    simplecrypts_GroupRecord_values_t values;
+    simplecrypts_GroupRecord_snapshot_t snapshot;
+    uint64_t local_revision;
+    uint64_t request_id;
+    uint64_t snapshot_id;
+    uint64_t acknowledged_id;
+    uint64_t last_sent_id;
+    bool request_pending;
+    bool response_pending;
+    bool receipt_pending;
+    bool has_snapshot;
+} simplecrypts_GroupRecord;
 
 typedef PB_BYTES_ARRAY_T(32) simplecrypts_Record_serial_t;
 typedef PB_BYTES_ARRAY_T(32) simplecrypts_Record_local_key_t;
 typedef PB_BYTES_ARRAY_T(32) simplecrypts_Record_peer_key_t;
-typedef PB_BYTES_ARRAY_T(64) simplecrypts_Record_desired_name_t;
-typedef PB_BYTES_ARRAY_T(64) simplecrypts_Record_actual_name_t;
 typedef PB_BYTES_ARRAY_T(32) simplecrypts_Record_challenge_t;
 typedef PB_BYTES_ARRAY_T(32) simplecrypts_Record_candidate_key_t;
+typedef PB_BYTES_ARRAY_T(32) simplecrypts_Record_schema_hash_t;
 /* Atomic bounded snapshot. Nonce reservations are a separate durable provider
  namespace and can never be rolled back by committing this record. */
 typedef struct _simplecrypts_Record {
@@ -61,18 +77,9 @@ typedef struct _simplecrypts_Record {
     simplecrypts_Record_local_key_t local_key;
     simplecrypts_Record_peer_key_t peer_key;
     bool registered;
-    simplecrypts_Record_desired_name_t desired_name;
-    simplecrypts_Record_actual_name_t actual_name;
-    bool has_temperature_mC;
-    int32_t temperature_mC;
-    uint64_t desired_revision;
     uint64_t reported_revision;
-    uint64_t processed_desired_revision;
-    uint64_t applied_desired_revision;
     uint64_t acked_reported_revision;
     uint64_t last_sent_reported_revision;
-    uint64_t last_sent_desired_revision;
-    uint32_t apply_status;
     bool has_enrollment_mode;
     uint32_t enrollment_mode;
     bool has_challenge;
@@ -83,10 +90,9 @@ typedef struct _simplecrypts_Record {
     simplecrypts_Record_candidate_key_t candidate_key;
     bool has_candidate_revision;
     uint64_t candidate_revision;
-    bool has_candidate_temperature;
-    int32_t candidate_temperature;
-    bool has_candidate_has_temperature;
-    bool candidate_has_temperature;
+    simplecrypts_Record_schema_hash_t schema_hash;
+    pb_size_t groups_count;
+    simplecrypts_GroupRecord groups[2];
 } simplecrypts_Record;
 
 
@@ -95,10 +101,12 @@ extern "C" {
 #endif
 
 /* Initializer values for message structs */
-#define simplecrypts_Packet_init_default         {0, 0, 0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, {0, {0}}, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, {0, {0}}}
-#define simplecrypts_Record_init_default         {0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, {0, {0}}, {0, {0}}, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, false, {0, {0}}, false, 0, false, {0, {0}}, false, 0, false, 0, false, 0}
-#define simplecrypts_Packet_init_zero            {0, 0, 0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, {0, {0}}, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, {0, {0}}}
-#define simplecrypts_Record_init_zero            {0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, {0, {0}}, {0, {0}}, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, false, {0, {0}}, false, 0, false, {0, {0}}, false, 0, false, 0, false, 0}
+#define simplecrypts_Packet_init_default         {0, 0, 0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, false, 0, false, 0, false, {0, {0}}, {0, {0}}, false, 0, false, {0, {0}}, false, 0, false, 0}
+#define simplecrypts_Record_init_default         {0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, 0, 0, false, 0, false, {0, {0}}, false, 0, false, {0, {0}}, false, 0, {0, {0}}, 0, {simplecrypts_GroupRecord_init_default, simplecrypts_GroupRecord_init_default}}
+#define simplecrypts_GroupRecord_init_default    {{0, {0}}, {0, {0}}, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+#define simplecrypts_Packet_init_zero            {0, 0, 0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, false, 0, false, 0, false, {0, {0}}, {0, {0}}, false, 0, false, {0, {0}}, false, 0, false, 0}
+#define simplecrypts_Record_init_zero            {0, 0, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, 0, 0, false, 0, false, {0, {0}}, false, 0, false, {0, {0}}, false, 0, {0, {0}}, 0, {simplecrypts_GroupRecord_init_zero, simplecrypts_GroupRecord_init_zero}}
+#define simplecrypts_GroupRecord_init_zero       {{0, {0}}, {0, {0}}, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define simplecrypts_Packet_version_tag          1
@@ -110,38 +118,41 @@ extern "C" {
 #define simplecrypts_Packet_recipient_key_tag    7
 #define simplecrypts_Packet_key_generation_tag   8
 #define simplecrypts_Packet_revision_tag         9
-#define simplecrypts_Packet_name_tag             10
-#define simplecrypts_Packet_temperature_mC_tag   11
-#define simplecrypts_Packet_processed_desired_revision_tag 12
-#define simplecrypts_Packet_applied_desired_revision_tag 13
-#define simplecrypts_Packet_apply_status_tag     14
 #define simplecrypts_Packet_acked_reported_revision_tag 15
 #define simplecrypts_Packet_enrollment_confirmed_tag 16
 #define simplecrypts_Packet_enrollment_token_tag 17
+#define simplecrypts_Packet_schema_hash_tag      18
+#define simplecrypts_Packet_group_id_tag         19
+#define simplecrypts_Packet_data_tag             20
+#define simplecrypts_Packet_request_id_tag       21
+#define simplecrypts_Packet_data_kind_tag        22
+#define simplecrypts_GroupRecord_values_tag      1
+#define simplecrypts_GroupRecord_snapshot_tag    2
+#define simplecrypts_GroupRecord_local_revision_tag 3
+#define simplecrypts_GroupRecord_request_id_tag  4
+#define simplecrypts_GroupRecord_snapshot_id_tag 5
+#define simplecrypts_GroupRecord_acknowledged_id_tag 6
+#define simplecrypts_GroupRecord_last_sent_id_tag 7
+#define simplecrypts_GroupRecord_request_pending_tag 8
+#define simplecrypts_GroupRecord_response_pending_tag 9
+#define simplecrypts_GroupRecord_receipt_pending_tag 10
+#define simplecrypts_GroupRecord_has_snapshot_tag 11
 #define simplecrypts_Record_version_tag          1
 #define simplecrypts_Record_role_tag             2
 #define simplecrypts_Record_serial_tag           3
 #define simplecrypts_Record_local_key_tag        4
 #define simplecrypts_Record_peer_key_tag         5
 #define simplecrypts_Record_registered_tag       6
-#define simplecrypts_Record_desired_name_tag     7
-#define simplecrypts_Record_actual_name_tag      8
-#define simplecrypts_Record_temperature_mC_tag   9
-#define simplecrypts_Record_desired_revision_tag 10
 #define simplecrypts_Record_reported_revision_tag 11
-#define simplecrypts_Record_processed_desired_revision_tag 12
-#define simplecrypts_Record_applied_desired_revision_tag 13
 #define simplecrypts_Record_acked_reported_revision_tag 14
 #define simplecrypts_Record_last_sent_reported_revision_tag 15
-#define simplecrypts_Record_last_sent_desired_revision_tag 16
-#define simplecrypts_Record_apply_status_tag     17
 #define simplecrypts_Record_enrollment_mode_tag  18
 #define simplecrypts_Record_challenge_tag        19
 #define simplecrypts_Record_enrollment_expires_tag 20
 #define simplecrypts_Record_candidate_key_tag    21
 #define simplecrypts_Record_candidate_revision_tag 22
-#define simplecrypts_Record_candidate_temperature_tag 23
-#define simplecrypts_Record_candidate_has_temperature_tag 24
+#define simplecrypts_Record_schema_hash_tag      25
+#define simplecrypts_Record_groups_tag           26
 
 /* Struct field encoding specification for nanopb */
 #define simplecrypts_Packet_FIELDLIST(X, a) \
@@ -154,14 +165,14 @@ X(a, STATIC,   REQUIRED, BYTES,    sender_key,        6) \
 X(a, STATIC,   REQUIRED, BYTES,    recipient_key,     7) \
 X(a, STATIC,   REQUIRED, UINT64,   key_generation,    8) \
 X(a, STATIC,   REQUIRED, UINT64,   revision,          9) \
-X(a, STATIC,   REQUIRED, BYTES,    name,             10) \
-X(a, STATIC,   OPTIONAL, SINT32,   temperature_mC,   11) \
-X(a, STATIC,   OPTIONAL, UINT64,   processed_desired_revision,  12) \
-X(a, STATIC,   OPTIONAL, UINT64,   applied_desired_revision,  13) \
-X(a, STATIC,   OPTIONAL, UINT32,   apply_status,     14) \
 X(a, STATIC,   OPTIONAL, UINT64,   acked_reported_revision,  15) \
 X(a, STATIC,   OPTIONAL, BOOL,     enrollment_confirmed,  16) \
-X(a, STATIC,   OPTIONAL, BYTES,    enrollment_token,  17)
+X(a, STATIC,   OPTIONAL, BYTES,    enrollment_token,  17) \
+X(a, STATIC,   REQUIRED, BYTES,    schema_hash,      18) \
+X(a, STATIC,   OPTIONAL, UINT32,   group_id,         19) \
+X(a, STATIC,   OPTIONAL, BYTES,    data,             20) \
+X(a, STATIC,   OPTIONAL, UINT64,   request_id,       21) \
+X(a, STATIC,   OPTIONAL, UINT32,   data_kind,        22)
 #define simplecrypts_Packet_CALLBACK NULL
 #define simplecrypts_Packet_DEFAULT NULL
 
@@ -172,38 +183,49 @@ X(a, STATIC,   REQUIRED, BYTES,    serial,            3) \
 X(a, STATIC,   REQUIRED, BYTES,    local_key,         4) \
 X(a, STATIC,   REQUIRED, BYTES,    peer_key,          5) \
 X(a, STATIC,   REQUIRED, BOOL,     registered,        6) \
-X(a, STATIC,   REQUIRED, BYTES,    desired_name,      7) \
-X(a, STATIC,   REQUIRED, BYTES,    actual_name,       8) \
-X(a, STATIC,   OPTIONAL, SINT32,   temperature_mC,    9) \
-X(a, STATIC,   REQUIRED, UINT64,   desired_revision,  10) \
 X(a, STATIC,   REQUIRED, UINT64,   reported_revision,  11) \
-X(a, STATIC,   REQUIRED, UINT64,   processed_desired_revision,  12) \
-X(a, STATIC,   REQUIRED, UINT64,   applied_desired_revision,  13) \
 X(a, STATIC,   REQUIRED, UINT64,   acked_reported_revision,  14) \
 X(a, STATIC,   REQUIRED, UINT64,   last_sent_reported_revision,  15) \
-X(a, STATIC,   REQUIRED, UINT64,   last_sent_desired_revision,  16) \
-X(a, STATIC,   REQUIRED, UINT32,   apply_status,     17) \
 X(a, STATIC,   OPTIONAL, UINT32,   enrollment_mode,  18) \
 X(a, STATIC,   OPTIONAL, BYTES,    challenge,        19) \
 X(a, STATIC,   OPTIONAL, UINT64,   enrollment_expires,  20) \
 X(a, STATIC,   OPTIONAL, BYTES,    candidate_key,    21) \
 X(a, STATIC,   OPTIONAL, UINT64,   candidate_revision,  22) \
-X(a, STATIC,   OPTIONAL, SINT32,   candidate_temperature,  23) \
-X(a, STATIC,   OPTIONAL, BOOL,     candidate_has_temperature,  24)
+X(a, STATIC,   REQUIRED, BYTES,    schema_hash,      25) \
+X(a, STATIC,   REPEATED, MESSAGE,  groups,           26)
 #define simplecrypts_Record_CALLBACK NULL
 #define simplecrypts_Record_DEFAULT NULL
+#define simplecrypts_Record_groups_MSGTYPE simplecrypts_GroupRecord
+
+#define simplecrypts_GroupRecord_FIELDLIST(X, a) \
+X(a, STATIC,   REQUIRED, BYTES,    values,            1) \
+X(a, STATIC,   REQUIRED, BYTES,    snapshot,          2) \
+X(a, STATIC,   REQUIRED, UINT64,   local_revision,    3) \
+X(a, STATIC,   REQUIRED, UINT64,   request_id,        4) \
+X(a, STATIC,   REQUIRED, UINT64,   snapshot_id,       5) \
+X(a, STATIC,   REQUIRED, UINT64,   acknowledged_id,   6) \
+X(a, STATIC,   REQUIRED, UINT64,   last_sent_id,      7) \
+X(a, STATIC,   REQUIRED, BOOL,     request_pending,   8) \
+X(a, STATIC,   REQUIRED, BOOL,     response_pending,   9) \
+X(a, STATIC,   REQUIRED, BOOL,     receipt_pending,  10) \
+X(a, STATIC,   REQUIRED, BOOL,     has_snapshot,     11)
+#define simplecrypts_GroupRecord_CALLBACK NULL
+#define simplecrypts_GroupRecord_DEFAULT NULL
 
 extern const pb_msgdesc_t simplecrypts_Packet_msg;
 extern const pb_msgdesc_t simplecrypts_Record_msg;
+extern const pb_msgdesc_t simplecrypts_GroupRecord_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
 #define simplecrypts_Packet_fields &simplecrypts_Packet_msg
 #define simplecrypts_Record_fields &simplecrypts_Record_msg
+#define simplecrypts_GroupRecord_fields &simplecrypts_GroupRecord_msg
 
 /* Maximum encoded size of messages (where known) */
 #define SIMPLECRYPTS_SC_PB_H_MAX_SIZE            simplecrypts_Record_size
-#define simplecrypts_Packet_size                 297
-#define simplecrypts_Record_size                 450
+#define simplecrypts_GroupRecord_size            389
+#define simplecrypts_Packet_size                 422
+#define simplecrypts_Record_size                 1071
 
 #ifdef __cplusplus
 } /* extern "C" */

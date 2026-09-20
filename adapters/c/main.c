@@ -105,12 +105,8 @@ static int command(sc_host **host,const object *o,char *frame64,size_t framecap)
     if(!strcmp(cmd,"enrollment_approve")){uint64_t now;if(!decode_key(text(o,"challenge",""),secret)||!decode_key(text(o,"key",""),seed)||!unsigned_value(o,"now",0,&now))return SC_ERR_ARGUMENT;return sc_host_enrollment_approve(*host,secret,seed,now);}
     if(!strcmp(cmd,"state"))return SC_OK;
     if(!strcmp(cmd,"close")){sc_host_close(*host);*host=NULL;return SC_OK;}
-    if(!strcmp(cmd,"name"))return sc_host_name(*host,text(o,"name",""));
-    if(!strcmp(cmd,"report")) {
-        char *end;long long temperature;f=get(o,"temperature");if(!f)f=get(o,"temperature_mC");if(!f||f->string)return SC_ERR_ARGUMENT;
-        errno=0;temperature=strtoll(f->value,&end,10);if(errno||!*f->value||*end||temperature<INT32_MIN||temperature>INT32_MAX)return SC_ERR_ARGUMENT;
-        return sc_host_report(*host,(int32_t)temperature);
-    }
+    if(!strcmp(cmd,"issue")||!strcmp(cmd,"consume")){uint64_t value;if(!unsigned_value(o,!strcmp(cmd,"issue")?"total":"amount",0,&value))return SC_ERR_ARGUMENT;return !strcmp(cmd,"issue")?sc_host_set_credits_issued(*host,value):sc_host_consume_credits(*host,value);}
+    if(!strcmp(cmd,"request"))return sc_host_request_credit_status(*host);
     if(!strcmp(cmd,"fail")){if(!unsigned_value(o,"count",1,&count)||count>UINT32_MAX)return SC_ERR_ARGUMENT;return sc_host_fail(*host,text(o,"operation",""),(unsigned)count);}
     if(!strcmp(cmd,"tx")) {
         if(!unsigned_value(o,"budget",512,&budget)||!unsigned_value(o,"capacity",512,&capacity)||capacity>65536||budget>SIZE_MAX)return SC_ERR_ARGUMENT;

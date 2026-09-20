@@ -222,7 +222,7 @@ int sc_host_initialize(int role, const char *storage, const char *serial,
         close(fd);
         crypto_generichash(digest, sizeof digest, (const unsigned char *)&initial,
                            offsetof(disk_record, digest), NULL, 0);
-        if (memcmp(initial.magic, "SCSTORE2", 8) || initial.format != 2 ||
+        if (memcmp(initial.magic, "SCSTORE3", 8) || initial.format != 3 ||
             initial.length > SC_MAX_RECORD || sodium_memcmp(digest, initial.digest, 32)) goto fail;
         if (initial.role != (uint32_t)role || sodium_memcmp(initial.token, secret, 32) ||
             strncmp(initial.serial, serial, sizeof initial.serial) ||
@@ -238,7 +238,7 @@ int sc_host_initialize(int role, const char *storage, const char *serial,
     } else {
         if (errno != ENOENT) goto fail;
         memset(&initial, 0, sizeof initial);
-        memcpy(initial.magic, "SCSTORE2", 8); initial.format = 2; initial.role = (uint32_t)role;
+        memcpy(initial.magic, "SCSTORE3", 8); initial.format = 3; initial.role = (uint32_t)role;
         memcpy(initial.serial, serial, strlen(serial) + 1); memcpy(initial.token, secret, 32);
         if (role == SC_DEVICE) memcpy(initial.server_key, server_key, 32);
         if (seed) crypto_sign_seed_keypair(initial.public_key, initial.private_key, seed);
@@ -271,8 +271,10 @@ void sc_host_close(sc_host *h) {
     if (h->dir_fd >= 0) close(h->dir_fd);
     sodium_memzero(h, sizeof *h); free(h);
 }
-int sc_host_name(sc_host *h, const char *name) { return h ? sc_set_name(&h->core, name) : SC_ERR_ARGUMENT; }
-int sc_host_report(sc_host *h, int32_t temp) { return h ? sc_report_temperature(&h->core, temp) : SC_ERR_ARGUMENT; }
+int sc_host_set_credits_issued(sc_host *h,uint64_t total){return h?sc_set_credits_issued(&h->core,total):SC_ERR_ARGUMENT;}
+int sc_host_consume_credits(sc_host *h,uint64_t amount){return h?sc_consume_credits(&h->core,amount):SC_ERR_ARGUMENT;}
+int sc_host_request_credit_status(sc_host *h){return h?sc_request_credit_status(&h->core):SC_ERR_ARGUMENT;}
+
 int sc_host_receive(sc_host *h, const uint8_t *frame, size_t n) { return h ? sc_receive_at(&h->core, frame, n,(uint64_t)time(NULL)) : SC_ERR_ARGUMENT; }
 int sc_host_outbound(sc_host *h, size_t budget, uint8_t *frame, size_t capacity, size_t *n) {
     return h ? sc_outbound(&h->core, budget, frame, capacity, n) : SC_ERR_ARGUMENT;
@@ -322,26 +324,17 @@ int sc_host_enrollment_approve(sc_host *h,const uint8_t challenge[32],const uint
 int sc_host_enrollment_cancel(sc_host *h){return h?sc_enrollment_cancel(&h->core):SC_ERR_ARGUMENT;}
 int sc_host_receive_at(sc_host *h,const uint8_t *frame,size_t n,uint64_t now){return h?sc_receive_at(&h->core,frame,n,now):SC_ERR_ARGUMENT;}
 int sc_host_inspect(sc_host *h, char *json, size_t capacity) {
-    sc_state state; char serial[6 * SC_MAX_SERIAL + 1], desired[6 * SC_MAX_NAME + 1], actual[6 * SC_MAX_NAME + 1];
-    char public_key[65], peer_key[65], buffer[4096]; int n, result;
-    if (!h || !json) return SC_ERR_ARGUMENT;
-    result = sc_inspect(&h->core, &state); if (result) return result;
-    json_string(state.serial, serial); json_string(state.desired_name, desired); json_string(state.actual_name, actual);
-    sodium_bin2hex(public_key, sizeof public_key, h->disk.public_key, 32);
-    sodium_bin2hex(peer_key, sizeof peer_key, state.peer_public_key, 32);
-    n = snprintf(buffer, sizeof buffer,
-        "{\"role\":\"%s\",\"serial\":\"%s\",\"desired_name\":\"%s\",\"actual_name\":\"%s\","
-        "\"temperature_mC\":%" PRId32 ",\"temperature\":%" PRId32 ",\"has_temperature\":%s,\"registered\":%s,\"pending\":%s,"
-        "\"desired_revision\":\"%" PRIu64 "\",\"reported_revision\":\"%" PRIu64 "\","
-        "\"processed_desired_revision\":\"%" PRIu64 "\",\"applied_desired_revision\":\"%" PRIu64 "\","
-        "\"acked_reported_revision\":\"%" PRIu64 "\",\"last_sent_reported_revision\":\"%" PRIu64 "\","
-        "\"last_sent_desired_revision\":\"%" PRIu64 "\",\"storage_generation\":\"%" PRIu64 "\","
-        "\"apply_status\":\"%s\",\"public_key\":\"%s\",\"peer_public_key\":\"%s\"}",
-        state.role == SC_DEVICE ? "device" : "server", serial, desired, actual, state.temperature_mC, state.temperature_mC,
-        state.has_temperature ? "true" : "false", state.registered ? "true" : "false", state.pending ? "true" : "false",
-        state.desired_revision, state.reported_revision, state.processed_desired_revision, state.applied_desired_revision,
-        state.acked_reported_revision, state.last_sent_reported_revision, state.last_sent_desired_revision, state.storage_generation,
-        state.apply_status == SC_APPLY_OK ? "applied" : state.apply_status == SC_APPLY_REJECTED ? "rejected" : "none", public_key, peer_key);
+    sc_state state;char serial[6*SC_MAX_SERIAL+1],public_key[65],peer_key[65],buffer[4096];int n,result;
+    if(!h||!json)return SC_ERR_ARGUMENT;
+    result=sc_inspect(&h->core,&state);if(result)return result;
+    json_string(state.serial,serial);sodium_bin2hex(public_key,65,h->disk.public_key,32);sodium_bin2hex(peer_key,65,state.peer_public_key,32);
+    const sc_group_state *g=&state.data.groups[0];
+    n=snprintf(buffer,sizeof buffer,
+        "{\"role\":\"%s\",\"serial\":\"%s\",\"public_key\":\"%s\",\"peer_public_key\":\"%s\",\"registered\":%s,\"pending\":%s,"
+        "\"credits_issued\":\"%" PRIu64 "\",\"credits_consumed\":\"%" PRIu64 "\",\"snapshot_issued\":\"%" PRIu64 "\",\"snapshot_consumed\":\"%" PRIu64 "\","
+        "\"request_id\":\"%" PRIu64 "\",\"snapshot_id\":\"%" PRIu64 "\",\"acknowledged_id\":\"%" PRIu64 "\",\"local_revision\":\"%" PRIu64 "\",\"has_snapshot\":%s,\"storage_generation\":\"%" PRIu64 "\"}",
+        state.role==SC_DEVICE?"device":"server",serial,public_key,peer_key,state.registered?"true":"false",state.pending?"true":"false",
+        g->values[0].u64,g->values[1].u64,g->snapshot[0].u64,g->snapshot[1].u64,g->request_id,g->snapshot_id,g->acknowledged_id,g->local_revision,g->has_snapshot?"true":"false",state.storage_generation);
     if(n>0&&(size_t)n<sizeof buffer){
         char challenge[65],candidate[65];size_t used=(size_t)n-1;
         sodium_bin2hex(challenge,sizeof challenge,state.challenge,32);sodium_bin2hex(candidate,sizeof candidate,state.candidate_key,32);
@@ -358,4 +351,17 @@ int sc_host_fixture_revision(sc_host *h, uint64_t revision) {
 #else
     (void)h; (void)revision; return SC_ERR_ARGUMENT;
 #endif
+}
+
+int sc_host_update_group(sc_host *h,uint16_t id,const uint8_t *data,size_t size){return h?sc_data_update_encoded(&h->core,id,data,size):SC_ERR_ARGUMENT;}
+int sc_host_request_group(sc_host *h,uint16_t id){return h?sc_data_request(&h->core,id):SC_ERR_ARGUMENT;}
+int sc_host_inspect_group(sc_host *h,uint16_t id,char *out,size_t cap){
+ sc_group_state g;uint8_t data[SC_DATA_MAX_PAYLOAD];char hex[SC_DATA_MAX_PAYLOAD*2+1],json[1024];size_t length;int n;sc_status status;
+ if(!h||!out)return SC_ERR_ARGUMENT;
+ status=sc_data_inspect(&h->core,id,&g);if(status!=SC_OK)return status;
+ status=sc_data_encode_values(&h->core,id,data,sizeof data,&length);if(status!=SC_OK)return status;
+ sodium_bin2hex(hex,sizeof hex,data,length);
+ n=snprintf(json,sizeof json,"{\"data\":\"%s\",\"local_revision\":\"%" PRIu64 "\",\"request_id\":\"%" PRIu64 "\",\"snapshot_id\":\"%" PRIu64 "\",\"acknowledged_id\":\"%" PRIu64 "\",\"has_snapshot\":%s,\"pending\":%s}",hex,g.local_revision,g.request_id,g.snapshot_id,g.acknowledged_id,g.has_snapshot?"true":"false",g.request_pending||g.response_pending||g.receipt_pending?"true":"false");
+ if(n<0||(size_t)n>=sizeof json||cap<=(size_t)n)return SC_ERR_BOUNDS;
+ memcpy(out,json,(size_t)n+1);return SC_OK;
 }

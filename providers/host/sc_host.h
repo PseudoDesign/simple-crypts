@@ -26,9 +26,13 @@ int sc_host_enrollment_begin(sc_host *,uint64_t now,uint64_t expires);
 int sc_host_enrollment_approve(sc_host *,const uint8_t challenge[32],const uint8_t key[32],uint64_t now);
 int sc_host_enrollment_cancel(sc_host *);
 int sc_host_receive_at(sc_host *,const uint8_t *,size_t,uint64_t now);
+int sc_host_update_group(sc_host *,uint16_t,const uint8_t *,size_t);
+int sc_host_request_group(sc_host *,uint16_t);
+int sc_host_inspect_group(sc_host *,uint16_t,char *,size_t);
 void sc_host_close(sc_host *host);
-int sc_host_name(sc_host *host, const char *name);
-int sc_host_report(sc_host *host, int32_t temperature_mC);
+int sc_host_set_credits_issued(sc_host *,uint64_t);
+int sc_host_consume_credits(sc_host *,uint64_t);
+int sc_host_request_credit_status(sc_host *);
 int sc_host_receive(sc_host *host, const uint8_t *frame, size_t size);
 int sc_host_outbound(sc_host *host, size_t budget, uint8_t *frame,
                      size_t capacity, size_t *size);

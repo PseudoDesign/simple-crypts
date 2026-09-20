@@ -40,7 +40,7 @@ void resource_probe(void) {
     provider.random=entropy;provider.enrollment_secret=secret;
     provider.load=load;provider.commit=commit;provider.reserve=reserve;
     observed=sc_init(&endpoint,&config,&provider);
-    observed=sc_report_temperature(&endpoint,22500);
+    observed=sc_consume_credits(&endpoint,25);
     observed=sc_outbound(&endpoint,sizeof frame,frame,sizeof frame,&length);
     observed=sc_receive(&endpoint,frame,length);
     for(;;) {}

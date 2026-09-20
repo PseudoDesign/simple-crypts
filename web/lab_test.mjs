@@ -7,22 +7,22 @@ let called=false;l.command=async()=>{called=true;return {code:1};};await assert.
 for(let i=0;i<1000;i++)l.event('event '+i);assert.equal(l.events.length,MAX_EVENTS);assert.equal(l.events[0].message,'event 800');
 let cancelled=false;l.workers={device:{terminate(){cancelled=true;}}};l.pending.set(1,{reject(error){assert.equal(error.name,'AbortError');}});l.stop();assert(cancelled);assert.equal(l.pending.size,0);assert(!l.ready);
 console.log('PASS relay: independent copies, queue/history bounds, no transmission at capacity, cancellation');
-const r=new Lab();r.ready=true;r.states={device:{temperature:1},server:{temperature:1}};
+const r=new Lab();r.ready=true;r.states={device:{credits_consumed:1},server:{credits_consumed:1}};
 r.queue=[{id:1,origin:1,location:'device-outbox',from:'device',to:'server',bytes:new Uint8Array([1,2,3]),corrupted:false}];r.nextPacket=2;
 r.move(1,'relay');assert.equal(r.packet(1).location,'relay');let recipient;
-r.command=async(role,command,args)=>{recipient=role;return {code:-3,status:'auth',state:{temperature:1}};};
+r.command=async(role,command,args)=>{recipient=role;return {code:-3,status:'auth',state:{credits_consumed:1}};};
 const rejected=await r.deliver(1,'device');assert.equal(recipient,'device');assert.deepEqual(rejected.changes,[]);assert.equal(r.archive.length,1);assert.equal(r.queue.length,0);
 const replay=r.replay(r.archive[0]);r.corrupt(replay);assert.deepEqual([...r.archive[0].bytes],[1,2,3]);r.drop(replay);
 for(let i=0;i<30;i++){const id=r.replay(r.archive[0]);r.drop(id);}assert.equal(r.archive.length,16);
 assert.throws(()=>r.move(999,'relay'),/no longer/);
 console.log('PASS message board: holding, explicit recipients, rejection without changes, independent replay copies, bounded archive');
 
-const snapshot=new Lab();snapshot.states.device={serial:'serial',temperature:12500,reported_revision:'9007199254740993'};
+const snapshot=new Lab();snapshot.states.device={serial:'serial',credits_consumed:12500,snapshot_id:'9007199254740993'};
 snapshot.command=async()=>({code:0,frame:new Uint8Array(90)});
 const packetId=await snapshot.transmit('device');
-snapshot.states.device.temperature=25000;snapshot.states.device.reported_revision='9007199254740994';
-assert.equal(snapshot.packet(packetId).senderState.temperature,12500);
-assert.equal(snapshot.packet(packetId).senderState.reported_revision,'9007199254740993');
+snapshot.states.device.credits_consumed=25000;snapshot.states.device.snapshot_id='9007199254740994';
+assert.equal(snapshot.packet(packetId).senderState.credits_consumed,12500);
+assert.equal(snapshot.packet(packetId).senderState.snapshot_id,'9007199254740993');
 assert(Object.isFrozen(snapshot.packet(packetId).senderState));
 assert.deepEqual(snapshot.packet(snapshot.duplicate(packetId)).senderState,snapshot.packet(packetId).senderState);
 console.log('PASS packet summaries retain the original sender snapshot and exact revisions');

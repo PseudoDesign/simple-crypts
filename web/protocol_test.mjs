@@ -22,103 +22,41 @@ async function tx(e){return (await ok(e,'tx')).frame;}
 async function move(a,b){return ok(b,'rx',{frame:await tx(a)});}
 const nonce=f=>Buffer.from(f.slice(38,62)).toString('hex');
 async function scenario(name,fn){await fn();checks++;console.log('PASS '+name);}
-await scenario('separate production key generation and provisioning preserve identity',async()=>{
- const module=await production();const d=new Endpoint(module);
- assert.equal(d.state(),null);
- const generated=await d.command('generate');assert.equal(generated.code,0);assert.match(generated.public_key,/^[a-f0-9]{64}$/);
- assert.equal(d.state(),null);await assert.rejects(()=>d.command('tx'),/not initialized/);
- assert((await d.command('generate')).code<0);
- const server=await wasm('server');await ok(d,'init',{role:'device',secret,server_public_key:server.state().public_key});
- assert.equal(d.state().public_key,generated.public_key);
- await ok(d,'report',{temperature:1000});await move(d,server);await move(server,d);assert(d.state().registered);
- await assert.rejects(()=>d.command('generate'),/Already initialized/);
-});
-await scenario('verified public challenge supplements secret key-generation randomness',async()=>{
- const server=await wasm('server');await ok(server,'enrollment_enable');await ok(server,'enrollment_begin',{now:100,expires:700});
- const frame=await tx(server),args={frame,server_public_key:server.state().public_key,serial:'mcu-0001'};
- const d=new Endpoint(await production());
+await scenario('challenge verification before keygen and secure entropy requirement',async()=>{
+ const server=await wasm('server');await ok(server,'enrollment_enable');await ok(server,'enrollment_begin',{now:100,expires:700});const frame=await tx(server);
+ const d=new Endpoint(await production()),args={frame,server_public_key:server.state().public_key,serial:'mcu-0001'};
  assert((await d.command('generate_from_challenge')).code<0);
- const bad=frame.slice();bad[171]^=1;
- assert.equal((await d.command('verify_challenge',{...args,frame:bad})).code,-3);
- assert((await d.command('generate_from_challenge')).code<0);assert.equal(d.state(),null);
- assert.equal((await d.command('verify_challenge',{...args,serial:'wrong'})).code,-4);
- await ok(d,'verify_challenge',args);
- const rng=globalThis.crypto;globalThis.crypto=undefined;
- await assert.rejects(()=>d.command('generate_from_challenge'),/randomness/);globalThis.crypto=rng;
- const key=await d.command('generate_from_challenge');assert.equal(key.code,0);
- const other=new Endpoint(await production());await ok(other,'verify_challenge',args);
- assert.notEqual((await other.command('generate_from_challenge')).public_key,key.public_key);
- await ok(d,'init',{role:'device',secret,server_public_key:server.state().public_key});await ok(d,'enrollment_enable');
- await ok(d,'rx',{frame});await ok(d,'report',{temperature:123});await ok(server,'rx',{frame:await tx(d),now:101});
- assert.equal(server.state().candidate_key,key.public_key);
+ const bad=frame.slice();bad[171]^=1;assert.equal((await d.command('verify_challenge',{...args,frame:bad})).code,-3);assert.equal(d.state(),null);
+ await ok(d,'verify_challenge',args);const rng=globalThis.crypto;globalThis.crypto=undefined;await assert.rejects(()=>d.command('generate_from_challenge'),/randomness/);globalThis.crypto=rng;
+ const key=await d.command('generate_from_challenge');assert.equal(key.code,0);const other=new Endpoint(await production());await ok(other,'verify_challenge',args);assert.notEqual((await other.command('generate_from_challenge')).public_key,key.public_key);
+ await ok(d,'init',{role:'device',secret,server_public_key:server.state().public_key});await ok(d,'enrollment_enable');await ok(d,'rx',{frame});const response=await tx(d);
+ assert.equal((await server.command('rx',{frame:response,now:701})).code,-10);await ok(server,'rx',{frame:response,now:101});assert(!server.state().registered);
+ await ok(server,'enrollment_approve',{challenge:server.state().challenge,key:key.public_key,now:102});await move(server,d);assert(d.state().registered);
 });
-await scenario('signed enrollment stages a key and requires explicit session-bound approval',async()=>{
- const[d,s]=await pair();for(const e of [d,s])await ok(e,'enrollment_enable');
- await ok(d,'report',{temperature:1234});assert.equal((await d.command('tx')).code,1);
- await assert.rejects(()=>s.command('enrollment_begin',{now:-1,expires:200}),/uint64/);
- await assert.rejects(()=>s.command('enrollment_begin',{now:9007199254740992,expires:'18446744073709551615'}),/uint64/);
- await ok(s,'enrollment_begin',{now:100n,expires:200n});const invitation=await tx(s);assert.equal(invitation.length,172);
- const tampered=invitation.slice();tampered[70]^=1;assert((await d.command('rx',{frame:tampered})).code<0);
- await ok(d,'rx',{frame:invitation});const response=await tx(d);
- assert((await s.command('rx',{frame:response,now:200n})).code<0);
- await ok(s,'rx',{frame:response,now:101n});assert(!s.state().registered);assert(!s.state().has_temperature);
- assert.equal(s.state().candidate_key,d.state().public_key);
- const args={challenge:s.state().challenge,key:d.state().public_key,now:101n};
- assert((await s.command('enrollment_approve',{...args,key:'11'.repeat(32)})).code<0);
- s.m._scw_test_fail(1);assert.equal((await s.command('enrollment_approve',args)).code,-5);assert(!s.state().registered);
- await ok(s,'reboot');await ok(s,'enrollment_approve',args);assert.equal(s.state().temperature,1234);
- const reply=await tx(s);await ok(d,'rx',{frame:reply});assert(d.state().registered);assert(!d.state().pending);
- await ok(s,'enrollment_approve',args);await ok(d,'rx',{frame:await tx(s)});
-});
-await scenario('enrollment with useful data, lost first frame, confirmation, reboot',async()=>{
- const[d,s]=await pair();await ok(d,'report',{temperature:-18250});const lost=await tx(d);assert(!s.state().registered);
- await ok(d,'report',{temperature:-18125});const next=await tx(d);assert.notEqual(nonce(lost),nonce(next));await ok(s,'rx',{frame:next});assert.equal(s.state().temperature,-18125);
- await ok(s,'name',{name:'Freezer 3'});await move(s,d);assert.equal(d.state().actual_name,'Freezer 3');assert(s.state().pending);
- const receipt=await tx(d);const identity=d.state().public_key;await ok(d,'reboot');assert.equal(d.state().public_key,identity);
- const retry=await tx(d);assert.notEqual(nonce(retry),nonce(receipt));await ok(s,'rx',{frame:retry});await move(s,d);assert(!s.state().pending&&!d.state().pending);
-});
-await scenario('duplicates, stale reports, corrupted ciphertext and reflection',async()=>{
- const[d,s]=await pair();await ok(d,'report',{temperature:1000});const old=await tx(d);await ok(d,'report',{temperature:2000});const newer=await tx(d);
- await ok(s,'rx',{frame:newer});await ok(s,'rx',{frame:old});await ok(s,'rx',{frame:newer});assert.equal(s.state().temperature,2000);
- const before=s.state();const modified=newer.slice();modified[modified.length-1]^=1;assert((await s.command('rx',{frame:modified})).code<0);assert.deepEqual(s.state(),before);
- const deviceBefore=d.state();assert((await d.command('rx',{frame:newer})).code<0);assert.deepEqual(d.state(),deviceBefore);
-});
-await scenario('invalid enrollment authorization and conflicting device identity',async()=>{
- const[d,s]=await pair();const bad=await wasm('device',s.state().public_key,{secret:'44'.repeat(32)});await ok(bad,'report',{temperature:1});assert.equal((await s.command('rx',{frame:await tx(bad)})).code,-10);assert(!s.state().registered);
- await ok(d,'report',{temperature:2});await move(d,s);const conflict=await wasm('device',s.state().public_key,{testSeed:'55'.repeat(32)});await ok(conflict,'report',{temperature:3});assert((await s.command('rx',{frame:await tx(conflict)})).code<0);assert.equal(s.state().temperature,2);
-});
-await scenario('exact uint64 revisions, UTF-8 bounds, application rejection',async()=>{
- const[d,s]=await pair();const big=9007199254740993n;assert.equal(s.m._scw_test_revision(big),0);
- await ok(d,'report',{temperature:10});await move(d,s);await ok(s,'name',{name:'é'.repeat(32)});assert.equal(s.state().desired_revision,(big+1n).toString());await move(s,d);assert.equal(d.state().applied_desired_revision,(big+1n).toString());await move(d,s);assert(!s.state().pending);
- await assert.rejects(()=>s.command('name',{name:'é'.repeat(33)}),/64 UTF-8/);await assert.rejects(()=>s.command('name',{name:'\ud800'}),/UTF-8/);await assert.rejects(()=>s.command('name',{name:'x\0y'}),/NUL/);
- await ok(s,'name',{name:''});await move(s,d);assert.equal(d.state().apply_status,2);await move(d,s);assert(!s.state().pending);assert.equal(s.state().apply_status,2);
-});
-await scenario('storage and reservation failure recovery, budgets, copied buffers',async()=>{
- const[d,s]=await pair();const before=d.state();d.m._scw_test_fail(1);assert.equal((await d.command('report',{temperature:3})).code,-5);assert.deepEqual(d.state(),before);await ok(d,'report',{temperature:3});
- const state=d.state();assert.equal((await d.command('tx',{budget:1})).code,-2);assert.deepEqual(d.state(),state);
- d.m._scw_test_fail(2);assert.equal((await d.command('tx')).code,-5);const a=await tx(d),copy=a.slice();const b=await tx(d);assert.deepEqual(a,copy);assert.notEqual(nonce(a),nonce(b));b.fill(0);await ok(s,'rx',{frame:a});
-});
-await scenario('no fresh randomness required after provisioning; secure provisioning required',async()=>{
- const[d,s]=await pair();globalThis.crypto=undefined;
- try{await ok(d,'report',{temperature:4});await move(d,s);await ok(d,'reboot');await move(d,s);const e=new Endpoint(await production());await assert.rejects(()=>e.command('init',{role:'server',secret}),/randomness/);}finally{globalThis.crypto=webcrypto;}
- const p=new Endpoint(await production());assert.equal(p.m._scw_test_init,undefined);await assert.rejects(()=>p.command('init',{role:'server',secret,testSeed:'22'.repeat(32)}),/unavailable/);
+await scenario('credits, frozen responses, reboot, exact integers and no unsolicited reports',async()=>{
+ const[d,s]=await pair();await move(d,s);await move(s,d);await ok(s,'issue',{total:'18446744073709551615'});const grant=await tx(s);await ok(d,'rx',{frame:grant});
+ await ok(d,'consume',{amount:'9007199254740993'});await move(d,s);assert.equal(s.state().credits_consumed,'0');await move(s,d);assert.equal((await d.command('tx')).code,1);
+ await ok(d,'rx',{frame:grant});await move(d,s);await move(s,d);assert.equal(s.state().credits_consumed,'0');await ok(d,'reboot');assert.equal(d.state().credits_consumed,'9007199254740993');
+ await ok(s,'request');await move(s,d);await move(d,s);await move(s,d);assert.equal(s.state().credits_consumed,'9007199254740993');
+ const state=d.state();d.m._scw_test_fail(1);assert.equal((await d.command('consume',{amount:'1'})).code,-5);assert.deepEqual(d.state(),state);
+ await assert.rejects(()=>d.command('consume',{amount:9007199254740992}),/exact uint64/);assert((await d.command('consume',{amount:'18446744073709551615'})).code<0);
+ await ok(s,'request');const f=await tx(s);assert((await d.command('rx',{frame:f.map((v,i)=>i===f.length-1?v^1:v)})).code<0);await ok(d,'rx',{frame:f});
+ assert.equal((await d.command('tx',{budget:1})).code,-2);await move(d,s);await move(s,d);
 });
 class Native {
  constructor(dir){this.child=spawn(native,[],{stdio:['pipe','pipe','inherit']});this.waiters=[];this.dir=dir;createInterface({input:this.child.stdout}).on('line',line=>this.waiters.shift()?.resolve(JSON.parse(line)));this.child.on('exit',code=>{for(const p of this.waiters)p.reject(new Error('native exited '+code));this.waiters=[];});}
  command(command,args={}){return new Promise((resolve,reject)=>{this.waiters.push({resolve,reject});this.child.stdin.write(JSON.stringify({command,...args})+'\n');});}
  close(){this.child.stdin.end();this.child.kill();}
 }
-for(const role of ['device','server'])await scenario(`native C ↔ WebAssembly (${role} in Wasm), including exact ciphertext`,async()=>{
- const dir=await mkdtemp(join(tmpdir(),'sc-web-'));const n=new Native(dir);const mirror=new Native(dir);try{
- const s=await wasm('server');const w=role==='server'?s:await wasm('device',s.state().public_key);const nativeRole=role==='device'?'server':'device';
- for(const [endpoint,r,storage]of [[n,nativeRole,join(dir,'native')],[mirror,role,join(dir,'mirror')]]){const result=await endpoint.command('init',{role:r,storage,serial:'mcu-0001',secret,key_seed:(r==='device'?'11':'22').repeat(32),server_public_key:s.state().public_key});assert.equal(result.status,'ok');}
- const cmd=role==='device'?'report':'name';const args=role==='device'?{temperature:-18125}:{name:'Wasm freezer'};
- if(role==='server'){await n.command('report',{temperature:5});const first=await n.command('tx');const frame=Uint8Array.from(Buffer.from(first.frame,'base64'));await ok(w,'rx',{frame});await mirror.command('rx',{frame:first.frame});}
- await ok(w,cmd,args);assert.equal((await mirror.command(cmd,args)).status,'ok');const frame=await tx(w);const m=await mirror.command('tx');assert.equal(Buffer.from(frame).toString('base64'),m.frame);
- const result=await n.command('rx',{frame:Buffer.from(frame).toString('base64')});assert.equal(result.status,'ok');
- if(role==='device')await n.command('name',{name:'Native freezer'});
- const reply=await n.command('tx');await ok(w,'rx',{frame:Uint8Array.from(Buffer.from(reply.frame,'base64'))});
- const receipt=await tx(w);assert.equal((await n.command('rx',{frame:Buffer.from(receipt).toString('base64')})).status,'ok');
+for(const role of ['device','server'])await scenario(`native C and Wasm ${role} exact ciphertext`,async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'sc-web-')),n=new Native(dir),mirror=new Native(dir);
+ try{
+ const server=await wasm('server'),w=role==='server'?server:await wasm('device',server.state().public_key),nativeRole=role==='server'?'device':'server';
+ for(const [e,r,path]of [[n,nativeRole,'native'],[mirror,role,'mirror']])assert.equal((await e.command('init',{role:r,storage:join(dir,path),serial:'mcu-0001',secret,key_seed:(r==='device'?'11':'22').repeat(32),...(r==='device'?{server_public_key:server.state().public_key}:{})})).status,'ok');
+ const sendW=async()=>{const f=await tx(w),m=await mirror.command('tx');assert.equal(Buffer.from(f).toString('base64'),m.frame);assert.equal((await n.command('rx',{frame:m.frame})).status,'ok');};
+ const sendN=async()=>{const f=await n.command('tx');assert.equal(f.status,'ok');await ok(w,'rx',{frame:Uint8Array.from(Buffer.from(f.frame,'base64'))});assert.equal((await mirror.command('rx',{frame:f.frame})).status,'ok');};
+ if(role==='device'){await sendW();await sendN();await n.command('issue',{total:'100'});await sendN();await sendW();await sendN();await ok(w,'consume',{amount:'25'});await mirror.command('consume',{amount:'25'});await n.command('request');await sendN();await sendW();await sendN();}
+ else{await sendN();await sendW();await ok(w,'issue',{total:'100'});await mirror.command('issue',{total:'100'});await sendW();await sendN();await sendW();await n.command('consume',{amount:'25'});await ok(w,'request');await mirror.command('request');await sendW();await sendN();await sendW();}
  }finally{n.close();mirror.close();await rm(dir,{recursive:true,force:true});}
 });
-console.log(`${checks} WebAssembly protocol scenarios passed`);
+console.log(`${checks} WebAssembly scenarios passed`);

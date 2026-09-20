@@ -1,0 +1,56 @@
+{
+  "name": "example",
+  "version": 1,
+  "groups": [
+    {
+      "id": 7,
+      "name": "example",
+      "fields": [
+        {
+          "id": 1,
+          "name": "count",
+          "type": "uint64",
+          "owner": "device"
+        },
+        {
+          "id": 2,
+          "name": "offset",
+          "type": "int64",
+          "owner": "server"
+        },
+        {
+          "id": 3,
+          "name": "enabled",
+          "type": "bool",
+          "owner": "server"
+        },
+        {
+          "id": 4,
+          "name": "label",
+          "type": "text",
+          "owner": "server",
+          "max_length": 16
+        },
+        {
+          "id": 5,
+          "name": "digest",
+          "type": "bytes",
+          "owner": "device",
+          "max_length": 16
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "independent",
+      "fields": [
+        {
+          "id": 1,
+          "name": "ready",
+          "type": "bool",
+          "owner": "device"
+        }
+      ]
+    }
+  ]
+}

@@ -107,17 +107,11 @@ func perform(endpoint **sc.Endpoint, m map[string]json.RawMessage, result map[st
 		(*endpoint).Close()
 		*endpoint = nil
 		return nil
-	case "name":
-		return (*endpoint).Name(text(m, "name", ""))
-	case "report":
-		v, err := integer(m, "temperature", 0)
-		if _, ok := m["temperature"]; !ok {
-			v, err = integer(m, "temperature_mC", 0)
-		}
-		if err != nil || int64(v) < -2147483648 || int64(v) > 2147483647 {
-			return errors.New("invalid temperature")
-		}
-		return (*endpoint).Report(int32(v))
+    case "issue", "consume":
+        field:="total";if command=="consume"{field="amount"}
+        v,err:=strconv.ParseUint(text(m,field,""),10,64);if err!=nil{return err}
+        if command=="issue"{return (*endpoint).SetCreditsIssued(v)};return (*endpoint).ConsumeCredits(v)
+    case "request":return (*endpoint).RequestCreditStatus()
 	case "rx":
 		b, err := base64.StdEncoding.Strict().DecodeString(text(m, "frame", ""))
 		if err != nil {

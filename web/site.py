@@ -4,7 +4,7 @@ import argparse, hashlib, json, re, shutil, sys, tempfile
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from test_report import verify_site as verify_report
-FILES=('index.html','style.css','app.mjs','lab.mjs','endpoint.mjs','worker.mjs','THIRD_PARTY_NOTICES.txt')
+FILES=('index.html','style.css','app.mjs','lab.mjs','endpoint.mjs','worker.mjs','resources.mjs','THIRD_PARTY_NOTICES.txt')
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def copy_asset(source,destination):

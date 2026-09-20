@@ -1,13 +1,16 @@
 simplecrypts.Packet.serial max_size:32
 simplecrypts.Packet.sender_key max_size:32
 simplecrypts.Packet.recipient_key max_size:32
-simplecrypts.Packet.name max_size:64
 simplecrypts.Packet.enrollment_token max_size:32
 simplecrypts.Record.serial max_size:32
 simplecrypts.Record.local_key max_size:32
 simplecrypts.Record.peer_key max_size:32
-simplecrypts.Record.desired_name max_size:64
-simplecrypts.Record.actual_name max_size:64
 
 simplecrypts.Record.challenge max_size:32
 simplecrypts.Record.candidate_key max_size:32
+simplecrypts.Packet.schema_hash max_size:32
+simplecrypts.Packet.data max_size:160
+simplecrypts.Record.schema_hash max_size:32
+simplecrypts.Record.groups max_count:2
+simplecrypts.GroupRecord.values max_size:160
+simplecrypts.GroupRecord.snapshot max_size:160

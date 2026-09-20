@@ -1,0 +1,2 @@
+// Generated resource metadata
+export const resources={"name":"credits","version":1,"groups":[{"id":1,"name":"credits","validator":"sc_credit_validate","fields":[{"id":1,"name":"issued","label":"Credits issued","type":"uint64","owner":"server","monotonic":true},{"id":2,"name":"consumed","label":"Credits consumed","type":"uint64","owner":"device","monotonic":true}]}]};

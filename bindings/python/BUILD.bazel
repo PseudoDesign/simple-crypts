@@ -1,2 +1,4 @@
 package(default_visibility=["//visibility:public"])
 exports_files(["simplecrypts.py"])
+
+exports_files(["resources.py"])

@@ -20,11 +20,11 @@ supply key access, cryptography, randomness, and durable storage.
 
 ## State model
 
-The current example uses a server-requested name and a device-reported
-temperature. Each stream has one authoritative writer and its own revisions.
-Complete snapshots allow a newer update to remain useful when earlier messages
-are missing. Application confirmation is distinct from transport delivery.
-Temperature represents the latest reported value rather than an event history.
+The current example uses server-issued and device-consumed credit totals.
+Each field has one authoritative writer. A generic resource layer provides
+bounded types, monotonic values, atomic groups, and requested snapshots.
+Consumption is persisted locally; only explicit requests capture reports.
+See [shared resources](docs/resources.md) for the implemented contract.
 
 The application supplies enrollment authorization policy. Signed enrollment
 binds approval to an exact serial, session challenge, and public key. A valid

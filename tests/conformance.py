@@ -1,434 +1,94 @@
-#!/usr/bin/env python3
-"""The same behavioral contract runs against all sixteen SDK pairings."""
-from __future__ import annotations
+"""Cross-language resource and credit contract with a hostile deterministic relay."""
+import argparse,base64,random
+from coordinator import Relay,replay
 
-import argparse
-import base64
-import random
-import sys
-
-from coordinator import Relay, replay
-
-
-def number(state, key):
-    value = state[key]
-    assert isinstance(value, str), (key, "64-bit values must be decimal strings", value)
-    return int(value)
-
-
-def accepted(response):
-    assert response["status"] in ("ok", "duplicate", "stale"), response
-
-
-def rejected(response):
-    assert response["status"] not in ("ok", "idle", "duplicate", "stale"), response
-
-
-def enrolled(relay):
-    d, s = relay.pair()
-    d.ok("report", temperature=21000)
-    relay.exchange("device", "server")
-    relay.exchange("server", "device")
-    assert d.state()["registered"] and s.state()["registered"]
-    return d, s
-
-
+def number(state,key):
+ value=state[key];assert isinstance(value,str);return int(value)
+def accepted(r):assert r['status']=='ok',r
+def rejected(r):assert r['status'] not in ('ok','idle'),r
+def enrolled(r):
+ d,s=r.pair();r.exchange('device','server');r.exchange('server','device');assert d.state()['registered'];return d,s
+def settle(r):
+ r.exchange('server','device');r.exchange('device','server');r.exchange('server','device')
 def first_exchange(r):
-    d, s = r.pair()
-    d.ok("report", temperature=-18250)
-    frame = r.exchange("device", "server")
-    assert s.state()["temperature"] == -18250
-    assert s.state()["registered"] and not d.state()["registered"]
-    s.ok("name", name="Freezer 3")
-    assert s.state()["pending"]
-    r.exchange("server", "device")
-    assert d.state()["actual_name"] == "Freezer 3"
-    assert s.state()["pending"], "delivery is not application confirmation"
-    r.exchange("device", "server")
-    state = s.state()
-    assert state["actual_name"] == "Freezer 3" and not state["pending"]
-    assert number(state, "applied_desired_revision") == number(state, "desired_revision")
-    r.exchange("server", "device")
-    assert not d.state()["pending"]
-    assert b"Freezer 3" not in r.queue[frame]
-
-
+ d,s=enrolled(r);s.ok('issue',total='100');settle(r)
+ d.ok('consume',amount='25');assert r.opportunity('device') is None
+ assert number(d.state(),'credits_consumed')==25 and number(s.state(),'credits_consumed')==0
+ s.ok('request');settle(r);assert number(s.state(),'credits_consumed')==25
+ assert r.opportunity('device') is None and r.opportunity('server') is None
+ rejected(d.command('consume',amount='76'));rejected(s.command('issue',total='99'))
+ rejected(d.command('issue',total='200'));rejected(s.command('consume',amount='1'));rejected(d.command('consume',amount='0'))
 def lost_initial(r):
-    d, s = r.pair()
-    d.ok("report", temperature=1000)
-    r.drop(r.opportunity("device"))
-    d.ok("report", temperature=2000)
-    r.advance(1000000)
-    r.exchange("device", "server")
-    assert s.state()["temperature"] == 2000 and s.state()["registered"]
-    assert not d.state()["registered"]
-    r.exchange("server", "device")
-    assert d.state()["registered"]
-
-
+ d,s=r.pair();r.drop(r.opportunity('device'));r.exchange('device','server');r.drop(r.opportunity('server'))
+ r.exchange('device','server');r.exchange('server','device');assert d.state()['registered']
 def authorization(r):
-    d, s = r.pair(secret="44" * 32, key_seed="44" * 32)
-    d.ok("report", temperature=1000)
-    before = s.state()
-    rejected(r.deliver(r.opportunity("device"), "server"))
-    assert s.state() == before
-    legit, result = r.spawn("legit", "device")
-    assert result["status"] == "ok"
-    legit.ok("report", temperature=22000)
-    r.exchange("legit", "server")
-    before = s.state()
-    conflict, result = r.spawn("conflict", "device", key_seed="55" * 32)
-    assert result["status"] == "ok"
-    conflict.ok("report", temperature=99000)
-    rejected(r.deliver(r.opportunity("conflict"), "server"))
-    assert s.state() == before, "serial/key binding must not be replaceable"
-
-
-def lost_receipts(r):
-    d, s = r.pair()
-    d.ok("report", temperature=1)
-    original = r.exchange("device", "server")
-    lost = r.opportunity("server")
-    assert lost is not None
-    accepted(r.deliver(original, "server"))
-    assert number(s.state(), "reported_revision") == 1
-    d.ok("report", temperature=2)
-    r.exchange("device", "server")
-    accepted(r.deliver(lost, "device"))
-    assert d.state()["pending"], "old receipt must not clear newer report"
-    r.exchange("server", "device")
-    assert not d.state()["pending"]
-    accepted(r.deliver(original, "server"))
-    assert s.state()["temperature"] == 2
-    assert number(s.state(), "reported_revision") == 2
-
-
-def lost_application_report(r):
-    d, s = enrolled(r)
-    s.ok("name", name="new name")
-    desired = r.exchange("server", "device")
-    r.drop(r.opportunity("device"))
-    assert s.state()["pending"]
-    accepted(r.deliver(desired, "device"))
-    r.exchange("device", "server")
-    assert not s.state()["pending"]
-    assert s.state()["actual_name"] == "new name"
-
-
-def rejected_name(r):
-    d, s = enrolled(r)
-    s.ok("name", name="kept name")
-    old = r.exchange("server", "device")
-    r.exchange("device", "server")
-    s.ok("name", name="")
-    assert s.state()["pending"]
-    r.exchange("server", "device")
-    assert d.state()["actual_name"] == "kept name"
-    assert d.state()["apply_status"] == "rejected"
-    assert s.state()["pending"]
-    r.exchange("device", "server")
-    assert not s.state()["pending"]
-    state = s.state()
-    assert state["apply_status"] == "rejected"
-    assert number(state, "processed_desired_revision") == number(state, "desired_revision")
-    assert number(state, "applied_desired_revision") < number(state, "desired_revision")
-    accepted(r.deliver(old, "device"))
-    assert d.state()["apply_status"] == "rejected", "older successful name must not undo rejection"
-
-
-def reordered_snapshots(r):
-    d, s = enrolled(r)
-    s.ok("name", name="older")
-    old_name = r.opportunity("server")
-    s.ok("name", name="newer")
-    new_name = r.opportunity("server")
-    accepted(r.deliver(new_name, "device"))
-    accepted(r.deliver(old_name, "device"))
-    assert d.state()["actual_name"] == "newer"
-    d.ok("report", temperature=100)
-    old_report = r.opportunity("device")
-    d.ok("report", temperature=200)
-    new_report = r.opportunity("device")
-    accepted(r.deliver(new_report, "server"))
-    accepted(r.deliver(old_report, "server"))
-    assert s.state()["temperature"] == 200
-    assert s.state()["actual_name"] == "newer"
-    assert not s.state()["pending"]
-
-
+ d,s=r.pair(secret='44'*32);rejected(r.deliver(r.opportunity('device'),'server'));assert not s.state()['registered']
+ legitimate, result = r.spawn('legitimate', 'device', key_seed='66'*32);accepted(result)
+ r.exchange('legitimate','server');r.exchange('server','legitimate');before=s.state()
+ for name, config in [('conflicting_key', {'key_seed':'55'*32}), ('conflicting_serial', {'serial':'different-device','key_seed':'77'*32})]:
+  endpoint,result=r.spawn(name,'device',**config);accepted(result)
+  rejected(r.deliver(r.opportunity(name),'server'));assert s.state()==before
+def snapshots(r):
+ d,s=enrolled(r);s.ok('issue',total='100');grant=r.exchange('server','device');d.ok('consume',amount='25')
+ response=r.exchange('device','server');assert number(s.state(),'credits_consumed')==0
+ r.drop(r.opportunity('server'));accepted(r.deliver(response,'server'));r.exchange('server','device')
+ accepted(r.deliver(grant,'device'));r.exchange('device','server');assert number(s.state(),'credits_consumed')==0;r.exchange('server','device')
+ s.ok('request');old=r.opportunity('server');s.ok('request');settle(r);accepted(r.deliver(old,'device'));assert not d.state()['pending']
+ accepted(r.deliver(response,'server'));assert number(s.state(),'credits_consumed')==25
+ s.ok('issue',total='200');new=r.exchange('server','device');accepted(r.deliver(grant,'device'));assert number(d.state(),'credits_issued')==200
+ r.exchange('device','server');r.exchange('server','device');accepted(r.deliver(new,'device'));r.exchange('device','server');r.exchange('server','device')
 def tamper_and_reflect(r):
-    d, s = r.pair()
-    d.ok("report", temperature=21000)
-    original = r.opportunity("device")
-    raw = r.queue[original]
-    before = s.state()
-    for offset in sorted(set((0, 1, len(raw) // 4, len(raw) // 2, len(raw) - 1))):
-        rejected(r.deliver(r.mutate(original, offset), "server"))
-        assert s.state() == before
-    for raw_invalid in (raw[:1], raw[:-1], bytes(513)):
-        rejected(s.command("rx", frame=base64.b64encode(raw_invalid).decode()))
-        assert s.state() == before
-    device_before = d.state()
-    rejected(r.deliver(original, "device"))
-    assert d.state() == device_before
-    accepted(r.deliver(original, "server"))
-    s.ok("name", name="protected")
-    downstream = r.opportunity("server")
-    server_before = s.state()
-    rejected(r.deliver(downstream, "server"))
-    assert s.state() == server_before
-    device_before = d.state()
-    rejected(r.deliver(r.mutate(downstream, -1), "device"))
-    assert d.state() == device_before
-
-
+ d,s=enrolled(r);s.ok('issue',total='100');f=r.opportunity('server');before=d.state()
+ rejected(r.deliver(r.mutate(f,len(r.queue[f])-1),'device'));assert before==d.state()
+ rejected(r.deliver(f,'server'));accepted(r.deliver(f,'device'));r.exchange('device','server');r.exchange('server','device')
+ old=r.mutate(f,2,1);rejected(r.deliver(old,'device'))
 def reboot(r):
-    d, s = enrolled(r)
-    s.ok("name", name="before reboot")
-    old_desired = r.exchange("server", "device")
-    old_report = r.exchange("device", "server")
-    device_before, server_before = d.state(), s.state()
-    r.restart("device")
-    r.restart("server")
-    for key in ("registered", "actual_name", "reported_revision", "applied_desired_revision"):
-        assert d.state()[key] == device_before[key]
-        assert s.state()[key] == server_before[key]
-    s.ok("name", name="after reboot")
-    new_desired = r.exchange("server", "device")
-    new_report = r.exchange("device", "server")
-    assert r.queue[old_desired] != r.queue[new_desired]
-    assert r.queue[old_report] != r.queue[new_report]
-    accepted(r.deliver(old_desired, "device"))
-    accepted(r.deliver(old_report, "server"))
-    assert d.state()["actual_name"] == s.state()["actual_name"] == "after reboot"
-    assert not s.state()["pending"]
-
+ d,s=enrolled(r);key=d.state()['public_key'];s.ok('issue',total='100');r.exchange('server','device');d.ok('consume',amount='25')
+ r.restart('device');assert d.state()['public_key']==key;r.exchange('device','server');assert number(s.state(),'credits_consumed')==0
+ r.restart('server');r.exchange('server','device');s.ok('request');r.exchange('server','device');r.restart('device');r.exchange('device','server');r.exchange('server','device');assert number(s.state(),'credits_consumed')==25
+ r.restart('device');assert r.opportunity('device') is None
 
 def failed_commits(r):
-    d, s = r.pair()
-    before = d.state()
-    d.ok("fail", operation="storage", count=1)
-    rejected(d.command("report", temperature=123))
-    assert d.state() == before
-    r.restart("device")
-    assert d.state()["reported_revision"] == before["reported_revision"]
-    d.ok("report", temperature=456)
-    frame = r.opportunity("device")
-    before = s.state()
-    s.ok("fail", operation="storage", count=1)
-    rejected(r.deliver(frame, "server"))
-    assert s.state() == before
-    r.restart("server")
-    assert not s.state()["registered"]
-    accepted(r.deliver(frame, "server"))
-    assert s.state()["registered"] and s.state()["temperature"] == 456
-    s.ok("name", name="commit me")
-    desired = r.opportunity("server")
-    before = d.state()
-    d.ok("fail", operation="storage", count=1)
-    rejected(r.deliver(desired, "device"))
-    assert d.state() == before
-    r.restart("device")
-    assert d.state()["actual_name"] == before["actual_name"]
-    accepted(r.deliver(desired, "device"))
-    assert d.state()["actual_name"] == "commit me"
-
-
+ d,s=enrolled(r);s.ok('issue',total='100');settle(r);before=d.state();d.ok('fail',operation='storage');rejected(d.command('consume',amount='1'));assert before==d.state()
+ d.ok('consume',amount='1');s.ok('request');f=r.opportunity('server');before=d.state();d.ok('fail',operation='storage');rejected(r.deliver(f,'device'));assert before==d.state();accepted(r.deliver(f,'device'))
+ reply=r.opportunity('device');before=s.state();s.ok('fail',operation='storage');rejected(r.deliver(reply,'server'));assert before==s.state();accepted(r.deliver(reply,'server'));r.exchange('server','device')
 def buffer_and_provider_failures(r):
-    d, s = r.pair()
-    d.ok("report", temperature=321)
-    before = d.state()
-    for arguments in ({"budget": 0}, {"budget": 1}, {"capacity": 1}, {"capacity": 0}):
-        response = d.command("tx", budget=arguments.get("budget", 512),
-                             capacity=arguments.get("capacity", 512))
-        assert not response.get("frame"), response
-        assert d.state() == before
-    d.ok("fail", operation="storage", count=1)
-    rejected(d.command("tx", budget=512, capacity=512))
-    assert d.state() == before
-    d.ok("fail", operation="crypto", count=1)
-    rejected(d.command("tx", budget=512, capacity=512))
-    assert d.state()["pending"]
-    r.exchange("device", "server")
-    s.ok("name", name="a" * 64)
-    before = s.state()
-    rejected(s.command("name", name="a" * 65))
-    rejected(s.command("name", name="é" * 33))
-    assert s.state() == before
-    s.ok("name", name="é" * 32)
-    r.exchange("server", "device")
-    assert d.state()["actual_name"] == "é" * 32
-
-
+ d,s=enrolled(r);s.ok('issue',total='100');before=s.state();rejected(s.command('tx',budget=1));rejected(s.command('tx',capacity=1));assert before==s.state()
+ s.ok('fail',operation='crypto');rejected(s.command('tx'));settle(r)
 def unavailable_randomness(r):
-    d, result = r.spawn("unprovisioned", "device", key_seed=None, random_unavailable=True)
-    assert result["status"] == "random", result
-    d, s = r.pair(random_unavailable=True)
-    d.ok("report", temperature=789)
-    first = r.exchange("device", "server")
-    r.restart("device")
-    d.ok("report", temperature=790)
-    second = r.exchange("device", "server")
-    assert r.queue[first] != r.queue[second]
-    r.exchange("server", "device")
-    assert not d.state()["pending"] and s.state()["temperature"] == 790
-
-
+ d,s=r.pair(random_unavailable=True);r.exchange('device','server');r.exchange('server','device');s.ok('issue',total='100');settle(r)
+ d2,res=r.spawn('no_rng','device',key_seed=None,random_unavailable=True);rejected(res)
 def exact_uint64(r):
-    base_device, base_server = 2**53 + 17, 2**53 + 31
-    d, dr = r.spawn("device", "device", initial_revision=str(base_device))
-    s, sr = r.spawn("server", "server", initial_revision=str(base_server))
-    assert dr["status"] == sr["status"] == "ok", (dr, sr)
-    d.ok("report", temperature=1234)
-    s.ok("name", name="64-bit revisions")
-    r.exchange("device", "server")
-    assert number(s.state(), "reported_revision") == base_device + 1
-    r.exchange("server", "device")
-    assert number(d.state(), "applied_desired_revision") == base_server + 1
-    assert number(d.state(), "reported_revision") == base_device + 2
-    r.exchange("device", "server")
-    assert not s.state()["pending"]
-    for name in ("device", "server"):
-        r.endpoints[name].config.pop("initial_revision")
-        r.restart(name)
-    assert number(s.state(), "reported_revision") == base_device + 2
-    assert number(d.state(), "applied_desired_revision") == base_server + 1
-    for role, operation, arguments in (("device", "report", {"temperature": 1}),
-                                       ("server", "name", {"name": "overflow"})):
-        endpoint, response = r.spawn("exhausted-" + role, role,
-                                    initial_revision=str(2**64 - 1))
-        assert response["status"] == "ok", response
-        before = endpoint.state()
-        rejected(endpoint.command(operation, **arguments))
-        assert endpoint.state() == before, "revision must never wrap"
-
-
+ d,s=enrolled(r);n=2**64-1;s.ok('issue',total=str(n));settle(r);d.ok('consume',amount=str(n));s.ok('request');settle(r)
+ assert number(s.state(),'credits_consumed')==n;rejected(d.command('consume',amount='1'));rejected(s.command('issue',total=str(n+1)))
 def bounded_withholding(r):
-    d, s = enrolled(r)
-    for i in range(100):
-        d.ok("report", temperature=i)
-        s.ok("name", name=f"latest-{i}")
-        r.advance(1000000)
-        # The library retains snapshots, not a history or a timer-driven queue.
-        if i % 10 == 0:
-            r.drop(r.opportunity("device"))
-            r.drop(r.opportunity("server"))
-    assert d.state()["pending"] and s.state()["pending"]
-    r.exchange("server", "device")
-    r.exchange("device", "server")
-    r.exchange("server", "device")
-    assert s.state()["temperature"] == 99
-    assert d.state()["actual_name"] == "latest-99"
-    assert not s.state()["pending"] and not d.state()["pending"]
-
-
-def generated_schedule(r):
-    d, s = enrolled(r)
-    rng = random.Random(r.seed)
-    pending = []
-    latest_temp, latest_name = 21000, ""
-    for i in range(80):
-        action = rng.randrange(8)
-        if action == 0:
-            latest_temp = rng.randrange(-50000, 100000)
-            d.ok("report", temperature=latest_temp)
-        elif action == 1:
-            latest_name = f"seed-{r.seed}-{i}"
-            s.ok("name", name=latest_name)
-        elif action in (2, 3):
-            sender, receiver = ("device", "server") if action == 2 else ("server", "device")
-            frame = r.opportunity(sender)
-            if frame is not None:
-                pending.append((frame, receiver))
-        elif action == 4 and pending:
-            frame, receiver = rng.choice(pending)
-            before = r.endpoints[receiver].state()
-            accepted(r.deliver(frame, receiver))
-            after = r.endpoints[receiver].state()
-            for key in ("reported_revision", "desired_revision", "applied_desired_revision"):
-                assert number(after, key) >= number(before, key), (key, before, after)
-        elif action == 5:
-            r.restart(rng.choice(("device", "server")))
-        elif action == 6 and pending:
-            frame, receiver = rng.choice(pending)
-            before = r.endpoints[receiver].state()
-            rejected(r.deliver(r.mutate(frame, -1), receiver))
-            assert r.endpoints[receiver].state() == before
-        else:
-            r.advance(rng.randrange(1, 1000000))
-    # Once the hostile relay cooperates, only current snapshots are needed.
-    for _ in range(3):
-        for sender, receiver in (("device", "server"), ("server", "device")):
-            frame = r.opportunity(sender)
-            if frame is not None:
-                accepted(r.deliver(frame, receiver))
-    assert s.state()["temperature"] == latest_temp
-    assert d.state()["actual_name"] == s.state()["actual_name"] == latest_name
-    assert not s.state()["pending"] and not d.state()["pending"]
-
+ d,s=enrolled(r)
+ for total in range(1,40):s.ok('issue',total=str(total));r.drop(r.opportunity('server'))
+ settle(r);assert number(d.state(),'credits_issued')==39
+ for _ in range(20):d.ok('consume',amount='1');assert r.opportunity('device') is None
+ s.ok('request');settle(r);assert number(s.state(),'credits_consumed')==20
 
 def signed_enrollment(r):
-    d,s=r.pair()
-    for e in (d,s): e.ok("enrollment_enable")
-    d.ok("report", temperature=-12345)
-    assert r.opportunity("device") is None
-    now=9007199254740993
-    s.ok("enrollment_begin", now=now, expires=now+100)
-    invitation=r.opportunity("server")
-    before=d.state()
-    rejected(r.deliver(r.mutate(invitation,-1),"device"));assert d.state()==before
-    accepted(r.deliver(invitation,"device"))
-    assert d.state()["challenge"]==s.state()["challenge"]
-    response=r.opportunity("device")
-    def receive(identifier,at=now):
-        return s.command("rx_at",frame=base64.b64encode(r.queue[identifier]).decode(),now=at)
-    rejected(receive(response,now+100))
-    accepted(receive(response));assert not s.state()["registered"] and not s.state()["has_temperature"]
-    assert s.state()["candidate_key"]==d.state()["public_key"]
-    r.restart("server");r.restart("device")
-    accepted(receive(response))
-    args=dict(challenge=s.state()["challenge"],key=d.state()["public_key"],now=now)
-    rejected(s.command("enrollment_approve",**{**args,"key":"11"*32}))
-    rejected(s.command("enrollment_approve",**{**args,"challenge":"11"*32}))
-    rejected(s.command("enrollment_approve",**{**args,"now":now+100}))
-    s.ok("fail",operation="storage")
-    rejected(s.command("enrollment_approve",**args));assert not s.state()["registered"]
-    s.ok("enrollment_approve",**args);assert s.state()["temperature"]==-12345
-    r.restart("server");s.ok("enrollment_approve",**args)
-    lost=r.opportunity("server");assert lost is not None
-    accepted(receive(response))
-    accepted(r.deliver(r.opportunity("server"),"device"))
-    assert d.state()["registered"] and not d.state()["pending"]
-    rejected(s.command("enrollment_begin",now=now,expires=now+100))
-    rejected(s.command("enrollment_cancel"))
+ d,s=r.pair()
+ for e in (d,s):e.ok('enrollment_enable')
+ s.ok('enrollment_begin',now=100,expires=700);invite=r.opportunity('server');rejected(r.deliver(r.mutate(invite,171),'device'));accepted(r.deliver(invite,'device'))
+ claim=r.opportunity('device');frame=base64.b64encode(r.queue[claim]).decode();rejected(s.command('rx_at',frame=frame,now=701));assert not s.state()['registered']
+ s.ok('rx_at',frame=frame,now=101);assert not s.state()['registered'];rejected(s.command('issue',total='100'))
+ r.restart('server');s.ok('enrollment_approve',challenge=s.state()['challenge'],key=d.state()['public_key'],now=102)
+ r.exchange('server','device');s.ok('issue',total='100');settle(r)
 
-
-def enrollment_session_replacement(r):
-    d,s=r.pair()
-    for e in (d,s): e.ok("enrollment_enable")
-    s.ok("fail",operation="random")
-    rejected(s.command("enrollment_begin",now=100,expires=200))
-    assert r.opportunity("server") is None
-    s.ok("enrollment_begin",now=100,expires=200)
-    accepted(r.deliver(r.opportunity("server"),"device"));d.ok("report",temperature=123)
-    old=r.opportunity("device");old_challenge=s.state()["challenge"]
-    s.ok("enrollment_cancel");r.restart("server")
-    frame=base64.b64encode(r.queue[old]).decode()
-    rejected(s.command("rx_at",frame=frame,now=101))
-    s.ok("enrollment_begin",now=101,expires=201)
-    assert s.state()["challenge"]!=old_challenge
-    rejected(s.command("rx_at",frame=frame,now=101))
-    accepted(r.deliver(r.opportunity("server"),"device"))
-    fresh=r.opportunity("device");s.ok("rx_at",frame=base64.b64encode(r.queue[fresh]).decode(),now=101)
-    s.ok("enrollment_approve",challenge=s.state()["challenge"],key=d.state()["public_key"],now=101)
-    accepted(r.deliver(r.opportunity("server"),"device"));assert d.state()["registered"]
-
-
-SCENARIOS = [signed_enrollment, enrollment_session_replacement, first_exchange, lost_initial, authorization, lost_receipts,
-             lost_application_report, rejected_name, reordered_snapshots, tamper_and_reflect,
-             reboot, failed_commits, buffer_and_provider_failures,
-             unavailable_randomness, exact_uint64, bounded_withholding, generated_schedule]
-
+def generated_schedule(r):
+ d,s=enrolled(r);rng=random.Random(r.seed);s.ok('issue',total='1000');settle(r);consumed=0;history=[]
+ for i in range(35):
+  d.ok('consume',amount='1');consumed+=1
+  if rng.randrange(3)==0:r.restart('device')
+  s.ok('request');f=r.opportunity('server');history.append(f)
+  if rng.randrange(2):r.drop(f);history.pop();continue
+  accepted(r.deliver(f,'device'))
+  if history:accepted(r.deliver(rng.choice(history),'device'))
+  r.exchange('device','server');r.exchange('server','device')
+ s.ok('request');settle(r);assert number(s.state(),'credits_consumed')==consumed
+SCENARIOS=[first_exchange,lost_initial,authorization,snapshots,tamper_and_reflect,reboot,failed_commits,buffer_and_provider_failures,unavailable_randomness,exact_uint64,bounded_withholding,signed_enrollment,generated_schedule]
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)

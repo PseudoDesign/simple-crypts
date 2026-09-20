@@ -44,10 +44,12 @@ def main():
                 endpoint.enrollment_cancel()
             elif command == "rx_at":
                 endpoint.receive_at(base64.b64decode(item["frame"], validate=True), item["now"])
-            elif command == "name":
-                endpoint.name(item["name"])
-            elif command == "report":
-                endpoint.report(item.get("temperature", item.get("temperature_mC")))
+            elif command == "issue":
+                endpoint.set_credits_issued(int(item["total"]))
+            elif command == "consume":
+                endpoint.consume_credits(int(item["amount"]))
+            elif command == "request":
+                endpoint.request_credit_status()
             elif command == "rx":
                 endpoint.receive(base64.b64decode(item["frame"], validate=True))
             elif command == "tx":

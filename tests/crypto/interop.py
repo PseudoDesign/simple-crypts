@@ -47,7 +47,7 @@ def main():
             c=invoke(sodium,"edkeys",identity,pub,"00"*24,"")
             assert c==invoke(go,"edkeys",identity,pub,"00"*24,"")
             keys.append((c[:64],c[64:128],c[128:]))
-        msg=(b"SCE2"+bytes([i])*104).hex()
+        msg=(b"SCE3"+bytes([i])*104).hex()
         sig=invoke(sodium,"sign",a,pub,"00"*24,msg)
         assert sig==invoke(go,"sign",a,pub,"00"*24,msg)
         invoke(go,"verify",b,keys[0][0],"00"*24,sig+msg)

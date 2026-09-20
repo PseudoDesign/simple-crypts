@@ -43,6 +43,19 @@ async function generate(page){
  assert.equal(await pending(page).count(),1);
 }
 async function corrupt(packet){const button=packet.locator('[data-action="corrupt"]');await button.click();}
+async function creditFlow(page,touch=false){
+ await next(page);const grantId=await pending(page).getAttribute('data-packet');
+ await dragPacket(page,pending(page),'#device-panel',touch);assert.equal(await page.locator('#device-issued').textContent(),'100');
+ const grant=page.locator(`[data-packet="-${grantId}"]`);
+ await dragPacket(page,grant,'#device-panel',touch);assert.equal(await page.locator('#device-issued').textContent(),'100');
+ await next(page);await dragPacket(page,pending(page),'#server-panel',touch);assert.equal(await page.locator('#server-consumed').textContent(),'0');
+ await next(page);assert.match(await pending(page).textContent(),/Receipt for request/);assert(!/Credits consumed/.test(await pending(page).textContent()));await dragPacket(page,pending(page),'#device-panel',touch);
+ await next(page);assert.equal(await pending(page).count(),0);assert.equal(await page.locator('#device-consumed').textContent(),'25');assert.equal(await page.locator('#server-consumed').textContent(),'0');
+ await next(page);await dragPacket(page,pending(page),'#device-panel',touch);
+ await next(page);await corrupt(pending(page));await dragPacket(page,pending(page),'#server-panel',touch);assert.match(await page.locator('#server-result').textContent(),/authentication/);assert.equal(await page.locator('#server-consumed').textContent(),'0');
+ await corrupt(saved(page));await dragPacket(page,saved(page),'#server-panel',touch);assert.equal(await page.locator('#server-consumed').textContent(),'25');
+ await next(page);await dragPacket(page,pending(page),'#device-panel',touch);assert.match(await page.locator('#tour-title').textContent(),/Credit exchange complete/);
+}
 try{
 for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
  const browser=await type.launch({headless:true});
@@ -66,17 +79,17 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    await corrupt(saved(page));await dragPacket(page,saved(page),'#device-panel');
    assert.match(await page.locator('#device-result').textContent(),/ok \(0\)/i);assert(!(await page.locator('#next').isDisabled()));
    await next(page);assert.match(await page.locator('#device-public-key').textContent(),/^[a-f0-9]{64}$/);await dragPacket(page,pending(page),'#server-panel');
-   assert.match(await page.locator('#server-summary').textContent(),/Awaiting approval/);assert.equal(await page.locator('#server-temperature').textContent(),'—');
+   assert.match(await page.locator('#server-summary').textContent(),/Awaiting approval/);assert.equal(await page.locator('#server-consumed').textContent(),'Not reported');
    // Replay is legitimate and idempotent here: expose success, not a fabricated error.
    await dragPacket(page,saved(page),'#server-panel');assert.match(await page.locator('#server-result').textContent(),/ok \(0\).*no newer state/i);
-   assert.equal(await page.locator('#server-temperature').textContent(),'—');
-   await next(page);assert.equal(await page.locator('#server-temperature').textContent(),'-18.125 °C');
+   assert.equal(await page.locator('#server-consumed').textContent(),'Not reported');
+   await next(page);assert.equal(await page.locator('#server-consumed').textContent(),'Not reported');
    await next(page);
-   assert.equal(await page.locator('#device-temperature-state').textContent(),'Awaiting server receipt');
    await dragPacket(page,pending(page),'#device-panel');assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
    await dragPacket(page,saved(page),'#device-panel');assert.match(await page.locator('#device-result').textContent(),/ok \(0\).*no newer state/i);
    // Reflect the saved server confirmation back to the server and surface its actual error.
    await dragPacket(page,saved(page),'#server-panel');assert.match(await page.locator('#server-result').textContent(),/\(-\d+\).*Rejected/);
+   await creditFlow(page);
    await page.screenshot({path:`/tmp/simple-crypts-${name}-${chapter}-log.png`,fullPage:true});console.log('PASS',name,chapter,'log workflow');
   }
   // Advancing simulated server time alone does not call receive. A later response fails expiry.
@@ -84,7 +97,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
   const identity=await page.locator('#device-public-key').textContent();const beforeClock=await page.locator('#server-details').textContent();
   await page.locator('#advance-time').click();await ready(page);assert.equal(await page.locator('#server-details').textContent(),beforeClock);
   await dragPacket(page,pending(page),'#server-panel');assert.match(await page.locator('#server-result').textContent(),/enrollment \(-10\)/);
-  assert.equal(await page.locator('#server-temperature').textContent(),'—');
+  assert.equal(await page.locator('#server-consumed').textContent(),'Not reported');
   for(let i=0;i<18;i++)await dragPacket(page,saved(page),'#server-panel');assert.equal(await page.locator('#message-log .packet').count(),16);
   assert.match(await page.locator('#tour-text').textContent(),/expired/);
   await page.locator('#restart-enrollment').click();await ready(page);
@@ -99,6 +112,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    await corrupt(pending(t));await dragPacket(t,pending(t),'#device-panel',true);assert.match(await t.locator('#device-result').textContent(),/\(-3\)/);
    await corrupt(saved(t));await dragPacket(t,saved(t),'#device-panel',true);await next(t);await dragPacket(t,pending(t),'#server-panel',true);await next(t);await next(t);await dragPacket(t,pending(t),'#device-panel',true);
    assert.equal(await t.locator('#device-status').textContent(),'Confirmed');assert(await t.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+   await creditFlow(t,true);
    await t.screenshot({path:'/tmp/simple-crypts-touch-log.png',fullPage:true});await touch.close();
   }
   const unavailable=await browser.newContext();await unavailable.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const p=await unavailable.newPage();await p.goto(base);await p.locator('#error').waitFor({state:'visible'});assert.match(await p.locator('#error').textContent(),/randomness/);await unavailable.close();

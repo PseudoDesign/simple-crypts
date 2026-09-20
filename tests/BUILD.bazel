@@ -1,6 +1,6 @@
 load("//build:defs.bzl", "c_test", "py_test", "conformance_matrix")
 exports_files(["coordinator.py"])
-c_test(name="core_test", srcs=["core_test.c"], deps=["//core:sc_testing"], copts=["-DSC_ENABLE_TESTING"])
+c_test(name="core_test", srcs=["core_test.c"], hdrs=["//schema:test_resources.h"], deps=["//core:sc_testing"], copts=["-DSC_ENABLE_TESTING"])
 py_test(name="bindings_python", main="bindings_python.py", shared="//providers/host:libsimplecrypts_testing", data=["//bindings/python:simplecrypts.py"])
 conformance_matrix()
 c_test(name="core_fuzz_smoke", srcs=["core_fuzz.c"], deps=["//core:sc_testing"], copts=["-DSC_ENABLE_TESTING", "-DSC_FUZZ_STANDALONE"])

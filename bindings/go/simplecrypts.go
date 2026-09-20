@@ -11,6 +11,8 @@ package simplecrypts
 */
 import "C"
 import (
+ "encoding/binary"
+ "encoding/hex"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -90,22 +92,43 @@ func (e *Endpoint) valid() error {
 	}
 	return nil
 }
-func (e *Endpoint) Name(name string) error {
-	if err := e.valid(); err != nil {
-		return err
-	}
-	if strings.ContainsRune(name, 0) {
-		return &Error{"invalid"}
-	}
-	p := C.CString(name)
-	defer C.free(unsafe.Pointer(p))
-	return check(C.sc_host_name(e.handle, p))
+func (e *Endpoint) SetCreditsIssued(total uint64) error {if err:=e.valid();err!=nil{return err};return check(C.sc_host_set_credits_issued(e.handle,C.uint64_t(total)))}
+func (e *Endpoint) ConsumeCredits(amount uint64) error {if err:=e.valid();err!=nil{return err};return check(C.sc_host_consume_credits(e.handle,C.uint64_t(amount)))}
+func (e *Endpoint) RequestCreditStatus() error {if err:=e.valid();err!=nil{return err};return check(C.sc_host_request_credit_status(e.handle))}
+// ResourceValue represents a schema-typed field update. Type values: 1=uint64,
+// 2=int64, 3=Boolean, 4=UTF-8, 5=bytes. Only the corresponding member is used.
+type ResourceValue struct { FieldID uint16; Type uint8; Uint64 uint64; Int64 int64; Boolean bool; Text string; Bytes []byte }
+func (e *Endpoint) UpdateGroup(id uint16,updates []ResourceValue) error {
+ if err:=e.valid();err!=nil{return err};var data []byte
+ for _,v:=range updates {
+  var raw []byte
+  switch v.Type {case 1,2:raw=make([]byte,8);n:=v.Uint64;if v.Type==2{n=uint64(v.Int64)};binary.BigEndian.PutUint64(raw,n)
+  case 3:raw=[]byte{0};if v.Boolean{raw[0]=1}
+  case 4:raw=[]byte(v.Text)
+  case 5:raw=append([]byte(nil),v.Bytes...)
+  default:return &Error{"invalid"}}
+  if len(raw)>64{return &Error{"buffer"}};data=append(data,byte(v.FieldID>>8),byte(v.FieldID),v.Type,byte(len(raw)));data=append(data,raw...)
+ }
+ if len(data)==0{return &Error{"invalid"}}
+ return check(C.sc_host_update_group(e.handle,C.uint16_t(id),(*C.uint8_t)(unsafe.Pointer(&data[0])),C.size_t(len(data))))
 }
-func (e *Endpoint) Report(temperature int32) error {
-	if err := e.valid(); err != nil {
-		return err
-	}
-	return check(C.sc_host_report(e.handle, C.int32_t(temperature)))
+func (e *Endpoint) RequestGroup(id uint16) error {if err:=e.valid();err!=nil{return err};return check(C.sc_host_request_group(e.handle,C.uint16_t(id)))}
+// InspectGroup returns copied typed values and exact decimal-string counters.
+func (e *Endpoint) InspectGroup(id uint16) (map[string]any,error) {
+ if err:=e.valid();err!=nil{return nil,err};out:=make([]byte,1024)
+ if err:=check(C.sc_host_inspect_group(e.handle,C.uint16_t(id),(*C.char)(unsafe.Pointer(&out[0])),C.size_t(len(out))));err!=nil{return nil,err}
+ var result map[string]any;for i,v:=range out{if v==0{err:=json.Unmarshal(out[:i],&result);if err!=nil{return nil,err}
+  data,err:=hex.DecodeString(result["data"].(string));if err!=nil{return nil,err};values:=make(map[uint16]any)
+  for len(data)>0{if len(data)<4||int(data[3])+4>len(data){return nil,&Error{"invalid"}};id:=binary.BigEndian.Uint16(data[:2]);tag,n:=data[2],int(data[3]);raw:=data[4:4+n]
+   switch tag{case 1:if n!=8{return nil,&Error{"invalid"}};values[id]=binary.BigEndian.Uint64(raw)
+   case 2:if n!=8{return nil,&Error{"invalid"}};values[id]=int64(binary.BigEndian.Uint64(raw))
+   case 3:if n!=1{return nil,&Error{"invalid"}};values[id]=raw[0]!=0
+   case 4:values[id]=string(raw)
+   case 5:values[id]=append([]byte(nil),raw...)
+   default:return nil,&Error{"invalid"}}
+   data=data[4+n:]
+  }
+  delete(result,"data");result["values"]=values;return result,nil}};return nil,&Error{"invalid"}
 }
 func (e *Endpoint) Receive(frame []byte) error {
 	if err := e.valid(); err != nil {

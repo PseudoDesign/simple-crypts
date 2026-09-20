@@ -3,8 +3,8 @@
 Simple Crypts is an open-source library and interactive demonstration of
 authenticated device/server messaging. It provides a bounded-memory C core,
 language bindings, and replaceable cryptography and storage providers. The
-current example synchronizes a device-reported temperature and server-requested
-name through an untrusted relay.
+current example synchronizes server-issued and device-consumed credit totals
+through an untrusted relay.
 
 Try the [live browser demo](https://pseudodesign.github.io/simple-crypts/): follow
 the guided exchange by dragging message boxes yourself, then try reflected,
@@ -13,7 +13,7 @@ library and NaCl box run locally through WebAssembly. View the
 [test evidence](https://pseudodesign.github.io/simple-crypts/report/) separately.
 See [web build and browser tests](web/README.md) to run the demo locally.
 
-Milestone 1 uses a bounded C99 protocol core, nanopb, and NaCl box
+The implementation uses a bounded C99 protocol core, nanopb, and NaCl box
 (X25519/XSalsa20-Poly1305), with Ed25519 identities converted inside the provider. Python uses CFFI, Rust wraps the C ABI, and Go uses
 cgo. Each SDK supports both roles. A server context represents one serial
 number; a fleet service supplies the registry and routes frames to contexts.
@@ -34,8 +34,8 @@ bazel build //platforms/cortex_m4:resource_report
 ```
 
 The demo runs a C device and a Python server as separate processes, drops an
-enrollment packet and an application report, restarts the device, and verifies
-that the latest snapshots converge. It does not connect to a network.
+enrollment packet and a requested credit snapshot, restarts the device, and
+verifies that both endpoints agree on the reported totals. It does not connect to a network.
 
 For a short example calling the SDK directly, read
 [examples/python_api.py](examples/python_api.py) or run
@@ -45,8 +45,9 @@ library, with no test hooks.
 ## Application model
 
 ```text
-device.report(temperature_mC)
-server.name("Freezer 3")
+server.set_credits_issued(100)
+device.consume_credits(25)              # local durable update, no report
+server.request_credit_status()          # capture a fresh snapshot on delivery
 
 frame = endpoint.outbound(byte_budget)   # only on a transmission opportunity
 peer.receive(frame)                     # whenever the relay actually delivers it
@@ -65,13 +66,20 @@ authorization policy opens a session; the device verifies its signed challenge a
 an encrypted response. Registration occurs only after explicit approval of the
 exact serial/session/key binding. The protected reply confirms enrollment.
 See [the enrollment and key-format contract](docs/protocol.md#enrollment).
-Version 2 intentionally rejects the previous raw-X25519 wire/store format.
+Version 3 intentionally rejects earlier wire/store formats. Start with fresh
+sample storage; existing identities and counters are never silently replaced.
 
-The server's requested name remains pending until an authenticated device
-report says it was processed. Temperature is latest state, not an event log.
-Snapshots coalesce while communication is withheld. Delivery opportunities are
-explicit; there are no pings or keepalives. The wire is binary, bounded to 512
-bytes per envelope. Base64 and JSON are used only by the test adapters.
+The server owns cumulative credits issued; the device owns cumulative credits
+consumed and refuses to overspend. Issuance also requests status. Local consumption
+stays local until a new authenticated request captures a snapshot. Replayed grants
+do not add credits, and retries preserve the captured response. Receipts acknowledge
+snapshots without creating report loops.
+
+Credits are a module built on [shared resource primitives](docs/resources.md):
+typed owned values, monotonic totals, atomic groups, and requested snapshots.
+Schemas generate bounded C descriptors, binding constants, and browser metadata.
+There are no pings or keepalives. Envelopes remain bounded to 512 bytes; JSON and
+base64 belong only to diagnostics and test adapters.
 
 ## What the tests establish
 

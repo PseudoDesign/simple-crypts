@@ -72,7 +72,8 @@ it cannot repair predictable local randomness. Missing browser randomness fails
 closed. This is a demo provider extension, not a change to the C protocol API.
 
 The server stages the response until the application authorizes the exact
-serial/session/key binding, then emits an encrypted confirmation. X25519 keys
+serial/session/key binding, then emits an encrypted confirmation. Enrollment
+contains no application measurement; the credit group starts at zero. X25519 keys
 are converted internally for NaCl box. User authentication is outside the demo.
 Device and server cards remain visible with public keys and private-key status.
 Packet details for ciphertext are the sender's teaching view, not host decryption.
@@ -97,3 +98,13 @@ Production provisioning cannot accept test seeds.
 
 See [publishing instructions](../docs/publishing.md) for source attribution and
 the separate recorded test report, whose original evidence remains unchanged.
+
+## Credit walkthrough
+
+Both chapters continue through cumulative issuance, its captured report and
+receipt, local consumption without transmission, and a new requested report.
+The server panel labels consumption as last reported. Replay and corruption
+controls operate on the same real library messages. `resources.mjs` supplies
+labels from the build-time resource definition. JavaScript passes uint64 values
+as exact strings/BigInt, never floating-point numbers. The recorded `/report/`
+evidence remains a separately attributed historical snapshot.

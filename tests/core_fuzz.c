@@ -77,13 +77,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     memset(ds.token, 0x73, 32); memset(ss.token, 0x73, 32);
     f_init(&device, &ds, SC_DEVICE, ss.key);
     f_init(&server, &ss, SC_SERVER, NULL);
-    require(sc_report_temperature(&device, 123) == SC_OK);
     require(sc_outbound(&device, 512, frame, 512, &n) == SC_OK);
     /* Optionally retain an unenrolled server to exercise token authorization. */
     if (!(mode & 16u)) require(sc_receive(&server, frame, n) == SC_OK);
     if (mode & 2u) {
         if (!server.state.registered) require(sc_receive(&server, frame, n) == SC_OK);
-        require(sc_set_name(&server, "fuzz-name") == SC_OK);
+        require(sc_set_credits_issued(&server, 100) == SC_OK);
         require(sc_outbound(&server, 512, frame, 512, &n) == SC_OK);
         target = &device;
     } else target = &server;
@@ -104,8 +103,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         require(sc_receive(target, frame, n) == SC_OK);
         require(memcmp(&after, &target->state, sizeof after) == 0);
     }
-    require(target->state.applied_desired_revision <= target->state.processed_desired_revision);
-    require(target->state.processed_desired_revision <= target->state.desired_revision);
     return 0;
 }
 

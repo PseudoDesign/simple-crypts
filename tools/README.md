@@ -20,3 +20,5 @@ PYTHONPATH=.toolchains/python PATH="$PWD/.toolchains/protobuf/bin:$PATH" python3
 ```
 
 The Cortex target emits `bazel-bin/platforms/cortex_m4/{resource_report.md,resource_report.json,probe.elf,probe.map,stack_usage.txt,size.txt}`. It compiles the actual protocol, nanopb codec, portable libsodium provider, and both box directions. The harness callbacks are explicitly nonproduction and the linker envelope is not a board capacity. Per-function `.su` entries do not establish peak stack use. A real board still needs reviewed durable storage, entropy/key provisioning, initialization, task/interrupt stack measurement, latency, and energy measurements.
+
+Resource descriptors and language metadata are generated from `schema/resources.json`. Run `python3 tools/resource_schema.py` after editing the schema; `bazel test //tools:resource_schema_check` verifies all committed outputs and schema bounds.

@@ -68,7 +68,7 @@ export class Lab {
   async update(role,command,args){
     const r=await this.command(role,command,args);
     if(r.code<0)throw new Error(`${role}: ${r.status}`);
-    this.event(command==='name'?`Server desires “${args.name}”. Awaiting an authenticated application report.`:command==='report'?`Device measures ${(args.temperature/1000).toFixed(3)} °C. Its latest snapshot is pending.`:`${role === 'device'?'Device':'Server'} rebooted; identity, stored revisions, and nonce reservations retained.`);
+    this.event(command==='issue'?`Server issued ${args.total} cumulative credits and requested status.`:command==='consume'?`Device consumed ${args.amount} credits locally. No report requested.`:command==='request'?'Server requested a fresh credit snapshot.':`${role} rebooted with durable state.`);
     return r;
   }
   async beginEnrollment(){
@@ -90,7 +90,7 @@ export class Lab {
     if(r.code<0)throw new Error(`${role}: ${r.status}; no frame queued.`);
     // UI serializes opportunities. Reserve capacity defensively for callers too.
     if(this.queue.length>=MAX_QUEUE)throw new Error('Relay queue filled during transmission; latest endpoint state remains pending.');
-    const packet={id:this.nextPacket++,from:role,to:role==='device'?'server':'device',signed:r.frame[2]===69,senderState:Object.freeze({...this.states[role]}),bytes:r.frame.slice(),corrupted:false,location:role+'-outbox',origin:this.nextPacket-1};
+    const packet={id:this.nextPacket++,from:role,to:role==='device'?'server':'device',signed:r.frame[2]===69,messageKind:r.messageKind,senderState:Object.freeze({...this.states[role]}),bytes:r.frame.slice(),corrupted:false,location:role+'-outbox',origin:this.nextPacket-1};
     this.queue.push(packet);this.event(`Frame ${packet.id}: ${role} → ${packet.to}, ${packet.bytes.length} ${packet.signed?'public signed':'encrypted'} bytes queued.`);return packet.id;
   }
   packet(id){const p=this.queue.find(p=>p.id===id);if(!p)throw new Error('Frame is no longer queued');return p;}
@@ -112,7 +112,7 @@ export class Lab {
     if(target==='device'&&!this.states.device&&result.code===0)this.verifiedChallenge=p.bytes.slice();
     if(epoch!==this.epoch)throw new DOMException('Session reset','AbortError');
     this.queue=this.queue.filter(p=>p.id!==id);
-    const fields=['registered','temperature','actual_name','desired_name','reported_revision','desired_revision','processed_desired_revision','acked_reported_revision','pending','challenge','candidate_key','candidate_revision'];
+    const fields=['registered','credits_issued','credits_consumed','request_id','snapshot_id','acknowledged_id','pending','challenge','candidate_key','candidate_revision'];
     const changes=fields.filter(k=>before[k]!==(result.state??{})[k]).map(k=>({field:k,before:before[k],after:(result.state??{})[k]}));
     result.changes=changes;
     this.remember({...p,result:{code:result.code,status:result.status,target,changed:changes.length}},result.code<0?'rejected by '+target:changes.length?'accepted by '+target:'accepted; no newer state');
@@ -122,6 +122,12 @@ export class Lab {
 }
 export const tour=[
   {title:'Deliver the signed challenge.',text:'The server opens an authorized session. Drag its challenge to the device.',target:'device',success:'The signature is valid. Now generate a private identity using secure local randomness, with the public challenge mixed in as additional input.',code:'sc_enrollment_begin(&server, now, expires);\nsc_receive(&device, frame, length);',prepare:async l=>{await l.beginEnrollment();return l.transmit('server');}},
-  {title:'Deliver the encrypted response.',text:'The device returns the challenge, its identity, and its first report.',target:'server',success:'The response authenticated. This proposed key is waiting for trusted approval; nothing is registered yet.',code:'sc_report_temperature(&device, -18125);\nsc_receive_at(&server, frame, length, now);',prepare:async l=>{if(!l.states.device){await l.generateDevice({fromChallenge:true});await l.provisionDevice();const r=await l.command('device','rx',{frame:l.verifiedChallenge});if(r.code!==0)throw new Error(r.status);}await l.update('device','report',{temperature:-18125});return l.transmit('device');}},
-  {title:'Deliver the enrollment confirmation.',text:'The approved server reply confirms this session and acknowledges the report.',target:'device',success:'The device authenticated the confirmation. Enrollment is complete.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')}
+  {title:'Deliver the encrypted response.',text:'The device returns the challenge, its identity, to prove possession of its private key.',target:'server',success:'The response authenticated. This proposed key is waiting for trusted approval; nothing is registered yet.',code:'sc_receive_at(&server, frame, length, now);',prepare:async l=>{if(!l.states.device){await l.generateDevice({fromChallenge:true});await l.provisionDevice();const r=await l.command('device','rx',{frame:l.verifiedChallenge});if(r.code!==0)throw new Error(r.status);}return l.transmit('device');}},
+  {title:'Deliver the enrollment confirmation.',text:'The approved server reply confirms this session and acknowledges the report.',target:'device',success:'The device authenticated the confirmation. Enrollment is complete.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')},
+ {title:'Deliver 100 issued credits.',text:'The server grants a cumulative total of 100 and asks for a status snapshot. Replaying this grant cannot add another 100.',target:'device',success:'The device accepted 100 issued credits and captured its current consumption for this request.',code:'sc_set_credits_issued(&server, 100);',prepare:async l=>{await l.update('server','issue',{total:'100'});return l.transmit('server');}},
+ {title:'Deliver the credit snapshot.',text:'This captured response contains 100 issued and 0 consumed. It also confirms that the device accepted the grant.',target:'server',success:'The server knows the device accepted 100 credits and had consumed 0 when it answered.',code:'sc_receive(&server, frame, length);',prepare:l=>l.transmit('device')},
+ {title:'Deliver the receipt.',text:'The server acknowledges this exact snapshot. The receipt asks for no additional report.',target:'device',success:'The exchange is settled. Next, spend credits locally without sending a message.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')},
+ {title:'Deliver the status request.',text:'The server requests current consumption. Until this reaches the device, its last report remains 0.',target:'device',success:'The device captured a new snapshot: 100 issued, 25 consumed.',code:'sc_request_credit_status(&server);',prepare:async l=>{await l.update('server','request',{});return l.transmit('server');}},
+ {title:'Deliver the updated snapshot.',text:'The encrypted response links 25 consumed credits to this request. Older snapshots cannot roll it back.',target:'server',success:'The server’s last reported consumption is now 25.',code:'sc_receive(&server, frame, length);',prepare:l=>l.transmit('device')},
+ {title:'Deliver the final receipt.',text:'The device can stop retrying this snapshot once it receives the authenticated receipt.',target:'device',success:'Both sides agree on the last reported snapshot. Future consumption remains local until another request.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')}
 ];

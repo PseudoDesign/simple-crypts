@@ -26,6 +26,7 @@ static struct {
 } store;
 static uint8_t input[4096], frame[SC_MAX_FRAME];
 static size_t frame_length;
+static int frame_kind;
 static char json[4096];
 static sc_status lookup(void *u, sc_key_handle h, const uint8_t **pk, const uint8_t **sk) {
     (void)u; if(h!=1 || !store.ready) return SC_ERR_ARGUMENT;
@@ -77,7 +78,7 @@ static int challenge_ready;
 API int scw_verify_challenge(size_t n) {
     if(store.ready)return SC_ERR_ARGUMENT;
     if(n!=172)return SC_ERR_BOUNDS;
-    if(memcmp(input,"SCE2",4))return SC_ERR_PROTOCOL;
+    if(memcmp(input,"SCE3",4))return SC_ERR_PROTOCOL;
     if(sodium_init()<0)return SC_ERR_RANDOM;
     if(sodium_memcmp(input+4,input+512,32) ||
        crypto_sign_verify_detached(input+108,input,108,input+512))return SC_ERR_AUTH;
@@ -127,26 +128,33 @@ API int scw_enrollment_begin(uint64_t now,uint64_t expires){return sc_enrollment
 API int scw_enrollment_approve(uint64_t now){return sc_enrollment_approve(&ctx,input,input+32,now);}
 API int scw_enrollment_cancel(void){return sc_enrollment_cancel(&ctx);}
 API int scw_receive_at(size_t n,uint64_t now){if(n>SC_MAX_FRAME)return SC_ERR_BOUNDS;return sc_receive_at(&ctx,input,n,now);}
-API int scw_report(int32_t t){return sc_report_temperature(&ctx,t);}
-API int scw_name(size_t n){
-    if(n>SC_MAX_NAME || memchr(input,0,n))return SC_ERR_BOUNDS;
-    input[n]=0;return sc_set_name(&ctx,(const char *)input);
-}
+API int scw_issue(uint64_t n){return sc_set_credits_issued(&ctx,n);}
+API int scw_consume(uint64_t n){return sc_consume_credits(&ctx,n);}
+API int scw_request(void){return sc_request_credit_status(&ctx);}
 API int scw_receive(size_t n){if(n>SC_MAX_FRAME)return SC_ERR_BOUNDS;return sc_receive(&ctx,input,n);}
-API int scw_outbound(size_t budget){frame_length=0;return sc_outbound(&ctx,budget,frame,sizeof frame,&frame_length);}
+API int scw_outbound(size_t budget){
+    int kind=!ctx.state.registered?(ctx.config.role==SC_SERVER?6:4):ctx.receipt_pending?5:ctx.config.role==SC_DEVICE?2:ctx.state.data.groups[0].request_pending?1:3;
+    frame_length=0;int status=sc_outbound(&ctx,budget,frame,sizeof frame,&frame_length);frame_kind=status==SC_OK?kind:0;return status;
+}
+API int scw_frame_kind(void){return frame_kind;}
 API const char *scw_status(int status){return sc_status_string((sc_status)status);}
 static void escape(char *out,const char *s) {
     while(*s){unsigned c=(unsigned char)*s++;if(c=='"'||c=='\\'){*out++='\\';*out++=(char)c;}
     else if(c<32){sprintf(out,"\\u%04x",c);out+=6;}else *out++=(char)c;}*out=0;
 }
 API const char *scw_state(void){
-    sc_state s;char desired[6*SC_MAX_NAME+1],actual[6*SC_MAX_NAME+1],serial[6*SC_MAX_SERIAL+1],pk[65],peer[65];
-    if(sc_inspect(&ctx,&s)!=SC_OK)return "null";
-    escape(desired,s.desired_name);escape(actual,s.actual_name);escape(serial,s.serial);
-    sodium_bin2hex(pk,sizeof pk,store.pk,32);sodium_bin2hex(peer,sizeof peer,s.peer_public_key,32);
-    snprintf(json,sizeof json,"{\"role\":%u,\"serial\":\"%s\",\"desired_name\":\"%s\",\"actual_name\":\"%s\",\"temperature\":%" PRId32 ",\"has_temperature\":%u,\"registered\":%u,\"pending\":%u,\"apply_status\":%u,\"public_key\":\"%s\",\"peer_public_key\":\"%s\","
-      "\"desired_revision\":\"%" PRIu64 "\",\"reported_revision\":\"%" PRIu64 "\",\"processed_desired_revision\":\"%" PRIu64 "\",\"applied_desired_revision\":\"%" PRIu64 "\",\"acked_reported_revision\":\"%" PRIu64 "\",\"storage_generation\":\"%" PRIu64 "\"}",
-      (unsigned)s.role,serial,desired,actual,s.temperature_mC,s.has_temperature,s.registered,s.pending,s.apply_status,pk,peer,s.desired_revision,s.reported_revision,s.processed_desired_revision,s.applied_desired_revision,s.acked_reported_revision,s.storage_generation);
+    sc_state state;char serial[6*SC_MAX_SERIAL+1],public_key[65],peer_key[65],buffer[4096];int n,result;
+    result=sc_inspect(&ctx,&state);if(result)return "null";
+    escape(serial,state.serial);sodium_bin2hex(public_key,65,store.pk,32);sodium_bin2hex(peer_key,65,state.peer_public_key,32);
+    const sc_group_state *g=&state.data.groups[0];
+    n=snprintf(buffer,sizeof buffer,
+        "{\"role\":\"%s\",\"serial\":\"%s\",\"public_key\":\"%s\",\"peer_public_key\":\"%s\",\"registered\":%s,\"pending\":%s,"
+        "\"credits_issued\":\"%" PRIu64 "\",\"credits_consumed\":\"%" PRIu64 "\",\"snapshot_issued\":\"%" PRIu64 "\",\"snapshot_consumed\":\"%" PRIu64 "\","
+        "\"request_id\":\"%" PRIu64 "\",\"snapshot_id\":\"%" PRIu64 "\",\"acknowledged_id\":\"%" PRIu64 "\",\"local_revision\":\"%" PRIu64 "\",\"has_snapshot\":%s,\"storage_generation\":\"%" PRIu64 "\"}",
+        state.role==SC_DEVICE?"device":"server",serial,public_key,peer_key,state.registered?"true":"false",state.pending?"true":"false",
+        g->values[0].u64,g->values[1].u64,g->snapshot[0].u64,g->snapshot[1].u64,g->request_id,g->snapshot_id,g->acknowledged_id,g->local_revision,g->has_snapshot?"true":"false",state.storage_generation);
+    (void)n;memcpy(json,buffer,strlen(buffer)+1);
+    sc_state s=state;
     {
         char challenge[65],candidate[65];size_t used=strlen(json)-1;
         sodium_bin2hex(challenge,sizeof challenge,s.challenge,32);sodium_bin2hex(candidate,sizeof candidate,s.candidate_key,32);

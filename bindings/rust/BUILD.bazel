@@ -11,3 +11,5 @@ sdk_test(
     shared = "//providers/host:libsimplecrypts_testing",
     srcs = [":sources", "//third_party/rust_crates:sources"],
 )
+
+exports_files(["src/resources.rs"])

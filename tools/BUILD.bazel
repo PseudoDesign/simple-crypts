@@ -3,3 +3,5 @@ package(default_visibility=["//visibility:public"])
 exports_files(["build_action.py", "bootstrap.py", "downloads.lock.json"])
 py_test(name="schema_check", main="check_schema.py", data=["//schema:sc.proto", "//schema:sc.options", "//schema:sc.pb.c", "//schema:sc.pb.h", "//third_party/nanopb:generator", "@protobuf_sdk//:files"])
 py_test(name="test_report_test", main="test_report_test.py", data=["test_report.py"])
+
+py_test(name="resource_schema_check",main="resource_schema.py",script_args=["--check"],data=["//schema:resources.json","//schema:test_resources.json","//schema:resources.h","//schema:test_resources.h","//bindings/python:resources.py","//bindings/rust:src/resources.rs","//bindings/go:resources.go","//web:resources.mjs"])

@@ -11,3 +11,5 @@ sdk_test(
     shared = "//providers/host:libsimplecrypts_testing",
     srcs = [":sources", "//providers/host:sc_host.h"],
 )
+
+exports_files(["resources.go"])

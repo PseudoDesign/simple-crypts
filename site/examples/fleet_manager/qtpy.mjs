@@ -1,9 +1,9 @@
 /* Physical-board page: one Web Lock owns the host database and one selected port.
  * This trusted static page never exports private provider checkpoints or logs bundles.
  */
-import createServer from './server.mjs?v=d41a01869d5c9434b1eb';
-import { SerialLink } from './qtpy-serial.mjs?v=d41a01869d5c9434b1eb';
-import { HardwareSession, openHardwareDatabase } from './qtpy-session.mjs?v=d41a01869d5c9434b1eb';
+import createServer from './server.mjs?v=0c67c90faa7f846a4e2a';
+import { SerialLink } from './qtpy-serial.mjs?v=0c67c90faa7f846a4e2a';
+import { HardwareSession, openHardwareDatabase } from './qtpy-session.mjs?v=0c67c90faa7f846a4e2a';
 
 const el = (id) => document.getElementById(`qt-${id}`);
 const supported =

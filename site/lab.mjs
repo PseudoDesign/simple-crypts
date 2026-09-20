@@ -82,7 +82,7 @@ export class Lab {
       // Compatibility slot only: signed enrollment uses no shared enrollment secret.
       const secret = '00'.repeat(32);
       for (const role of ['device', 'server']) {
-        const worker = this.workerFactory(new URL('./worker.mjs?v=d41a01869d5c9434b1eb', import.meta.url));
+        const worker = this.workerFactory(new URL('./worker.mjs?v=0c67c90faa7f846a4e2a', import.meta.url));
         this.workers[role] = worker;
         worker.onmessage = ({ data }) => {
           const p = this.pending.get(data.id);

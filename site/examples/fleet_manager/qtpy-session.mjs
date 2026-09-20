@@ -1,7 +1,7 @@
 /** @module examples/fleet_manager/qtpy-session */
-import { Endpoint, validSerial, uint64 } from './endpoint.mjs?v=d41a01869d5c9434b1eb';
-import { transaction, endpointStorage } from './storage.mjs?v=d41a01869d5c9434b1eb';
-import { commands } from './qtpy-serial.mjs?v=d41a01869d5c9434b1eb';
+import { Endpoint, validSerial, uint64 } from './endpoint.mjs?v=0c67c90faa7f846a4e2a';
+import { transaction, endpointStorage } from './storage.mjs?v=0c67c90faa7f846a4e2a';
+import { commands } from './qtpy-serial.mjs?v=0c67c90faa7f846a4e2a';
 
 const keyBytes = (hex) => Uint8Array.from(hex.match(/../g), (pair) => parseInt(pair, 16));
 const now = () => BigInt(Math.floor(Date.now() / 1000));
@@ -53,18 +53,27 @@ export class HardwareSession {
       this.problem =
         'This device trusts another host. Use its original browser/profile or Python operator. To move it here, factory-reset the board first; this erases its identity and credits.';
     else if (this.row) {
-      this.server = await Endpoint.open(
-        this.factory,
-        endpointStorage(this.db, this.row.session, 'server', false),
-        'server',
-        this.device.serial,
-        '00'.repeat(32),
-        false,
-      );
-      if (this.server.state().public_key !== this.row.serverKey)
-        throw new Error('Saved host identity mismatch. No replacement identity was created.');
+      await this.restore(this.row);
     }
     return this.device;
+  }
+  /** Restore a saved host without opening or writing to the device.
+   * @param {object} row Saved serial/session/server-key binding.
+   * @returns {Promise<void>} Host restored; missing identities fail closed.
+   */
+  async restore(row) {
+    validSerial(row.serial);
+    this.row = row;
+    this.server = await Endpoint.open(
+      this.factory,
+      endpointStorage(this.db, row.session, 'server', false),
+      'server',
+      row.serial,
+      '00'.repeat(32),
+      false,
+    );
+    if (this.server.state().public_key !== row.serverKey)
+      throw new Error('Saved host identity mismatch. No replacement identity was created.');
   }
   /** Supply fresh per-boot entropy through the demo-only management channel.
    * @returns {Promise<void>} Device ready for management/protocol work.
@@ -72,6 +81,8 @@ export class HardwareSession {
   async start() {
     this.device = await this.link.inspect();
     if (this.device.fault) throw new Error('Device storage is faulted.');
+    if (!this.device.provisioned)
+      throw new Error('Device was reset. Register it again before exchanging credits.');
     if (
       !this.server ||
       (this.device.provisioned && this.device.server_key !== this.server.state().public_key)

@@ -1,19 +1,54 @@
-/* The worker owns devices, storage, and links. This file owns only table forms
- * and movable console windows; dragging/hiding never changes device lifetime.
+/* The worker owns simulated peers. HardwareFleet owns physical USB peers and
+ * their existing host database. This UI combines their public views only.
  */
+import { HardwareFleet } from './qtpy-fleet.mjs?v=0c67c90faa7f846a4e2a';
 const $ = (id) => document.getElementById(id);
-const worker = new Worker(new URL('./worker.mjs?v=d41a01869d5c9434b1eb', import.meta.url), { type: 'module' });
+const worker = new Worker(new URL('./worker.mjs?v=0c67c90faa7f846a4e2a', import.meta.url), { type: 'module' });
 const waiting = new Map();
 const consoles = new Map();
 const rows = new Map();
 let nextId = 0,
+  simulated = [],
   fleet = [],
   busy = true,
   available = false,
   topWindow = 50;
 
+const hardware = new HardwareFleet(() => {
+  rebuild();
+  render();
+});
+function rebuild() {
+  fleet = [
+    ...simulated.map((entry) => ({ ...entry, id: `browser:${entry.serial}`, kind: 'browser' })),
+    ...hardware.view(),
+  ];
+}
+function choosePort() {
+  return navigator.serial.requestPort({ filters: [{ usbVendorId: 0x2e8a, usbProductId: 0x000a }] });
+}
+function connectHardware(expected) {
+  if (busy || !available || !hardware.ready) return;
+  // Keep the port chooser inside the click gesture.
+  const selected = choosePort();
+  action(async () => {
+    const serial = await hardware.connect(await selected, expected);
+    const entry = hardware.entries.get(serial);
+    if (!expected && !entry.session.problem && !entry.session.device.registered)
+      await hardware.command(serial, 'server', { command: 'begin' });
+    notice(
+      entry.session.problem ||
+        `QT Py ${serial} connected. Use its fleet row to approve enrollment or request a report.`,
+      Boolean(entry.session.problem),
+    );
+  });
+}
+
 worker.onmessage = ({ data }) => {
-  if (data.result?.fleet || data.fleet) fleet = data.result?.fleet ?? data.fleet;
+  if (data.result?.fleet || data.fleet) {
+    simulated = data.result?.fleet ?? data.fleet;
+    rebuild();
+  }
   const pending = waiting.get(data.id);
   if (!pending) return;
   waiting.delete(data.id);
@@ -27,7 +62,10 @@ worker.onerror = (event) => {
   render();
 };
 
-function send(command, serial, args = {}) {
+function send(command, idOrSerial, args = {}) {
+  const entry = fleet.find((item) => item.id === idOrSerial);
+  if (entry?.kind === 'qtpy') return hardware.command(entry.serial, command, args);
+  const serial = entry?.serial ?? idOrSerial;
   const id = ++nextId;
   return new Promise((resolve, reject) => {
     waiting.set(id, { resolve, reject });
@@ -82,16 +120,30 @@ function openConsole(serial) {
 function makeRow(entry) {
   const root = $('row-template').content.firstElementChild.cloneNode(true);
   root.dataset.serial = entry.serial;
+  root.dataset.kind = entry.kind;
   const row = { root, entry };
-  rows.set(entry.serial, row);
+  rows.set(entry.id, row);
   $('fleet-rows').append(root);
   const button = (name) => root.querySelector(`[data-action="${name}"]`);
   const server = (command, args = {}) =>
     action(async () => {
-      await send('server', entry.serial, { command, ...args });
-      notice(`Updated ${entry.serial}. See its console for the exchange.`);
+      await send('server', entry.id, { command, ...args });
+      notice(`Updated ${entry.serial}. See its activity for the exchange.`);
     });
-  button('open').onclick = () => openConsole(entry.serial);
+  button('usb').onclick = () => {
+    if (row.entry.connected)
+      action(async () => {
+        await send('connection', entry.id, { enabled: false });
+        notice('USB disconnected. Saved host and board state retained.');
+      });
+    else connectHardware(entry.serial);
+  };
+  button('inspect').onclick = () =>
+    action(async () => {
+      await send('inspect', entry.id);
+      openConsole(entry.id);
+    });
+  button('open').onclick = () => openConsole(entry.id);
   button('begin').onclick = () => server('begin');
   button('cancel').onclick = () => server('cancel');
   button('request').onclick = () => server('request');
@@ -107,7 +159,7 @@ function makeRow(entry) {
   button('power').onclick = () =>
     action(async () => {
       const command = row.entry.running ? 'stop' : 'start';
-      await send(command, entry.serial);
+      await send(command, entry.id);
       notice(
         `${entry.serial} ${command === 'stop' ? 'stopped' : 'started'}. Saved state retained.`,
       );
@@ -116,21 +168,38 @@ function makeRow(entry) {
 }
 
 function updateRow(entry) {
-  const row = rows.get(entry.serial) ?? makeRow(entry);
+  const row = rows.get(entry.id) ?? makeRow(entry);
   row.entry = entry;
   const field = (name, text) => {
     row.root.querySelector(`[data-field="${name}"]`).textContent = text;
   };
   const control = (name) => row.root.querySelector(`[data-action="${name}"]`);
+  const physical = entry.kind === 'qtpy';
   const state = entry.server;
   const candidate = state?.candidate_key && !/^0+$/.test(state.candidate_key);
   field('serial', entry.serial);
   field('error', entry.error ?? '');
-  field('running', entry.running ? 'Running' : 'Stopped');
+  field('kind', physical ? 'QT Py · USB' : 'Simulated');
+  field(
+    'running',
+    physical
+      ? entry.connected
+        ? 'USB attached'
+        : 'Saved device — USB disconnected'
+      : entry.running
+        ? 'Running'
+        : 'Stopped',
+  );
   field('connection', entry.connected ? 'Connection enabled' : 'Disconnected');
   field(
     'enrollment',
-    state?.registered ? 'Registered' : candidate ? 'Awaiting approval' : 'Unregistered',
+    physical && entry.device?.provisioned === 0
+      ? 'Device reset — register again'
+      : state?.registered
+        ? 'Registered'
+        : candidate
+          ? 'Awaiting approval'
+          : 'Unregistered',
   );
   field('candidate', state?.candidate_key ?? '—');
   field('challenge', state?.challenge ?? '—');
@@ -147,18 +216,34 @@ function updateRow(entry) {
   const unusable = busy || !available || Boolean(entry.error) || state?.storage_failed;
   for (const button of row.root.querySelectorAll('button')) button.disabled = Boolean(unusable);
   control('open').disabled = busy || !available;
-  control('begin').disabled ||= state?.registered;
+  control('begin').disabled ||= state?.registered && !(physical && entry.device?.provisioned === 0);
   control('cancel').disabled ||=
     state?.registered || !state?.enrollment_expires || state.enrollment_expires === '0';
   control('approve').disabled ||= state?.registered || !candidate;
   control('request').disabled ||= !state?.registered;
   control('issue').querySelector('button').disabled ||= !state?.registered;
+  control('power').hidden = physical;
+  control('cancel').hidden = physical;
+  control('usb').hidden = control('inspect').hidden = !physical;
+  control('open').textContent = physical ? 'View activity' : 'Open console';
+  control('begin').textContent = physical ? 'Register / resume' : 'Authorize enrollment';
+  control('usb').textContent = entry.connected ? 'Disconnect USB' : 'Connect USB';
+  control('usb').disabled = busy || !available || !hardware.ready;
+  if (physical) {
+    for (const name of ['begin', 'approve', 'request', 'inspect'])
+      control(name).disabled ||= !entry.connected;
+    control('issue').querySelector('button').disabled ||= !entry.connected;
+    if (entry.device?.provisioned === 0) {
+      control('approve').disabled = control('request').disabled = true;
+      control('issue').querySelector('button').disabled = true;
+    }
+  }
 }
 
 function render() {
   $('empty').hidden = fleet.length > 0;
   for (const [serial, row] of rows) {
-    if (fleet.some((entry) => entry.serial === serial)) continue;
+    if (fleet.some((entry) => entry.id === serial)) continue;
     row.root.remove();
     rows.delete(serial);
     consoles.get(serial).root.remove();
@@ -170,14 +255,20 @@ function render() {
   }
   $('create-form').querySelector('button').disabled = busy || !available;
   $('reset').disabled = busy || !available;
+  $('register-qtpy').disabled = busy || !available || !hardware.ready;
+  $('qtpy-support').textContent =
+    hardware.problem ||
+    'QT Py registrations are saved in this browser. Connect over USB to approve, issue credits, or request a report.';
 }
 
 function updateConsole(entry) {
-  let panel = consoles.get(entry.serial);
+  let panel = consoles.get(entry.id);
   if (!panel) {
     const root = document.createElement('article');
     root.className = 'console';
+    root.hidden = entry.kind === 'qtpy';
     root.dataset.serial = entry.serial;
+    root.dataset.kind = entry.kind;
     root.setAttribute('aria-label', `Device console ${entry.serial}`);
     const top = document.createElement('div');
     top.className = 'console-titlebar';
@@ -192,23 +283,28 @@ function updateConsole(entry) {
     handle.append(title, status);
     const connection = document.createElement('button');
     connection.dataset.action = 'connection';
-    connection.onclick = () =>
+    connection.onclick = () => {
+      if (entry.kind === 'qtpy' && !panel.entry.connected) {
+        connectHardware(entry.serial);
+        return;
+      }
       action(async () => {
         const enabled = !panel.entry.connected;
-        await send('connection', entry.serial, { enabled });
+        await send('connection', entry.id, { enabled });
         notice(`${entry.serial}: connection ${enabled ? 'enabled' : 'disabled'}.`);
       });
+    };
     const debug = document.createElement('button');
     debug.dataset.action = 'debug';
     debug.onclick = () =>
       action(async () => {
-        await send('debug', entry.serial, { enabled: !panel.entry.debug });
+        await send('debug', entry.id, { enabled: !panel.entry.debug });
       });
     const hide = document.createElement('button');
     hide.textContent = 'Hide';
     hide.onclick = () => {
       root.hidden = true;
-      rows.get(entry.serial).root.querySelector('[data-action="open"]').focus();
+      rows.get(entry.id).root.querySelector('[data-action="open"]').focus();
     };
     top.append(handle, connection, debug, hide);
     const log = document.createElement('pre');
@@ -244,7 +340,7 @@ function updateConsole(entry) {
       cursor: 0,
       draft: '',
     };
-    consoles.set(entry.serial, panel);
+    consoles.set(entry.id, panel);
     place(
       panel,
       innerWidth - 464 - ((consoles.size - 1) % 5) * 28,
@@ -322,7 +418,7 @@ function updateConsole(entry) {
         panel.cursor = panel.history.length;
         panel.draft = '';
         input.value = '';
-        const result = await send('console', entry.serial, { line });
+        const result = await send('console', entry.id, { line });
         notice(
           result.error ? result.output : `Command completed on ${entry.serial}.`,
           result.error,
@@ -340,7 +436,9 @@ function updateConsole(entry) {
   panel.connection.textContent = entry.connected ? 'Disconnect' : 'Connect';
   panel.connection.setAttribute('aria-pressed', String(entry.connected));
   panel.connection.disabled =
-    busy || !available || Boolean(entry.error) || entry.server?.storage_failed;
+    entry.kind === 'qtpy'
+      ? busy || !available || !hardware.ready
+      : busy || !available || Boolean(entry.error) || entry.server?.storage_failed;
   panel.debug.textContent = entry.debug ? 'Debug: on' : 'Debug: off';
   panel.debug.setAttribute('aria-pressed', String(entry.debug));
   panel.debug.title = entry.debug ? 'Disable debug logging' : 'Enable debug logging';
@@ -348,6 +446,14 @@ function updateConsole(entry) {
   panel.input.disabled =
     busy || !available || !entry.running || Boolean(entry.error) || entry.device?.storage_failed;
   panel.submit.disabled = panel.input.disabled;
+  if (entry.kind === 'qtpy') {
+    panel.input.closest('form').hidden = true;
+    panel.input.disabled = panel.submit.disabled = true;
+    panel.debug.hidden = true;
+    panel.status.textContent = entry.connected
+      ? 'USB connected · press BOOT to consume'
+      : 'USB disconnected';
+  }
   const text = entry.activity
     .filter((line) => entry.debug || line.level !== 'debug')
     .map((line) => line.text)
@@ -371,15 +477,18 @@ $('create-form').onsubmit = async (event) => {
     $('serial').value = `mcu-${String(number).padStart(4, '0')}`;
     notice('Device created. Authorize enrollment and approve its identity in the fleet table.');
   });
-  if (consoles.has(serial)) openConsole(serial);
+  if (consoles.has(`browser:${serial}`)) openConsole(`browser:${serial}`);
 };
+$('register-qtpy').onclick = () => connectHardware();
 $('reset').onclick = () => $('reset-dialog').showModal();
 $('reset-dialog').addEventListener('close', () => {
   if ($('reset-dialog').returnValue !== 'reset') return;
   action(async () => {
     await send('reset');
     $('serial').value = 'mcu-0001';
-    notice('All saved fleet data deleted. Create a device to start fresh.');
+    notice(
+      'Saved simulated devices deleted. QT Py registrations and physical boards are unchanged.',
+    );
   });
 });
 
@@ -387,7 +496,9 @@ render();
 try {
   await send('list');
   available = true;
-  notice('Fleet ready. Create a device or open a console to begin.');
+  await hardware.initialize();
+  rebuild();
+  notice('Fleet ready. Create a simulated device or register a QT Py to begin.');
 } catch (error) {
   notice(error.message, true);
 }

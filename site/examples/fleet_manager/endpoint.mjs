@@ -2,12 +2,9 @@
  * suspending export uses async ccall. The fleet worker serializes calls.
  */
 const encoder = new TextEncoder();
-export const hex = bytes => Array.from(bytes, n => n.toString(16).padStart(2, '0')).join('');
-
-export function unhex(text, bytes) {
-  if (typeof text !== 'string' || !/^(?:[a-f0-9]{2})+$/i.test(text) ||
-      text.length > 1024 || (bytes !== undefined && text.length !== bytes * 2))
-    throw new Error('Expected contiguous hexadecimal bytes (frame maximum: 512).');
+function keyBytes(text) {
+  if (typeof text !== 'string' || !/^[a-f0-9]{64}$/i.test(text))
+    throw new Error('Expected a 32-byte public key or challenge.');
   return Uint8Array.from(text.match(/../g), pair => parseInt(pair, 16));
 }
 
@@ -32,7 +29,7 @@ export class Endpoint {
     const module = await factory({storage});
     const endpoint = new Endpoint(module);
     endpoint.put(new Uint8Array(4096));
-    endpoint.put(unhex(pin, 32));
+    endpoint.put(keyBytes(pin));
     endpoint.put(encoder.encode(serial), 32);
     await endpoint.call('ex_init', ['number', 'number'], [role === 'device' ? 1 : 2, fresh ? 1 : 0]);
     return endpoint;
@@ -66,25 +63,29 @@ export class Endpoint {
       case 'begin': await this.call('ex_begin'); break;
       case 'cancel': await this.call('ex_cancel'); break;
       case 'approve':
-        this.put(unhex(args.challenge, 32));
-        this.put(unhex(args.key, 32), 32);
+        this.put(keyBytes(args.challenge));
+        this.put(keyBytes(args.key), 32);
         await this.call('ex_approve'); break;
       case 'issue': this.values(uint64(args.total)); await this.call('ex_issue'); break;
       case 'request': await this.call('ex_request'); break;
-      case 'rx': {
-        const frame = unhex(args.frame.trim());
-        this.put(frame);
-        await this.call('ex_receive', ['number'], [frame.length]); break;
-      }
-      case 'tx': {
-        const status = await this.call('ex_outbound');
-        if (status === 1) return 'No output.';
-        const start = this.module._ex_frame();
-        return hex(this.module.HEAPU8.slice(start, start + this.module._ex_frame_length()));
-      }
       default: throw new Error('Unknown server command.');
     }
     return 'ok';
+  }
+
+  // Opaque bytes belong to the simulated transport, never to console input.
+  async outbound() {
+    if (await this.call('ex_outbound') === 1) return null;
+    const start = this.module._ex_frame();
+    return this.module.HEAPU8.slice(start, start + this.module._ex_frame_length());
+  }
+
+  async receive(frame, now) {
+    if (!(frame instanceof Uint8Array) || frame.length === 0 || frame.length > 512)
+      throw new Error('Expected a binary frame of 1–512 bytes.');
+    this.values(now);
+    this.put(frame);
+    await this.call('ex_receive', ['number'], [frame.length]);
   }
 
   async console(line, now) {
@@ -94,7 +95,8 @@ export class Endpoint {
     const start = this.module._device_line();
     this.module.HEAPU8.set(bytes, start);
     this.module.HEAPU8[start + bytes.length] = 0;
-    const quit = await this.module.ccall('device_command', 'number', [], [], {async: true});
-    return {output: this.module.UTF8ToString(this.module._device_output()), quit: quit === 1};
+    const result = await this.module.ccall('device_command', 'number', [], [], {async: true});
+    return {output: this.module.UTF8ToString(this.module._device_output()),
+      quit: result === 1, error: result === 2, sync: result === 3};
   }
 }

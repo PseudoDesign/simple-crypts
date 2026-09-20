@@ -1,12 +1,10 @@
-/* Rendering and user input only. The worker owns keys, storage, and endpoints.
- * No timer, UI refresh, or clipboard action invokes a protocol transmission.
+/* UI only: the worker owns endpoints, persistence, and the simulated link.
+ * Console commands run in C++; exchange events return as readable activity.
  */
 const $ = id => document.getElementById(id);
-const worker = new Worker(new URL('./worker.mjs?v=43851a847fb842c03057', import.meta.url), {type: 'module'});
+const worker = new Worker(new URL('./worker.mjs?v=d58ba208009013e6b13a', import.meta.url), {type: 'module'});
 const waiting = new Map();
 const consoles = new Map();
-const outbound = new Map();
-const incoming = new Map();
 let nextId = 0, fleet = [], selected, busy = true, available = false;
 let displayedApproval;
 
@@ -47,8 +45,6 @@ async function action(operation) {
   finally { busy = false; render(); }
 }
 
-function shellQuote(value) { return "'" + value.replaceAll("'", "'\\''") + "'"; }
-
 function render() {
   if (!fleet.some(entry => entry.serial === selected)) selected = fleet[0]?.serial;
   $('empty').hidden = fleet.length > 0;
@@ -63,7 +59,7 @@ function render() {
     button.onclick = () => { selected = entry.serial; render(); };
     cell.append(button);
     row.append(cell);
-    for (const text of [entry.kind === 'external' ? 'Python / external' : entry.running ? 'C++ / running' : 'C++ / stopped',
+    for (const text of [entry.running ? 'Running' : 'Stopped',
       entry.error ? 'Storage error' : entry.server?.registered ? 'Registered' : 'Unregistered',
       entry.server?.credits_issued ?? '—', entry.server?.credits_consumed ?? '—']) {
       const cell = document.createElement('td');
@@ -71,29 +67,25 @@ function render() {
       row.append(cell);
     }
     $('fleet-rows').append(row);
-    if (entry.kind === 'browser') updateConsole(entry);
+    updateConsole(entry);
   }
   const entry = fleet.find(item => item.serial === selected);
   $('details').hidden = !entry;
   if (entry) {
     const state = entry.server;
-    $('selected-title').textContent = entry.serial;
-    $('kind-label').textContent = entry.kind === 'browser' ? 'C++ / WebAssembly' : 'Python / native';
+    $('selected-title').textContent = `Server · ${entry.serial}`;
     $('entry-error').textContent = entry.error ?? '';
     $('server-key').textContent = state?.public_key ?? 'Unavailable';
-    $('external-help').hidden = entry.kind !== 'external';
-    $('launch-command').textContent = state ?
-      `bazel run //examples/python_device:console -- --serial ${shellQuote(entry.serial)} --store ${shellQuote('/tmp/simple-crypts-device-' + encodeURIComponent(entry.serial))} --server-key ${state.public_key}` : '';
     $('candidate').textContent = state?.candidate_key ?? '—';
     $('challenge').textContent = state?.challenge ?? '—';
     displayedApproval = {challenge: state?.challenge, key: state?.candidate_key};
+    const candidate = state?.candidate_key && !/^0+$/.test(state.candidate_key);
+    $('enrollment-status').textContent = state?.registered ? 'Registered. Device identity approved.' : candidate ?
+      'Device responded. Review its identity and approve enrollment.' : 'Authorize enrollment to connect this device.';
     $('expires').textContent = state?.enrollment_expires !== '0' && state?.enrollment_expires ?
-      `Session expires: ${new Date(Number(state.enrollment_expires) * 1000).toLocaleString()}` : 'No active enrollment deadline.';
+      `Session expires: ${new Date(Number(state.enrollment_expires) * 1000).toLocaleString()}` : '';
     $('totals').textContent = state ? `Issued: ${state.credits_issued} · Last reported consumed: ${state.credits_consumed}` : '';
     $('server-state').textContent = JSON.stringify(state, null, 2);
-    $('outbound').value = outbound.get(selected) ?? '';
-    $('incoming').value = incoming.get(selected) ?? '';
-    $('device-controls').hidden = entry.kind !== 'browser';
   }
   for (const button of document.querySelectorAll('button')) button.disabled = busy || !available;
   if (entry) {
@@ -106,13 +98,10 @@ function render() {
     $('issue-form').querySelector('button').disabled ||= !entry.server?.registered;
     $('start').disabled ||= entry.running;
     $('stop').disabled ||= !entry.running;
-    $('copy').disabled ||= !/^[0-9a-f]+$/i.test(outbound.get(selected) ?? '');
   }
   for (const item of fleet) {
     const panel = consoles.get(item.serial);
-    if (!panel) continue;
-    panel.input.disabled = busy || !available || !item.running || Boolean(item.error);
-    panel.copy.disabled = busy || !available || !panel.frame;
+    panel.input.disabled = busy || !available || !item.running || Boolean(item.error) || item.device?.storage_failed;
     panel.submit.disabled = panel.input.disabled;
   }
 }
@@ -135,64 +124,69 @@ function updateConsole(entry) {
     log.setAttribute('aria-live', 'polite');
     const form = document.createElement('form');
     const label = document.createElement('label');
-    label.textContent = `Command for ${entry.serial}`;
+    label.textContent = `${entry.serial} >`;
     const input = document.createElement('input');
     input.autocomplete = 'off';
     input.spellcheck = false;
     input.maxLength = 4096;
+    input.placeholder = 'Type help, status, consume 25, or sync';
     label.append(input);
     const submit = document.createElement('button');
     submit.textContent = 'Run command';
-    const copy = document.createElement('button');
-    copy.type = 'button';
-    copy.textContent = 'Copy last frame';
-    copy.onclick = () => action(async () => {
-      await navigator.clipboard.writeText(panel.frame);
-      notice('Copied device frame. Paste it into the server to deliver it.');
-    });
-    form.append(label, submit, copy);
+    form.append(label, submit);
     root.append(top, log, form);
     $('consoles').append(root);
-    panel = {root, title, log, input, submit, copy, lines: ['Type help to list commands.'], frame: ''};
+    panel = {root, title, log, input, submit, history: [], cursor: 0, draft: ''};
     consoles.set(entry.serial, panel);
-    form.onsubmit = event => {
+    input.onkeydown = event => {
+      if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return;
       event.preventDefault();
-      const line = input.value;
-      action(async () => {
-        const result = await send('console', entry.serial, {line});
-        panel.lines.push(`> ${line}`, result.output);
-        panel.lines = panel.lines.slice(-200);
-        panel.log.textContent = panel.lines.join('\n');
-        panel.log.scrollTop = panel.log.scrollHeight;
-        if (/^(?:[a-f0-9]{2}){1,512}$/i.test(result.output)) panel.frame = result.output;
-        input.value = '';
-        notice(result.output.startsWith('error:') ? result.output : 'Device command completed. No frame was delivered.', result.output.startsWith('error:'));
-      });
+      if (panel.cursor === panel.history.length) panel.draft = input.value;
+      panel.cursor = Math.max(0, Math.min(panel.history.length,
+        panel.cursor + (event.key === 'ArrowUp' ? -1 : 1)));
+      input.value = panel.cursor === panel.history.length ? panel.draft : panel.history[panel.cursor];
     };
-    log.textContent = panel.lines.join('\n');
+    form.onsubmit = async event => {
+      event.preventDefault();
+      const line = input.value.trim();
+      if (!line) return;
+      await action(async () => {
+        panel.history.push(line);
+        panel.history = panel.history.slice(-50);
+        panel.cursor = panel.history.length;
+        panel.draft = '';
+        input.value = '';
+        const result = await send('console', entry.serial, {line});
+        notice(result.error ? result.output : `Command completed on ${entry.serial}.`, result.error);
+      });
+      if (!input.disabled) input.focus();
+    };
   }
-  panel.title.textContent = `${entry.serial} · ${entry.running ? 'running' : 'stopped'}`;
+  panel.title.textContent = `${entry.serial} · ${entry.running ? 'connected' : 'stopped'}`;
+  const text = entry.activity.join('\n');
+  if (panel.log.textContent !== text) {
+    panel.log.textContent = text;
+    panel.log.scrollTop = panel.log.scrollHeight;
+  }
 }
 
 async function server(command, args = {}) {
-  const serial = selected;
-  const result = await send('server', serial, {command, ...args});
-  if (command === 'tx') outbound.set(serial, result.output);
-  notice(command === 'tx' ? 'Frame generated. Copy it to the device console to deliver it.' : 'Server action completed. No frame was transmitted.');
+  await send('server', selected, {command, ...args});
+  notice('Server action completed. See the device console for the exchange.');
 }
 
-$('create-form').onsubmit = event => {
+$('create-form').onsubmit = async event => {
   event.preventDefault();
   const serial = $('serial').value;
-  const kind = event.submitter?.value ?? 'browser';
-  action(async () => {
-    await send('create', serial, {kind});
+  await action(async () => {
+    await send('create', serial);
     selected = serial;
     let number = 1;
     while (fleet.some(item => item.serial === `mcu-${String(number).padStart(4, '0')}`)) number++;
     $('serial').value = `mcu-${String(number).padStart(4, '0')}`;
-    notice('Device added. Authorize enrollment to begin the manual exchange.');
+    notice('Device created. Authorize enrollment, then approve its identity.');
   });
+  consoles.get(serial)?.input.focus();
 };
 $('begin').onclick = () => action(() => server('begin'));
 $('cancel').onclick = () => action(() => server('cancel'));
@@ -200,30 +194,26 @@ $('approve').onclick = () => {
   const approval = {...displayedApproval};
   action(() => server('approve', approval));
 };
-$('tx').onclick = () => action(() => server('tx'));
 $('request').onclick = () => action(() => server('request'));
-$('incoming').oninput = () => incoming.set(selected, $('incoming').value);
-$('receive-form').onsubmit = event => {
-  event.preventDefault();
-  action(() => server('rx', {frame: $('incoming').value}));
-};
 $('issue-form').onsubmit = event => {
   event.preventDefault();
-  action(() => server('issue', {total: $('total').value}));
+  const total = $('total').value;
+  action(() => server('issue', {total}));
 };
-$('copy').onclick = () => action(async () => {
-  await navigator.clipboard.writeText(outbound.get(selected));
-  notice('Copied server frame. Paste it into a device rx command to deliver it.');
-});
-$('show-console').onclick = () => { consoles.get(selected).root.hidden = false; };
-$('start').onclick = () => action(async () => { await send('start', selected); notice('Resumed saved device.'); });
-$('stop').onclick = () => action(async () => { await send('stop', selected); notice('Stopped device. Saved state retained.'); });
+$('show-console').onclick = () => {
+  const panel = consoles.get(selected);
+  panel.root.hidden = false;
+  panel.root.scrollIntoView({block: 'nearest'});
+  panel.input.focus();
+};
+$('start').onclick = () => action(async () => { await send('start', selected); notice('Device resumed and synchronized.'); });
+$('stop').onclick = () => action(async () => { await send('stop', selected); notice('Device stopped. Saved state retained.'); });
 
 render();
 try {
   await send('list');
   available = true;
-  notice('Fleet ready. All message transfers are manual.');
+  notice('Fleet ready. Create a device or open a console to begin.');
 } catch (error) { notice(error.message, true); }
 busy = false;
 render();

@@ -1,20 +1,25 @@
-/* One runtime owner, one serialized command queue, one fleet-wide Web Lock.
- * Each endpoint gets a separate Wasm memory and independent identity. There is
- * deliberately no relay/pump: only explicit tx and rx commands move bytes.
+/* One owner, one serialized command queue, one fleet-wide Web Lock. Each
+ * browser device and server peer has its own Wasm instance and identity.
+ * The transport runs in response to user actions, never from a retry timer.
  */
-import createServer from './server.mjs?v=43851a847fb842c03057';
-import createDevice from './device.mjs?v=43851a847fb842c03057';
-import {Endpoint, validSerial} from './endpoint.mjs?v=43851a847fb842c03057';
-import {openDatabase, rows, saveRow, endpointStorage} from './storage.mjs?v=43851a847fb842c03057';
+import createServer from './server.mjs?v=d58ba208009013e6b13a';
+import createDevice from './device.mjs?v=d58ba208009013e6b13a';
+import {Endpoint, validSerial} from './endpoint.mjs?v=d58ba208009013e6b13a';
+import {openDatabase, rows, saveRow, endpointStorage} from './storage.mjs?v=d58ba208009013e6b13a';
+import {exchange} from './transport.mjs?v=d58ba208009013e6b13a';
 
 const zeroKey = '00'.repeat(32);
 const fleet = new Map();
+const savedSerials = new Set();
 let db;
 let resolveReady, rejectReady;
 const ready = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
-// Attach a handler immediately; a locked second tab may initialize before its
-// first request arrives. Requests still observe the original rejected promise.
 ready.catch(() => {});
+
+function log(entry, text) {
+  entry.activity.push(...text.split('\n'));
+  entry.activity = entry.activity.slice(-200);
+}
 
 async function openEndpoint(row, role, fresh) {
   return Endpoint.open(role === 'server' ? createServer : createDevice,
@@ -22,19 +27,39 @@ async function openEndpoint(row, role, fresh) {
     role === 'server' ? zeroKey : row.serverKey, fresh);
 }
 
+async function synchronize(entry) {
+  try {
+    await exchange(entry.server, entry.device, BigInt(Math.floor(Date.now() / 1000)), text => log(entry, text));
+  } catch (error) {
+    log(entry, `error: ${error.message}`);
+    throw error;
+  }
+}
+
 async function initialize() {
   db = await openDatabase();
   for (const row of await rows(db)) {
-    const entry = {row};
+    savedSerials.add(row.serial);
+    // Retired external entries are left untouched on disk. Never repurpose an
+    // existing identity or delete user state when removing an example workflow.
+    if (row.kind === 'external') continue;
+    const entry = {row, activity: []};
     fleet.set(row.serial, entry);
     try {
       validSerial(row.serial);
-      if (row.phase !== 'ready' || !['browser', 'external'].includes(row.kind))
-        throw new Error('Incomplete or incompatible saved entry. State was retained; no replacement identity was created.');
+      if (row.phase !== 'ready' || row.kind !== 'browser')
+        throw new Error('Incomplete or incompatible saved entry. No replacement identity was created.');
       entry.server = await openEndpoint(row, 'server', false);
       if (entry.server.state().public_key !== row.serverKey) throw new Error('Saved server identity mismatch.');
-      if (row.kind === 'browser' && row.running) entry.device = await openEndpoint(row, 'device', false);
-    } catch (error) { entry.error = error.message; }
+      if (row.running) entry.device = await openEndpoint(row, 'device', false);
+      log(entry, row.running ? 'Device restored. Type help for commands.' : 'Device stopped. Saved state retained.');
+    } catch (error) { entry.error = error.message; log(entry, `error: ${error.message}`); }
+  }
+  for (const entry of fleet.values()) {
+    if (!entry.error && entry.device) {
+      // A transport error does not invalidate the registry or regenerate keys.
+      try { await synchronize(entry); } catch { /* Already recorded in console. */ }
+    }
   }
 }
 
@@ -43,33 +68,32 @@ else navigator.locks.request('simple-crypts-fleet-v1', {ifAvailable: true}, asyn
   if (!lock) throw new Error('This saved fleet is open in another tab. Close that tab and reload.');
   await initialize();
   resolveReady();
-  // The dedicated worker dies with its page; then the browser releases the lock.
-  await new Promise(() => {});
+  await new Promise(() => {}); // Worker lifetime owns the lock.
 }).catch(rejectReady);
 
 function view() {
-  return Array.from(fleet.values(), ({row, server, device, error}) => ({
-    serial: row.serial, kind: row.kind, running: Boolean(device), error,
+  return Array.from(fleet.values(), ({row, server, device, error, activity}) => ({
+    serial: row.serial, running: Boolean(device), error, activity,
     server: server?.state(), device: device?.state(),
   }));
 }
 
-async function create(serial, kind) {
+async function create(serial) {
   validSerial(serial);
-  if (!['browser', 'external'].includes(kind)) throw new Error('Invalid device kind.');
-  if (fleet.has(serial)) throw new Error('That serial already exists.');
-  const row = {serial, kind, phase: 'creating', running: kind === 'browser'};
-  // Reserve the serial first. A crash leaves an explicit incomplete entry,
-  // rather than silently regenerating an identity on the next page load.
+  if (savedSerials.has(serial)) throw new Error('That serial exists in saved storage. Choose a different serial.');
+  const row = {serial, kind: 'browser', phase: 'creating', running: true};
   await saveRow(db, row, true);
-  const entry = {row};
+  savedSerials.add(serial);
+  const entry = {row, activity: []};
   fleet.set(serial, entry);
   try {
     entry.server = await openEndpoint(row, 'server', true);
     row.serverKey = entry.server.state().public_key;
-    if (kind === 'browser') entry.device = await openEndpoint(row, 'device', true);
+    entry.device = await openEndpoint(row, 'device', true);
     row.phase = 'ready';
     await saveRow(db, row);
+    log(entry, 'Device ready. Type help for commands.');
+    log(entry, 'Waiting for the server to authorize enrollment.');
   } catch (error) { entry.error = error.message; throw error; }
 }
 
@@ -82,29 +106,42 @@ async function stop(entry) {
 
 async function dispatch({command, serial, args = {}}) {
   if (command === 'list') return {};
-  if (command === 'create') { await create(serial, args.kind); return {}; }
+  if (command === 'create') { await create(serial); return {}; }
   const entry = fleet.get(serial);
   if (!entry) throw new Error('Unknown serial.');
   if (entry.error) throw new Error(entry.error);
   const now = BigInt(Math.floor(Date.now() / 1000));
   switch (command) {
-    case 'server': return {output: await entry.server.server(args.command, args, now)};
+    case 'server': {
+      const labels = {begin: 'Server authorized enrollment.', cancel: 'Server canceled enrollment.',
+        approve: 'Server approved the device identity.', issue: `Server set issued total to ${args.total}.`,
+        request: 'Server requested a fresh consumption report.'};
+      if (!Object.hasOwn(labels, args.command)) throw new Error('Unknown server command.');
+      await entry.server.server(args.command, args, now);
+      log(entry, labels[args.command]);
+      if (args.command !== 'cancel') await synchronize(entry);
+      return {};
+    }
     case 'console': {
       if (!entry.device) throw new Error('Device is stopped. Start it first.');
+      log(entry, `> ${args.line}`);
       const result = await entry.device.console(args.line, now);
+      log(entry, result.output);
       if (result.quit) await stop(entry);
+      else if (result.sync) await synchronize(entry);
       return result;
     }
-    case 'stop': await stop(entry); return {};
+    case 'stop': await stop(entry); log(entry, 'Device stopped. Saved state retained.'); return {};
     case 'start': {
-      if (entry.row.kind !== 'browser') throw new Error('Run external devices in your Python terminal.');
       if (!entry.device) {
         const device = await openEndpoint(entry.row, 'device', false);
         const next = {...entry.row, running: true};
         await saveRow(db, next);
         entry.row = next;
         entry.device = device;
+        log(entry, 'Device started with saved identity and credits.');
       }
+      await synchronize(entry);
       return {};
     }
     default: throw new Error('Unknown fleet command.');

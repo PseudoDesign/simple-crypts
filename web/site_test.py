@@ -90,6 +90,13 @@ class SiteTest(unittest.TestCase):
             ("index.html", "examples/fleet_manager/index.html"),
             ("examples/fleet_manager/worker.mjs", "device.mjs"),
             ("examples/fleet_manager/device.mjs", "device.wasm"),
+            ("index.html", "examples/fleet_manager/qtpy.html"),
+            ("examples/fleet_manager/qtpy.html", "qtpy.mjs"),
+            ("examples/fleet_manager/qtpy.mjs", "qtpy-serial.mjs"),
+            ("examples/fleet_manager/qtpy.mjs", "qtpy-session.mjs"),
+            ("examples/fleet_manager/qtpy.mjs", "server.mjs"),
+            ("examples/fleet_manager/qtpy-session.mjs", "endpoint.mjs"),
+            ("examples/fleet_manager/qtpy-session.mjs", "storage.mjs"),
         ]:
             match = re.search(re.escape(asset) + r"\?v=([0-9a-f]{20})", (root / file).read_text())
             self.assertIsNotNone(match, (file, asset))

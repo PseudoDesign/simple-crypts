@@ -37,6 +37,10 @@ fleet_site(
         "app.mjs",
         "worker.mjs",
         "transport.mjs",
+        "qtpy.html",
+        "qtpy.mjs",
+        "qtpy-serial.mjs",
+        "qtpy-session.mjs",
         "//examples/common:endpoint.mjs",
         "//examples/common:storage.mjs",
     ],
@@ -67,7 +71,10 @@ py_test(
     timeout = "long",
     data = [
         "browser_test.mjs",
+        "qtpy-serial.mjs",
+        "qtpy_browser_test.mjs",
         ":site",
+        "//examples/embedded/qtpy_rp2040:sim",
         "//web:browser_packages",
     ],
     main = "run_browser_test.py",
@@ -82,4 +89,13 @@ filegroup(
     name = "quality_sources",
     srcs = glob(["*"]),
     visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "qtpy_serial_test",
+    data = [
+        "qtpy-serial.mjs",
+        "qtpy_serial_test.mjs",
+    ],
+    main = "run_qtpy_serial_test.py",
 )

@@ -39,7 +39,8 @@ FLEET_V2_NAMES = (
     "device.mjs",
     "device.wasm",
 )
-FLEET_NAMES = (*FLEET_V2_NAMES, "transport.mjs")
+FLEET_V3_NAMES = (*FLEET_V2_NAMES, "transport.mjs")
+FLEET_NAMES = (*FLEET_V3_NAMES, "qtpy.html", "qtpy.mjs", "qtpy-serial.mjs", "qtpy-session.mjs")
 FILES = WEB_FILES + tuple("examples/fleet_manager/" + name for name in FLEET_NAMES)
 
 
@@ -94,10 +95,19 @@ def verify(root, require_commit=True):
     # Previously committed sites remain verifiable until the next deliberate
     # publication. New manifests must inventory the complete fleet bundle.
     version = m.get("format_version", 1)
-    if version not in (1, 2, 3, 4):
+    if version not in (1, 2, 3, 4, 5):
         raise ValueError("Unsupported demo manifest version")
     legacy_fleet = WEB_FILES + tuple("examples/fleet_manager/" + name for name in FLEET_V2_NAMES)
-    expected = set(FILES if version >= 3 else legacy_fleet if version == 2 else WEB_FILES) | {
+    previous = WEB_FILES + tuple("examples/fleet_manager/" + name for name in FLEET_V3_NAMES)
+    expected = set(
+        FILES
+        if version >= 5
+        else previous
+        if version >= 3
+        else legacy_fleet
+        if version == 2
+        else WEB_FILES
+    ) | {
         "endpoint.wasm.mjs",
         "endpoint.wasm.wasm",
     }
@@ -191,10 +201,10 @@ def assemble(
     version_assets(root)
     (root / ".nojekyll").write_text("")
     manifest = {
-        "format_version": 4,
+        "format_version": 5,
         "source_commit": source_commit,
         "runtime": "C core + nanopb + libsodium 1.0.20 / Ed25519 identities + NaCl box / Emscripten 4.0.10",
-        "storage": "guided demo: temporary; fleet example: browser-local IndexedDB",
+        "storage": "guided demo: temporary; fleet and QT Py examples: browser-local IndexedDB",
         "assets": {
             name: digest(root / name)
             for name in (*FILES, "endpoint.wasm.mjs", "endpoint.wasm.wasm")

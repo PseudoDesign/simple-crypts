@@ -128,10 +128,12 @@ The [design notes](PLAN.md) summarize architecture choices and historical
 alternatives. [Embedded evaluation notes](MCU_FEASIBILITY.md) describe optional
 platform integrations; the protocol documents define the implemented profile.
 
-## C API reference and quality checks
+## API references and repository quality checks
 
 Browse the [generated C API reference](https://pseudodesign.github.io/simple-crypts/api/)
+and [binding references](https://pseudodesign.github.io/simple-crypts/api/bindings.html)
 for ownership, buffers, return codes, enrollment, credits, and provider contracts.
 With clang-format/clang-tidy 18.1.3 and Doxygen 1.9.8 installed, run
 `bazel test //tools:quality` and `bazel build //docs:api`.
-See [C quality checks](docs/quality.md) for setup, formatting, analysis, and local HTML/XML output.
+All maintained languages, including tests and examples, are checked.
+See [repository quality checks](docs/quality.md) for setup, formatting, analysis, and local HTML/XML output.

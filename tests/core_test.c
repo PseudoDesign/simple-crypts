@@ -29,6 +29,14 @@ typedef struct {
     } while (0)
 #define OK(x) CHECK((x) == SC_OK)
 
+/* Compare snapshots of the same live object: rejected calls must not write even
+ * padding bytes. This is deliberately stronger than semantic state equality. */
+static int unchanged(const uint8_t *before, const sc_state *state) {
+    uint8_t after[sizeof(sc_state)];
+    memcpy(after, state, sizeof after);
+    return memcmp(before, after, sizeof after) == 0;
+}
+
 static sc_status public_key(void *u, sc_key_handle h, uint8_t out[32]) {
     (void)h;
     memcpy(out, ((memory_store *)u)->key, 32);
@@ -190,7 +198,8 @@ static void credits(void) {
     memory_store dm, sm;
     uint8_t f[512], old[512];
     size_t n, on;
-    sc_state before;
+    /* Capture bytes explicitly: rejection must not mutate even padding. */
+    uint8_t before[sizeof(sc_state)];
     sc_group_state g;
     simplecrypts_Packet p;
     pair(&d, &dm, &s, &sm);
@@ -209,9 +218,9 @@ static void credits(void) {
     transfer(&d, &s);
     CHECK(s.state.data.groups[0].values[1].u64 == 0);
     transfer(&s, &d);
-    before = d.state;
+    memcpy(before, &d.state, sizeof before);
     CHECK(sc_consume_credits(&d, 76) == SC_ERR_CONFLICT);
-    CHECK(!memcmp(&before, &d.state, sizeof before));
+    CHECK(unchanged(before, &d.state));
     CHECK(sc_consume_credits(&d, 0) == SC_ERR_ARGUMENT);
     OK(sc_request_credit_status(&s));
     transfer(&s, &d);
@@ -231,9 +240,9 @@ static void credits(void) {
     transfer(&d, &s);
     transfer(&s, &d);
     dm.fail_commit = 1;
-    before = d.state;
+    memcpy(before, &d.state, sizeof before);
     CHECK(sc_consume_credits(&d, 1) == SC_ERR_STORAGE);
-    CHECK(!memcmp(&before, &d.state, sizeof before));
+    CHECK(unchanged(before, &d.state));
     dm.fail_commit = 0;
     OK(sc_set_credits_issued(&s, UINT64_MAX));
     transfer(&s, &d);
@@ -245,13 +254,13 @@ static void credits(void) {
     on = outbound(&s, old);
     n = 0;
     CHECK(sc_outbound(&s, 1, f, sizeof f, &n) == SC_ERR_BOUNDS && n == 0);
-    before = d.state;
+    memcpy(before, &d.state, sizeof before);
     p = decode_packet(old, on);
     p.schema_hash.bytes[0] ^= 1;
     n = rewrite_packet(f, &p);
     memcpy(f, old, 78);
     CHECK(sc_receive(&d, f, n) == SC_ERR_PROTOCOL);
-    CHECK(!memcmp(&before, &d.state, sizeof before));
+    CHECK(unchanged(before, &d.state));
     memcpy(f, old, on);
     f[2] = 2;
     CHECK(sc_receive(&d, f, on) == SC_ERR_PROTOCOL);
@@ -266,7 +275,8 @@ static void generic(void) {
     sc_config dc, sc;
     sc_provider dp, sp;
     sc_data_update u[3];
-    sc_state before;
+    /* Capture bytes explicitly: rejection must not mutate even padding. */
+    uint8_t before[sizeof(sc_state)];
     pair(&d, &dm, &s, &sm);
     dc = d.config;
     sc = s.config;
@@ -303,12 +313,12 @@ static void generic(void) {
     transfer(&d, &s);
     CHECK(s.state.data.groups[0].values[4].length == 3);
     transfer(&s, &d);
-    before = s.state;
+    memcpy(before, &s.state, sizeof before);
     u[0].field_id = 4;
     u[0].value.length = 1;
     u[0].value.bytes[0] = 0xff;
     CHECK(sc_data_update_group(&s, 7, u, 1) == SC_ERR_UTF8);
-    CHECK(!memcmp(&before, &s.state, sizeof before));
+    CHECK(unchanged(before, &s.state));
     u[0].value.length = 17;
     CHECK(sc_data_update_group(&s, 7, u, 1) == SC_ERR_BOUNDS);
     u[0].field_id = 1;
@@ -339,21 +349,22 @@ static void exhaustion(void) {
     memory_store dm, sm;
     uint8_t f[512];
     size_t n;
-    sc_state before;
+    /* Capture bytes explicitly: rejection must not mutate even padding. */
+    uint8_t before[sizeof(sc_state)];
     pair(&d, &dm, &s, &sm);
     OK(sc_test_seed_revision(&s, UINT64_MAX));
     enroll(&d, &s);
-    before = s.state;
+    memcpy(before, &s.state, sizeof before);
     CHECK(sc_request_credit_status(&s) == SC_ERR_EXHAUSTED);
-    CHECK(!memcmp(&before, &s.state, sizeof before));
+    CHECK(unchanged(before, &s.state));
     pair(&d, &dm, &s, &sm);
     OK(sc_test_seed_revision(&d, UINT64_MAX));
     enroll(&d, &s);
     OK(sc_set_credits_issued(&s, 10));
     transfer(&s, &d);
-    before = d.state;
+    memcpy(before, &d.state, sizeof before);
     CHECK(sc_consume_credits(&d, 1) == SC_ERR_EXHAUSTED);
-    CHECK(!memcmp(&before, &d.state, sizeof before));
+    CHECK(unchanged(before, &d.state));
     d.nonce_next = d.nonce_limit;
     dm.fail_reserve = 1;
     n = 0;

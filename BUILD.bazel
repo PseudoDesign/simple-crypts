@@ -6,3 +6,44 @@ exports_files([
     ".clang-format",
     ".clang-tidy",
 ])
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob([
+        "*",
+        ".github/workflows/*",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "repository_sources",
+    srcs = [
+        "//:quality_sources",
+        "//adapters/c:quality_sources",
+        "//adapters/go:quality_sources",
+        "//adapters/python:quality_sources",
+        "//adapters/rust:quality_sources",
+        "//bindings/go:quality_sources",
+        "//bindings/python:quality_sources",
+        "//bindings/rust:quality_sources",
+        "//build:quality_sources",
+        "//core:quality_sources",
+        "//docs:quality_sources",
+        "//examples:quality_sources",
+        "//examples/common:quality_sources",
+        "//examples/device_console:quality_sources",
+        "//examples/fleet_manager:quality_sources",
+        "//modules/credits:quality_sources",
+        "//platforms/cortex_m4:quality_sources",
+        "//providers/host:quality_sources",
+        "//providers/sodium:quality_sources",
+        "//schema:quality_sources",
+        "//tests:quality_sources",
+        "//tests/crypto:quality_sources",
+        "//tools:quality_sources",
+        "//web:quality_sources",
+    ],
+    visibility = ["//visibility:public"],
+)

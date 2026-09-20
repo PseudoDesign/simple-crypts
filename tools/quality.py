@@ -7,17 +7,13 @@ import os
 from pathlib import Path
 import re
 import subprocess
-import sys
 
 from build_action import C_FLAGS
-
-ROOTS = ("core", "modules/credits", "providers/host", "providers/sodium")
+from source_policy import owned, sources as repository_sources
 
 
 def sources():
-    return sorted(
-        p for root in ROOTS for p in Path(root).iterdir() if p.suffix in (".c", ".h", ".inc")
-    )
+    return [p for p in repository_sources() if p.suffix in (".c", ".h", ".inc", ".cpp", ".proto")]
 
 
 def tool(name, version):
@@ -40,17 +36,46 @@ def format_check(write=False):
 
 def lint(database):
     tidy = tool("clang-tidy-18", "18.1.3")
+    records = json.loads(Path(database).read_text())
+    expected = {str(path) for path in repository_sources() if path.suffix in (".c", ".cpp")}
+    missing = expected - {record["file"] for record in records}
+    if missing:
+        raise RuntimeError(
+            "First-party translation units missing from Bazel analysis: "
+            + ", ".join(sorted(missing))
+        )
     failed = False
-    for record in json.loads(Path(database).read_text()):
-        if not any(record["file"].startswith(root + "/") for root in ROOTS):
+    for record in records:
+        if not owned(record["file"]):
             continue
         print(f"Analyzing {record['file']} {record['copts']}", flush=True)
+        profile = record.get("profile", "native")
+        flags = C_FLAGS if profile == "native" else ["-Wall", "-Wextra", "-std=c99"]
+        if profile == "wasm":
+            sysroot = str(Path(record["sdk"]) / "emscripten/cache/sysroot")
+            flags += [
+                "--target=wasm32-unknown-emscripten",
+                "--sysroot=" + sysroot,
+                "-isystem",
+                sysroot + "/include/compat",
+            ]
+            if record["file"].endswith(".cpp"):
+                flags = [f for f in flags if f != "-std=c99"]
+                flags += ["-std=c++17", "-nostdinc++", "-isystem", sysroot + "/include/c++/v1"]
+        elif profile == "arm":
+            flags += [
+                "--target=arm-none-eabi",
+                "-mcpu=cortex-m4",
+                "-mthumb",
+                "-isystem",
+                "/usr/include/newlib",
+            ]
         command = [
             tidy,
             "--config-file=.clang-tidy",
             record["file"],
             "--",
-            *C_FLAGS,
+            *flags,
             *record["copts"],
             *["-I" + p for p in record["includes"]],
         ]
@@ -72,7 +97,9 @@ def main():
         # Bazel runs in its read-only runfiles tree. Only direct invocation may edit.
         if args.format and os.environ.get("RUNFILES_DIR"):
             parser.error("Run python3 tools/quality.py --format from the source checkout")
-        format_check(args.format)
+        from repository_quality import format_all
+
+        format_all(args.format)
 
 
 if __name__ == "__main__":

@@ -6,3 +6,4 @@ __pycache__/
 target/
 web/node_modules/
 web/test-results/
+.ruff_cache/

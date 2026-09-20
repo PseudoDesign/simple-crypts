@@ -1,5 +1,7 @@
 load("//build:defs.bzl", "cortex_resource_report")
 
+package(default_visibility = ["//visibility:public"])
+
 cortex_resource_report(
     name = "resource_report",
     srcs = [
@@ -22,4 +24,11 @@ cortex_resource_report(
     ],
     linker = "probe.ld",
     sodium = "//third_party/libsodium:sodium_arm",
+)
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
 )

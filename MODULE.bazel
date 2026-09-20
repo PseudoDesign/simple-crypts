@@ -35,3 +35,8 @@ local_repository(
     name = "emscripten_sdk",
     path = ".toolchains/emscripten",
 )
+
+local_repository(
+    name = "quality_sdk",
+    path = ".toolchains/quality",
+)

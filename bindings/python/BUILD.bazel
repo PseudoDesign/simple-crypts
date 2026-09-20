@@ -3,3 +3,10 @@ package(default_visibility = ["//visibility:public"])
 exports_files(["simplecrypts.py"])
 
 exports_files(["resources.py"])
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
+)

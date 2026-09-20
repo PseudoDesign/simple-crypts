@@ -1,19 +1,38 @@
-load("//build:defs.bzl", "sdk_binary")
+load("//build:defs.bzl", "sdk_binary", "sdk_test")
 
 package(default_visibility = ["//visibility:public"])
 
 sdk_binary(
     name = "adapter",
-    srcs = glob([
-        "*.go",
-        "go.mod",
-    ]) + [
+    srcs = ["go.mod"] + glob(["*.go"]) + [
         "//bindings/go:sources",
         "//core:sources",
         "//providers/host:sc_host.h",
     ],
     kind = "go",
     module = "adapters/go",
+    sdk = "@go_sdk//:files",
+    sdk_marker = "@go_sdk//:bin/go",
+    shared = "//providers/host:libsimplecrypts_testing",
+)
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
+)
+
+sdk_test(
+    name = "lint",
+    srcs = ["go.mod"] + glob(["*.go"]) + [
+        "//bindings/go:sources",
+        "//core:sources",
+        "//providers/host:sc_host.h",
+    ],
+    kind = "go",
+    module = "adapters/go",
+    quality = True,
     sdk = "@go_sdk//:files",
     sdk_marker = "@go_sdk//:bin/go",
     shared = "//providers/host:libsimplecrypts_testing",

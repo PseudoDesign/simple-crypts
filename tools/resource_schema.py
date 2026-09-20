@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Generate bounded resource descriptors and language metadata; no dependencies."""
 
-import argparse, hashlib, json, tempfile
+import argparse
+import hashlib
+import json
+import tempfile
 from pathlib import Path
 
 TYPES = {"uint64": 1, "int64": 2, "bool": 3, "text": 4, "bytes": 5}

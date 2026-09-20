@@ -41,7 +41,6 @@ async function tx(e) {
 async function move(a, b) {
   return ok(b, 'rx', { frame: await tx(a) });
 }
-const nonce = (f) => Buffer.from(f.slice(38, 62)).toString('hex');
 async function scenario(name, fn) {
   await fn();
   checks++;

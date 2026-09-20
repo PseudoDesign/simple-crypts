@@ -18,10 +18,11 @@ exports_files(glob([
     "*.options",
     "*.pb.c",
     "*.pb.h",
+    "*.json",
+]) + [
     "resources.h",
     "test_resources.h",
-    "*.json",
-]))
+])
 
 filegroup(
     name = "sources",
@@ -31,4 +32,11 @@ filegroup(
         "sc.pb.h",
         "test_resources.h",
     ],
+)
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
 )

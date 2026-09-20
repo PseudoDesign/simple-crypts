@@ -110,7 +110,8 @@ static void f_init(sc_context *ctx, fuzz_store *store, sc_role role, const uint8
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     sc_context device, server, *target;
     fuzz_store ds, ss;
-    sc_state before, after;
+    /* Raw snapshots deliberately test byte-for-byte failure atomicity. */
+    uint8_t before[sizeof(sc_state)], after[sizeof(sc_state)];
     uint8_t frame[SC_MAX_FRAME];
     size_t n = 0;
     sc_status status;
@@ -162,15 +163,16 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         ds.fail_commit = 1;
         ss.fail_commit = 1;
     }
-    before = target->state;
+    memcpy(before, &target->state, sizeof before);
     status = sc_receive(target, frame, n);
-    after = target->state;
+    memcpy(after, &target->state, sizeof after);
     if (status != SC_OK) {
-        require(memcmp(&before, &after, sizeof before) == 0);
+        require(memcmp(before, after, sizeof before) == 0);
     } else {
         /* Receiving exactly the same protected snapshot is idempotent. */
         require(sc_receive(target, frame, n) == SC_OK);
-        require(memcmp(&after, &target->state, sizeof after) == 0);
+        memcpy(before, &target->state, sizeof before);
+        require(memcmp(after, before, sizeof after) == 0);
     }
     return 0;
 }

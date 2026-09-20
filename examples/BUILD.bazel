@@ -1,5 +1,7 @@
 load("//build:defs.bzl", "py_binary", "py_test")
 
+package(default_visibility = ["//visibility:public"])
+
 py_binary(
     name = "device_server_demo",
     data = [
@@ -28,4 +30,11 @@ py_test(
     data = ["//bindings/python:simplecrypts.py"],
     main = "python_api.py",
     shared = "//providers/host:libsimplecrypts",
+)
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
 )

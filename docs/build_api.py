@@ -66,15 +66,25 @@ def validate_links(root):
                 continue  # Checked in assembled-site browser acceptance.
             if not target.is_relative_to(html) or not target.is_file():
                 raise ValueError(f"Broken API link: {page.name}: {link}")
-            if (
-                url.fragment
-                and target in pages
-                and unquote(url.fragment) not in pages[target].targets
-            ):
-                raise ValueError(f"Broken API anchor: {page.name}: {link}")
+            if url.fragment and target in pages:
+                fragment = unquote(url.fragment)
+                # Rustdoc's source viewer interprets numeric ranges dynamically.
+                if target.is_relative_to(html / "rust/src") and re.fullmatch(
+                    r"[0-9]+-[0-9]+", fragment
+                ):
+                    first, last = map(int, fragment.split("-"))
+                    valid = first <= last and all(
+                        str(n) in pages[target].targets for n in range(first, last + 1)
+                    )
+                else:
+                    valid = (
+                        fragment in pages[target].targets or url.fragment in pages[target].targets
+                    )
+                if not valid:
+                    raise ValueError(f"Broken API anchor: {page.name}: {link}")
 
 
-def build(output):
+def build(output, c_only=False):
     doxygen = tool("doxygen", "1.9.8")
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -91,18 +101,25 @@ def build(output):
         )
     )
     validate_xml(output)
+    if c_only:
+        (output / "html/bindings.html").write_text("<!doctype html><title>Bindings fixture</title>")
+    if not c_only:
+        from binding_docs import build_bindings
+
+        build_bindings(output)
     validate_links(output)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output")
+    parser.add_argument("--c-only", action="store_true", help="Isolate C documentation fixtures")
     args = parser.parse_args()
     if args.output:
-        build(args.output)
+        build(args.output, args.c_only)
     else:
         with tempfile.TemporaryDirectory(prefix="sc-api-") as directory:
-            build(directory)
+            build(directory, args.c_only)
 
 
 if __name__ == "__main__":

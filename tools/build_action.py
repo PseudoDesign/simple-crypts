@@ -138,6 +138,15 @@ def sdk_binary(config):
             module_mode = (
                 "-mod=vendor" if (root / config["module"] / "vendor").is_dir() else "-mod=readonly"
             )
+            if config.get("quality"):
+                run(
+                    [str(sdk / "bin/go"), "vet", module_mode, "./..."],
+                    cwd=root / config["module"],
+                    env=env,
+                )
+                output.write_text("#!/bin/sh\nexit 0\n")
+                output.chmod(0o755)
+                return
             command = ["test", "-c"] if config.get("test_build") else ["build"]
             run(
                 [str(sdk / "bin/go"), *command, module_mode, "-trimpath", "-o", str(output), "."],
@@ -165,6 +174,31 @@ def sdk_binary(config):
                 "--target-dir",
                 str(root / ".target"),
             ]
+            if config.get("documentation"):
+                env["RUSTDOCFLAGS"] = "-Dwarnings"
+                run(
+                    [str(sdk / "bin/cargo"), "doc", *common, "--lib", "--no-deps"],
+                    cwd=root,
+                    env=env,
+                )
+                shutil.copytree(root / ".target/doc", output, dirs_exist_ok=True)
+                return
+            if config.get("quality"):
+                run(
+                    [
+                        str(sdk / "bin/cargo"),
+                        "clippy",
+                        *common,
+                        "--all-targets",
+                        "--",
+                        "-Dwarnings",
+                    ],
+                    cwd=root,
+                    env=env,
+                )
+                output.write_text("#!/bin/sh\nexit 0\n")
+                output.chmod(0o755)
+                return
             if config.get("test_build"):
                 result = subprocess.run(
                     [
@@ -206,7 +240,6 @@ def sdk_binary(config):
 
 def resource_report(config):
     outputs = {name: Path(path).resolve() for name, path in config["outputs"].items()}
-    root = Path.cwd()
     for path in outputs.values():
         path.parent.mkdir(parents=True, exist_ok=True)
     compiler = "/usr/bin/arm-none-eabi-gcc"

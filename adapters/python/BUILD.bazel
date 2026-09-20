@@ -8,3 +8,10 @@ py_binary(
     main = "main.py",
     shared = "//providers/host:libsimplecrypts_testing",
 )
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
+)

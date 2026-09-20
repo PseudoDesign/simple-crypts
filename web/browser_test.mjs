@@ -117,6 +117,32 @@ async function apiReference(page) {
   await result.click();
   await page.waitForURL(/api\/.*html/);
   assert.match(await page.locator('body').innerText(), /SC_ERR_CONFLICT/);
+  if (manifest.api_assets['api/bindings.html']) {
+    for (const [language, query] of [
+      ['python', 'consume_credits'],
+      ['go', 'ConsumeCredits'],
+      ['javascript', 'outbound'],
+    ]) {
+      await page.goto(base + `api/${language}/index.html`);
+      await page.getByRole('searchbox').fill(query);
+      const entries = page.locator('article:visible');
+      assert.ok((await entries.count()) > 0, `${language} API search has results`);
+      for (const entry of await entries.allTextContents())
+        assert.ok(entry.toLowerCase().includes(query.toLowerCase()));
+      await page.getByRole('link', { name: 'All bindings', exact: true }).click();
+      await page.getByRole('link', { name: 'Rust', exact: true }).waitFor();
+    }
+    await page.goto(base + 'api/rust/simplecrypts/struct.Endpoint.html');
+    assert.match(await page.locator('body').innerText(), /consume_credits/);
+    const search = page.locator('input.search-input');
+    await search.fill('consume_credits');
+    await search.press('Enter');
+    await page
+      .locator('.search-results a')
+      .filter({ hasText: 'consume_credits' })
+      .first()
+      .waitFor();
+  }
   await page.goto(base + 'api/');
   await page.getByRole('link', { name: 'Home and demos', exact: true }).click();
   assert.equal(new URL(page.url()).pathname, '/simple-crypts/index.html');

@@ -1,5 +1,7 @@
 load("//build:defs.bzl", "c_test", "conformance_matrix", "py_test")
 
+package(default_visibility = ["//visibility:public"])
+
 exports_files(["coordinator.py"])
 
 c_test(
@@ -17,7 +19,7 @@ py_test(
     shared = "//providers/host:libsimplecrypts_testing",
 )
 
-conformance_matrix()
+conformance_matrix(name = "conformance")
 
 c_test(
     name = "core_fuzz_smoke",
@@ -63,4 +65,11 @@ py_test(
         "//third_party/nanopb:sources",
     ],
     main = "sanitizers.py",
+)
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
 )

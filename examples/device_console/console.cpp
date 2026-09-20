@@ -2,6 +2,7 @@
 // parsing and local device operations run here in C++. The return value tells
 // the owning worker when to synchronize the simulated transport or stop.
 #include "examples/common/endpoint.h"
+#include "examples/device_console/console.h"
 #include "core/sc.h"
 #include <emscripten/emscripten.h>
 #include <cstdint>

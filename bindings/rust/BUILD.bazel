@@ -25,3 +25,29 @@ sdk_test(
 )
 
 exports_files(["src/resources.rs"])
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob([
+        "*",
+        "src/*",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+sdk_test(
+    name = "lint",
+    srcs = [
+        ":sources",
+        "//adapters/rust:main.rs",
+        "//third_party/rust_crates:sources",
+    ],
+    kind = "rust",
+    module = "bindings/rust",
+    quality = True,
+    sdk = "@rust_sdk//:files",
+    sdk_marker = "@rust_sdk//:bin/rustc",
+    shared = "//providers/host:libsimplecrypts_testing",
+    test_build = True,
+)

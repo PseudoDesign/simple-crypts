@@ -1,4 +1,4 @@
-name: C library quality
+name: Repository quality
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: c-quality-${{ github.ref }}
+  group: repository-quality-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -36,6 +36,8 @@ jobs:
           sudo install -m 755 /tmp/sc-bazel /usr/local/bin/bazel
       - name: Bootstrap pinned SDKs
         run: python3 tools/bootstrap.py
+      - name: Install pinned browser and quality tools
+        run: npm ci --prefix web --ignore-scripts --no-audit --no-fund
       - name: Enforce quality and run regressions
         run: |
           bazel test //...
@@ -44,7 +46,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: c-quality
+          name: repository-quality
           path: |
             bazel-bin/docs/api
             bazel-testlogs/**/test.log

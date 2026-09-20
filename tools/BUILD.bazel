@@ -7,6 +7,8 @@ exports_files([
     "bootstrap.py",
     "downloads.lock.json",
     "quality.py",
+    "repository_quality.py",
+    "source_policy.py",
 ])
 
 py_test(
@@ -46,13 +48,30 @@ py_test(
 
 c_analysis_database(
     name = "analysis_database",
+    testonly = True,
     deps = [
+        "//adapters/c:adapter",
+        "//docs:example",
+        "//examples/device_console:module",
+        "//examples/fleet_manager:module",
+        "//platforms/cortex_m4:resource_report",
         "//providers/host",
         "//providers/host:host_testing",
+        "//tests:core_fuzz_smoke",
+        "//tests:core_test",
+        "//tests/crypto:oracle_sodium",
+        "//web:module",
+        "//web:test_module",
     ],
 )
 
 QUALITY_INPUTS = [
+    "@quality_sdk//:files",
+    "@go_sdk//:files",
+    "@rust_sdk//:files",
+    "//web:browser_packages",
+    "//:repository_sources",
+    "@emscripten_sdk//:files",
     "quality.py",
     "build_action.py",
     "//:.clang-format",
@@ -68,12 +87,12 @@ QUALITY_INPUTS = [
 py_test(
     name = "format_check",
     data = QUALITY_INPUTS,
-    main = "quality.py",
-    script_args = ["--format-check"],
+    main = "repository_quality.py",
+    script_args = ["format-check"],
 )
 
 py_test(
-    name = "lint",
+    name = "c_lint",
     data = QUALITY_INPUTS + [":analysis_database"],
     main = "quality.py",
     script_args = [
@@ -88,7 +107,9 @@ test_suite(
         ":format_check",
         ":lint",
         ":quality_test",
+        ":repository_quality_test",
         "//docs:api_check",
+        "//docs:binding_docs_test",
         "//docs:example",
     ],
 )
@@ -100,4 +121,36 @@ py_test(
         "//docs:doc_inputs",
     ],
     main = "quality_test.py",
+)
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "script_lint",
+    data = QUALITY_INPUTS,
+    main = "repository_quality.py",
+    script_args = ["lint"],
+)
+
+test_suite(
+    name = "lint",
+    tests = [
+        ":c_lint",
+        ":script_lint",
+        "//adapters/go:lint",
+        "//bindings/go:lint",
+        "//bindings/rust:lint",
+        "//tests/crypto:lint",
+    ],
+)
+
+py_test(
+    name = "repository_quality_test",
+    data = QUALITY_INPUTS,
+    main = "repository_quality_test.py",
 )

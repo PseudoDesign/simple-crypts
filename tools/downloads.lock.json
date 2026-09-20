@@ -58,5 +58,25 @@
     "file": "emscripten-4.0.10.tar.xz",
     "sha256": "0183f887b56c3f8d4b45826cb49856a3324afb66236ad3c13944c0fd2550cbbc",
     "url": "https://storage.googleapis.com/webassembly/emscripten-releases-builds/linux/8103ffedfb0c42d231c6af6859a5a1a832260b43/wasm-binaries.tar.xz"
+  },
+  {
+    "file": "rustfmt-1.85.1-x86_64-unknown-linux-gnu.tar.xz",
+    "url": "https://static.rust-lang.org/dist/rustfmt-1.85.1-x86_64-unknown-linux-gnu.tar.xz",
+    "sha256": "6e6e7d094a2d756dc223d3246fc8978a75195b289d5860f99f9c492c2fd409fa"
+  },
+  {
+    "file": "clippy-1.85.1-x86_64-unknown-linux-gnu.tar.xz",
+    "url": "https://static.rust-lang.org/dist/clippy-1.85.1-x86_64-unknown-linux-gnu.tar.xz",
+    "sha256": "3ba8c5b9ad1c6911ad17f3fc816d5c580e891416da6db65f9358d7bdcba56b96"
+  },
+  {
+    "file": "ruff-x86_64-unknown-linux-gnu.tar.gz",
+    "url": "https://github.com/astral-sh/ruff/releases/download/0.11.13/ruff-x86_64-unknown-linux-gnu.tar.gz",
+    "sha256": "01aa32d29d00876b8d1429c617ed63a00b1fc81abfa4183bb05c9cb647fbc3d0"
+  },
+  {
+    "file": "buildifier-linux-amd64",
+    "url": "https://github.com/bazel-contrib/buildtools/releases/download/v8.2.1/buildifier-linux-amd64",
+    "sha256": "6ceb7b0ab7cf66fceccc56a027d21d9cc557a7f34af37d2101edb56b92fcfa1a"
   }
 ]

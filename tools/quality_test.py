@@ -3,7 +3,6 @@
 
 from contextlib import contextmanager
 import hashlib
-import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -53,6 +52,8 @@ class QualityTest(unittest.TestCase):
             root = Path(directory)
             for name in (
                 "core/sc.h",
+                "examples/common/endpoint.h",
+                "examples/device_console/console.h",
                 "core/data.h",
                 "providers/host/sc_host.h",
                 "providers/sodium/sc_sodium.h",
@@ -71,6 +72,7 @@ class QualityTest(unittest.TestCase):
             [
                 "/usr/bin/python3",
                 str(Path("docs/build_api.py").resolve()),
+                "--c-only",
                 "--output",
                 str(root / output),
             ],

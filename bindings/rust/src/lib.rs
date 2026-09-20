@@ -1,3 +1,10 @@
+//! Owned Rust bindings to the synchronous C core and durable host provider.
+//! Each endpoint has one peer and an exclusive store lock. Drop or close releases
+//! the handle. Endpoints are neither Send nor Sync; no private keys are exported.
+#![deny(missing_docs)]
+
+/// Generated schema identifiers; checked against the canonical resource schema.
+#[allow(missing_docs)] // The generated file is validated by resource_schema_check.
 pub mod resources;
 // Safe owned Rust bindings to the common core and durable host provider.
 // One Endpoint is one role and one peer; Drop closes its native handle.
@@ -58,10 +65,13 @@ extern "C" {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// Native host failure represented by its stable status token.
 pub struct Error {
+    /// Stable native status token.
     pub status: String,
 }
 impl Error {
+    /// Construct an invalid-argument error without entering native code.
     pub fn invalid() -> Self {
         Self {
             status: "invalid".into(),
@@ -89,27 +99,45 @@ fn cstr(value: &str) -> Result<CString, Error> {
     CString::new(value).map_err(|_| Error::invalid())
 }
 #[derive(Clone, Copy)]
+/// Endpoint role; every handle represents one device/server peer.
 pub enum Role {
+    /// Device role; owns consumption.
     Device,
+    /// Server role; owns credit issuance.
     Server,
 }
+/// Borrowed initialization inputs copied by the native provider.
 pub struct Config<'a> {
+    /// Device or server role.
     pub role: Role,
+    /// Private persistent store directory.
     pub storage: &'a str,
+    /// Printable ASCII serial of 1 through 32 bytes.
     pub serial: &'a str,
+    /// 32-byte enrollment secret; must match an existing store.
     pub secret: &'a [u8; 32],
+    /// Optional trusted 32-byte identity seed; None creates fresh keys for a new store.
     pub provisioned_seed: Option<&'a [u8; 32]>,
+    /// 32-byte pinned server Ed25519 key, required on a device.
     pub server_public_key: Option<&'a [u8; 32]>,
+    /// Fixture-only entropy failure switch; use false in applications.
     pub random_unavailable: bool,
 }
 #[derive(Debug, Clone, PartialEq)]
+/// Owned typed resource value; strings are UTF-8 and byte arrays are bounded.
 pub enum ResourceValue {
+    /// Unsigned 64-bit integer.
     Uint64(u64),
+    /// Signed 64-bit integer.
     Int64(i64),
+    /// Boolean value.
     Boolean(bool),
+    /// UTF-8 text without embedded NUL.
     Text(String),
+    /// Arbitrary bytes.
     Bytes(Vec<u8>),
 }
+/// Owned durable native endpoint; dropping it closes and wipes the native handle.
 pub struct Endpoint {
     handle: NonNull<c_void>,
     _single_owner: PhantomData<Rc<()>>,
@@ -120,6 +148,9 @@ impl Endpoint {
     pub fn close(self) {
         drop(self)
     }
+    /// Open or create a durable endpoint with an exclusive store lock. Configuration bytes are
+    /// copied by the native provider. Existing incompatible or corrupt stores fail instead of
+    /// replacing identities.
     pub fn initialize(config: Config<'_>) -> Result<Self, Error> {
         let storage = cstr(config.storage)?;
         let serial = cstr(config.serial)?;
@@ -150,12 +181,19 @@ impl Endpoint {
             _single_owner: PhantomData,
         })
     }
+    /// Persistently enable signed enrollment before registration. This mode cannot be disabled.
     pub fn enrollment_enable(&mut self) -> Result<(), Error> {
         check(unsafe { sc_host_enrollment_enable(self.handle.as_ptr()) })
     }
+    /// Authorize a new server enrollment session. now and expires use the same trusted server clock
+    /// and application-defined units; expires must be greater than now. A fresh challenge replaces
+    /// any prior candidate.
     pub fn enrollment_begin(&mut self, now: u64, expires: u64) -> Result<(), Error> {
         check(unsafe { sc_host_enrollment_begin(self.handle.as_ptr(), now, expires) })
     }
+    /// Approve the exact 32-byte challenge and candidate Ed25519 key at trusted server time now.
+    /// The application must authorize the serial/session/key binding. Stale or expired approvals
+    /// fail.
     pub fn enrollment_approve(
         &mut self,
         challenge: &[u8; 32],
@@ -166,21 +204,34 @@ impl Endpoint {
             sc_host_enrollment_approve(self.handle.as_ptr(), challenge.as_ptr(), key.as_ptr(), now)
         })
     }
+    /// Cancel an unregistered server session durably. This does not revoke an enrolled peer.
     pub fn enrollment_cancel(&mut self) -> Result<(), Error> {
         check(unsafe { sc_host_enrollment_cancel(self.handle.as_ptr()) })
     }
+    /// Authenticate one complete frame using trusted server time now for enrollment expiry.
+    /// Accepted changes are persisted; responses remain pending for outbound transport.
     pub fn receive_at(&mut self, frame: &[u8], now: u64) -> Result<(), Error> {
         check(unsafe { sc_host_receive_at(self.handle.as_ptr(), frame.as_ptr(), frame.len(), now) })
     }
+    /// Set the cumulative issued total on an enrolled server. The uint64 total must not decrease.
+    /// Success commits locally and queues work; it does not deliver a frame.
     pub fn set_credits_issued(&mut self, total: u64) -> Result<(), Error> {
         check(unsafe { sc_host_set_credits_issued(self.handle.as_ptr(), total) })
     }
+    /// Consume a positive uint64 amount on an enrolled device. Insufficient credits fail with
+    /// conflict; overflow fails with exhausted. The server learns consumption through a later
+    /// requested report.
     pub fn consume_credits(&mut self, amount: u64) -> Result<(), Error> {
         check(unsafe { sc_host_consume_credits(self.handle.as_ptr(), amount) })
     }
+    /// Persist a new credit report request on an enrolled server. Exchange the resulting request,
+    /// response and receipt through application-owned transport.
     pub fn request_credit_status(&mut self) -> Result<(), Error> {
         check(unsafe { sc_host_request_credit_status(self.handle.as_ptr()) })
     }
+    /// Atomically replace fields owned by this endpoint in id. Values must match the configured
+    /// schema; invalid, duplicate, decreasing monotonic or wrong-owner updates fail without partial
+    /// changes.
     pub fn update_group(&mut self, id: u16, updates: &[(u16, ResourceValue)]) -> Result<(), Error> {
         let mut data = Vec::new();
         for (field, value) in updates {
@@ -201,10 +252,14 @@ impl Endpoint {
         }
         check(unsafe { sc_host_update_group(self.handle.as_ptr(), id, data.as_ptr(), data.len()) })
     }
+    /// Queue and persist a resource-group snapshot request on an enrolled server. Unknown group IDs
+    /// fail; no bytes are transferred automatically.
     pub fn request_group(&mut self, id: u16) -> Result<(), Error> {
         check(unsafe { sc_host_request_group(self.handle.as_ptr(), id) })
     }
-    /// Copied group values (exact JSON integers) and decimal-string counters.
+    /// Return a copied diagnostic snapshot of one group. Field values retain exact integer values;
+    /// revision counters are decimal strings. Device-owned values on the server are last reported
+    /// values.
     pub fn inspect_group(&self, id: u16) -> Result<serde_json::Value, Error> {
         let mut out = [0u8; 1024];
         check(unsafe {
@@ -258,10 +313,13 @@ impl Endpoint {
         result["values"] = values.into();
         Ok(result)
     }
+    /// Authenticate one complete protocol frame without a trusted clock. Unapproved signed server
+    /// enrollment fails closed; use receive_at during enrollment.
     pub fn receive(&mut self, frame: &[u8]) -> Result<(), Error> {
         check(unsafe { sc_host_receive(self.handle.as_ptr(), frame.as_ptr(), frame.len()) })
     }
-    /// None means idle. Failed budget or capacity checks retain pending work.
+    /// Generate at most one frame within budget and capacity byte limits. An idle endpoint returns
+    /// no frame. Bounds failures retain pending work. Generating a frame never delivers it.
     pub fn outbound(&mut self, budget: usize, capacity: usize) -> Result<Option<Vec<u8>>, Error> {
         if capacity > 65536 {
             return Err(Error::invalid());
@@ -289,7 +347,8 @@ impl Endpoint {
         frame.truncate(length);
         Ok(Some(frame))
     }
-    /// Diagnostics retain all 64-bit counters as exact decimal strings.
+    /// Return copied public-state diagnostics with uint64 counters as decimal strings. No private
+    /// keys are exported, and this snapshot is not a restorable native context.
     pub fn inspect(&self) -> Result<serde_json::Value, Error> {
         let mut buffer = [0u8; 4096];
         check(unsafe {
@@ -307,11 +366,14 @@ impl Endpoint {
             status: "internal".into(),
         })
     }
+    /// Fixture-only injection: fail the next count storage, random or crypto operations. Zero
+    /// clears the selected counter. This is not an application recovery API.
     pub fn fail(&mut self, operation: &str, count: u32) -> Result<(), Error> {
         let operation = cstr(operation)?;
         check(unsafe { sc_host_fail(self.handle.as_ptr(), operation.as_ptr(), count) })
     }
-    /// Fixture-only counter boundary testing; absent from production builds.
+    /// Fixture-only revision seeding for uint64 boundary tests. Requires an explicitly testing-
+    /// enabled native library; production builds reject it.
     pub fn fixture_revision(&mut self, revision: u64) -> Result<(), Error> {
         check(unsafe { sc_host_fixture_revision(self.handle.as_ptr(), revision) })
     }
@@ -321,7 +383,8 @@ impl Drop for Endpoint {
         unsafe { sc_host_close(self.handle.as_ptr()) }
     }
 }
-/// Test provisioning helper. Production devices receive the server public key.
+/// Derive a public key from a 32-byte fixture seed. Use independently generated provisioning
+/// secrets for real deployments.
 pub fn fixture_public_key(seed: &[u8; 32]) -> Result<[u8; 32], Error> {
     let mut key = [0u8; 32];
     check(unsafe { sc_host_fixture_public(seed.as_ptr(), key.as_mut_ptr()) })?;

@@ -11,6 +11,10 @@ Start with @ref initialization and @ref host. Embedded integrations implement @r
 Use @ref enrollment before @ref credits or @ref resources; exchange complete frames through
 @ref transport. @ref fixtures contains test helpers, not application provisioning APIs.
 
+@par Binding and browser interfaces
+[Python, Go, Rust, and JavaScript references](bindings.html).
+The @ref examples interfaces belong to the browser applications, not the stable C library ABI.
+
 @par Working example
 The following Linux example creates a temporary server, authorizes enrollment and generates
 an invitation. A real application retains its private store directory and securely provisions
@@ -54,3 +58,5 @@ and [Quality checks](https://github.com/PseudoDesign/simple-crypts/blob/main/doc
 /** @defgroup transport Frame generation and reception */
 /** @defgroup host Durable Linux host API */
 /** @defgroup fixtures Test and fixture helpers */
+
+/** @defgroup examples Browser example interfaces */

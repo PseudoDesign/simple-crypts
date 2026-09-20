@@ -13,6 +13,8 @@ filegroup(
         "api.dox",
         "api_example.c",
         "//core:sources",
+        "//examples/common:endpoint.h",
+        "//examples/device_console:console.h",
         "//providers/host:sources",
         "//providers/sodium:sources",
     ],
@@ -20,7 +22,16 @@ filegroup(
 
 INPUTS = [
     ":doc_inputs",
+    "binding_docs.py",
+    "go_docs.go",
+    "//:repository_sources",
+    "//tools:repository_quality.py",
+    "//third_party/rust_crates:sources",
+    "@rust_sdk//:files",
+    "@go_sdk//:files",
+    "//web:browser_packages",
     "//tools:quality.py",
+    "//tools:source_policy.py",
     "//tools:build_action.py",
 ]
 
@@ -39,4 +50,17 @@ c_test(
     name = "example",
     srcs = ["api_example.c"],
     deps = ["//providers/host"],
+)
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "binding_docs_test",
+    data = INPUTS,
+    main = "binding_docs_test.py",
 )

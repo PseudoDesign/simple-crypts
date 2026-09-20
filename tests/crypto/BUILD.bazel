@@ -1,4 +1,6 @@
-load("//build:defs.bzl", "c_binary", "py_test", "sdk_binary")
+load("//build:defs.bzl", "c_binary", "py_test", "sdk_binary", "sdk_test")
+
+package(default_visibility = ["//visibility:public"])
 
 c_binary(
     name = "oracle_sodium",
@@ -36,4 +38,25 @@ py_test(
         "--vector",
         "tests/crypto/vector.json",
     ],
+)
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
+)
+
+sdk_test(
+    name = "lint",
+    srcs = [
+        "go.mod",
+        "go.sum",
+        "oracle.go",
+    ] + glob(["vendor/**"]),
+    kind = "go",
+    module = "tests/crypto",
+    quality = True,
+    sdk = "@go_sdk//:files",
+    sdk_marker = "@go_sdk//:bin/go",
 )

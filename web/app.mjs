@@ -7,13 +7,11 @@ let busy = false,
   step = -1,
   operation = 0,
   queueKey = '',
-  archiveKey = '',
   selected = null,
   dragged = null;
 let expected = null,
   completed = false,
   original = null,
-  setup = 0,
   chapter = 'trust',
   consumedLocally = false;
 let errorLesson = -1,
@@ -489,9 +487,9 @@ function render() {
         : 'Restart enrollment ↺',
   );
   $('advance-time').disabled = locked || !lab.states.server;
-  $('begin-enrollment').disabled = true || !!lab.states.server?.registered;
-  $('approve-enrollment').disabled =
-    true || !lab.states.server || lab.states.server.candidate_revision === '0';
+  // Enrollment is driven by the guided action; these experimental controls stay disabled.
+  $('begin-enrollment').disabled = true;
+  $('approve-enrollment').disabled = true;
   $('packet-inspector').hidden = mode !== 'tour' || step < 0;
   $('experiment-tools').hidden = true;
   const waitForPlus =
@@ -543,7 +541,6 @@ function intro() {
   showTip();
   $('packet-inspector').open = false;
   $('experiment-tools').open = false;
-  setup = 0;
   consumedLocally = false;
   step = -1;
   completed = false;

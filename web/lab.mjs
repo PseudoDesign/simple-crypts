@@ -1,9 +1,18 @@
-import { hex } from './endpoint.mjs';
+/** @module web/lab */
+/** Maximum pending packet count and retained event count, respectively. */
 export const MAX_QUEUE = 64,
   MAX_EVENTS = 200;
-// The demo device has a fixed serial before it generates keys or enrolls.
+/** Fixed demo serial used before key generation or enrollment. */
 export const DEVICE_SERIAL = 'mcu-0001';
+/**
+ * Own two isolated guided-demo workers and explicit packet queues. The lab controls simulated time and transport; it never fabricates protocol responses. Reset terminates old workers and rejects outstanding calls.
+ */
 export class Lab {
+  /**
+   * Create a lab without starting workers; reset initializes them.
+   * @param {Function} [onChange] Observer called after state changes.
+   * @param {Function} [workerFactory] Factory for isolated endpoint workers.
+   */
   constructor(onChange = () => {}, workerFactory = (url) => new Worker(url, { type: 'module' })) {
     this.onChange = onChange;
     this.workerFactory = workerFactory;
@@ -19,14 +28,25 @@ export class Lab {
     this.ready = false; // Freeze the simulated server clock at a real date for readable packet timestamps.
     this.time = Math.floor(Date.now() / 1000);
   }
+  /**
+   * Notify the UI with the current lab state.
+   */
   notify() {
     this.onChange(this);
   }
+  /**
+   * Append a bounded diagnostic event and notify observers.
+   * @param {string} message Display text.
+   * @param {string} [kind] Event category.
+   */
   event(message, kind = 'info') {
     this.events.push({ message, kind });
     if (this.events.length > MAX_EVENTS) this.events.shift();
     this.notify();
   }
+  /**
+   * Terminate workers and reject pending calls, invalidating the current session.
+   */
   stop() {
     this.epoch++;
     this.ready = false;
@@ -36,6 +56,11 @@ export class Lab {
       pending.reject(new DOMException('Session reset', 'AbortError'));
     this.pending.clear();
   }
+  /**
+   * Discard transient state and initialize fresh workers and server identity.
+   * @param {object} [options] Set deferDevice to postpone device provisioning.
+   * @returns {Promise<void>} Completion; initialization failures reject.
+   */
   async reset({ deferDevice = false } = {}) {
     this.stop();
     const epoch = this.epoch;
@@ -112,6 +137,11 @@ export class Lab {
       throw error;
     }
   }
+  /**
+   * Generate a fresh device identity after optional challenge verification.
+   * @param {object} [options] Set fromChallenge to verify the displayed invitation first.
+   * @returns {Promise<void>} Completion; invalid session or verification failures reject.
+   */
   async generateDevice({ fromChallenge = false } = {}) {
     const epoch = this.epoch;
     const result = await this.raw('device', fromChallenge ? 'generate_from_challenge' : 'generate');
@@ -121,6 +151,10 @@ export class Lab {
     this.event('Device generated an Ed25519 key pair locally. No packet sent.');
     return result.public_key;
   }
+  /**
+   * Initialize the generated device with its serial and pinned server key.
+   * @returns {Promise<void>} Completion; missing provisioning inputs reject.
+   */
   async provisionDevice() {
     const epoch = this.epoch;
     const result = await this.raw('device', 'init', {
@@ -139,6 +173,13 @@ export class Lab {
       'Device identity ready; its serial and trusted server public key are already available.',
     );
   }
+  /**
+   * Send a command to one worker and correlate its response; no peer transfer occurs.
+   * @param {string} role Endpoint role.
+   * @param {string} command Bridge command.
+   * @param {object} [args] Command arguments.
+   * @returns {Promise<object>} Worker response; runtime errors reject.
+   */
   raw(role, command, args = {}) {
     const worker = this.workers[role];
     if (!worker) return Promise.reject(new Error('Endpoint is unavailable'));
@@ -148,6 +189,13 @@ export class Lab {
       worker.postMessage({ id, command, args });
     });
   }
+  /**
+   * Execute a worker command and update visible state and events.
+   * @param {string} role Endpoint role.
+   * @param {string} command Bridge command.
+   * @param {object} [args] Command arguments.
+   * @returns {Promise<object>} Worker result.
+   */
   async command(role, command, args = {}) {
     if (!this.ready) throw new Error('Session is not ready');
     const epoch = this.epoch;
@@ -157,6 +205,13 @@ export class Lab {
     this.notify();
     return response;
   }
+  /**
+   * Apply a state-changing command and report its result; frame generation is separate.
+   * @param {string} role Endpoint role.
+   * @param {string} command Bridge command.
+   * @param {object} args Command arguments.
+   * @returns {Promise<object>} Command result; delivery remains explicit.
+   */
   async update(role, command, args) {
     const r = await this.command(role, command, args);
     if (r.code < 0) throw new Error(`${role}: ${r.status}`);
@@ -171,6 +226,10 @@ export class Lab {
     );
     return r;
   }
+  /**
+   * Authorize a ten-minute session using the simulated server clock.
+   * @returns {Promise<void>} Completion; native failures reject.
+   */
   async beginEnrollment() {
     const r = await this.command('server', 'enrollment_begin', {
       now: this.time,
@@ -179,6 +238,10 @@ export class Lab {
     if (r.code !== 0) throw new Error(r.status);
     this.event('Application policy authorized a 10-minute enrollment session.');
   }
+  /**
+   * Approve the displayed candidate binding at the current simulated time.
+   * @returns {Promise<void>} Completion; stale or absent candidates fail.
+   */
   async approveEnrollment() {
     const s = this.states.server;
     const r = await this.command('server', 'enrollment_approve', {
@@ -191,6 +254,12 @@ export class Lab {
       'Application policy approved this exact serial, session, and Ed25519 key. Device registered.',
     );
   }
+  /**
+   * Generate and stage a packet in its sender box; do not deliver it.
+   * @param {string} role Sending endpoint.
+   * @param {number} [budget=512] Maximum frame bytes.
+   * @returns {Promise<number|null>} Queued packet ID, or null when idle.
+   */
   async transmit(role, budget = 512) {
     if (this.queue.length >= MAX_QUEUE)
       throw new Error(
@@ -227,27 +296,50 @@ export class Lab {
     );
     return packet.id;
   }
+  /**
+   * Find a queued packet or throw if it is no longer available.
+   * @param {number} id Packet identifier.
+   * @returns {object} Mutable queue record.
+   */
   packet(id) {
     const p = this.queue.find((p) => p.id === id);
     if (!p) throw new Error('Frame is no longer queued');
     return p;
   }
+  /**
+   * Archive a packet with its final outcome, keeping bounded history.
+   * @param {object} packet Queue record.
+   * @param {string} outcome Final outcome.
+   */
   remember(packet, outcome) {
     this.archive.unshift({ ...packet, bytes: packet.bytes.slice(), outcome });
     if (this.archive.length > 16) this.archive.pop();
   }
+  /**
+   * Move a visible packet between transport locations.
+   * @param {number} id Packet identifier.
+   * @param {string} location New location.
+   */
   move(id, location) {
     if (!['relay', 'device-outbox', 'server-outbox'].includes(location))
       throw new Error('Unknown holding area');
     this.packet(id).location = location;
     this.event(`Message ${id} held; no endpoint has received it.`);
   }
+  /**
+   * Discard a packet without reception and record the outcome.
+   * @param {number} id Packet identifier.
+   */
   drop(id) {
     const p = this.packet(id);
     this.remember({ ...p, result: null }, 'dropped · receiver not called');
     this.queue = this.queue.filter((p) => p.id !== id);
     this.event(`Host discarded message ${id}.`);
   }
+  /**
+   * Queue a copy of archived bytes for explicit replay testing.
+   * @param {object} packet Archived record.
+   */
   replay(packet) {
     if (this.queue.length >= MAX_QUEUE) throw new Error('Relay queue is full (64 messages).');
     const copy = {
@@ -262,6 +354,10 @@ export class Lab {
     this.event(`An identical copy of message ${packet.id} is queued as message ${copy.id}.`);
     return copy.id;
   }
+  /**
+   * Queue a second copy without mutating the original.
+   * @param {number} id Packet identifier.
+   */
   duplicate(id) {
     if (this.queue.length >= MAX_QUEUE) throw new Error('Relay queue is full (64 frames).');
     const p = this.packet(id);
@@ -270,12 +366,22 @@ export class Lab {
     this.event(`Host duplicated frame ${id} as frame ${copy.id}.`);
     return copy.id;
   }
+  /**
+   * Flip ciphertext bytes for authentication-failure testing.
+   * @param {number} id Packet identifier.
+   */
   corrupt(id) {
     const p = this.packet(id);
     p.bytes[p.bytes.length - 1] ^= 1;
     p.corrupted = !p.corrupted;
     this.event(`Host flipped the final wire byte of frame ${id}.`);
   }
+  /**
+   * Deliver a queued packet to one endpoint and record its acceptance or failure.
+   * @param {number} id Packet identifier.
+   * @param {string} target Destination role.
+   * @returns {Promise<object>} Receive result.
+   */
   async deliver(id, target) {
     const p = this.packet(id);
     target = target ?? p.to;

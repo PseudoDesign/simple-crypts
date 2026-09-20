@@ -1,4 +1,4 @@
 Checks: '-*,clang-analyzer-core.*,clang-analyzer-deadcode.*,clang-analyzer-unix.*,clang-analyzer-security.*,bugprone-sizeof-expression,bugprone-suspicious-memory-comparison,bugprone-suspicious-memset-usage,bugprone-macro-parentheses,bugprone-multiple-statement-macro,cert-err34-c,readability-braces-around-statements'
 WarningsAsErrors: '*'
-HeaderFilterRegex: '(^|/)(core|modules/credits|providers/(host|sodium))/'
+HeaderFilterRegex: '(^|/)(core|modules|providers|adapters|tests|examples|web|platforms|docs)/'
 FormatStyle: file

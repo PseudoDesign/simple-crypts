@@ -1,1 +1,10 @@
+package(default_visibility = ["//visibility:public"])
+
 exports_files(["defs.bzl"])
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
+)

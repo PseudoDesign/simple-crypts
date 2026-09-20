@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Assemble and verify the static demo plus previously recorded test evidence."""
 
-import argparse, hashlib, json, re, shutil, sys, tempfile
+import argparse
+import hashlib
+import json
+import re
+import shutil
+import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))

@@ -19,8 +19,13 @@ import (
 	"unsafe"
 )
 
-type Error struct{ Status string }
+// Error represents native host failure with a stable status token.
+type Error struct {
+	// Status is the stable native failure token.
+	Status string
+}
 
+// Error returns the stable native status token.
 func (e *Error) Error() string { return e.Status }
 func check(code C.int) error {
 	if code == 0 {
@@ -29,11 +34,25 @@ func check(code C.int) error {
 	return &Error{C.GoString(C.sc_host_status(code))}
 }
 
+// Config represents initialization inputs copied by the native provider.
 type Config struct {
-	Role, Storage, Serial                    string
-	Secret, ProvisionedSeed, ServerPublicKey []byte
-	RandomUnavailable                        bool
+	// Role is "device" or "server".
+	Role string
+	// Storage is a private durable store directory.
+	Storage string
+	// Serial is 1 through 32 printable ASCII bytes.
+	Serial string
+	// Secret is a required 32-byte enrollment secret.
+	Secret []byte
+	// ProvisionedSeed optionally supplies a trusted 32-byte identity seed.
+	ProvisionedSeed []byte
+	// ServerPublicKey is the required 32-byte Ed25519 server pin for a device.
+	ServerPublicKey []byte
+	// RandomUnavailable injects entropy failure in fixtures; applications use false.
+	RandomUnavailable bool
 }
+
+// Endpoint represents an owned native handle; close it and externally synchronize concurrent calls.
 type Endpoint struct{ handle *C.sc_host }
 
 func ptr32(value []byte, optional bool) (*C.uint8_t, error) {
@@ -45,6 +64,10 @@ func ptr32(value []byte, optional bool) (*C.uint8_t, error) {
 	}
 	return (*C.uint8_t)(unsafe.Pointer(&value[0])), nil
 }
+
+// Initialize opens or create a durable endpoint with an exclusive store lock. Configuration
+// bytes are copied by the native provider. Existing incompatible or corrupt stores fail instead
+// of replacing identities.
 func Initialize(config Config) (*Endpoint, error) {
 	role := C.int(0)
 	if config.Role == "device" {
@@ -80,6 +103,9 @@ func Initialize(config Config) (*Endpoint, error) {
 	}
 	return endpoint, nil
 }
+
+// Close closes the native handle and release its exclusive store lock. Repeated closes are
+// harmless; do not use the endpoint afterward.
 func (e *Endpoint) Close() {
 	if e != nil && e.handle != nil {
 		C.sc_host_close(e.handle)
@@ -92,18 +118,28 @@ func (e *Endpoint) valid() error {
 	}
 	return nil
 }
+
+// SetCreditsIssued sets the cumulative issued total on an enrolled server. The uint64 total must
+// not decrease. Success commits locally and queues work; it does not deliver a frame.
 func (e *Endpoint) SetCreditsIssued(total uint64) error {
 	if err := e.valid(); err != nil {
 		return err
 	}
 	return check(C.sc_host_set_credits_issued(e.handle, C.uint64_t(total)))
 }
+
+// ConsumeCredits consumes a positive uint64 amount on an enrolled device. Insufficient credits
+// fail with conflict; overflow fails with exhausted. The server learns consumption through a
+// later requested report.
 func (e *Endpoint) ConsumeCredits(amount uint64) error {
 	if err := e.valid(); err != nil {
 		return err
 	}
 	return check(C.sc_host_consume_credits(e.handle, C.uint64_t(amount)))
 }
+
+// RequestCreditStatus persists a new credit report request on an enrolled server. Exchange the
+// resulting request, response and receipt through application-owned transport.
 func (e *Endpoint) RequestCreditStatus() error {
 	if err := e.valid(); err != nil {
 		return err
@@ -114,15 +150,25 @@ func (e *Endpoint) RequestCreditStatus() error {
 // ResourceValue represents a schema-typed field update. Type values: 1=uint64,
 // 2=int64, 3=Boolean, 4=UTF-8, 5=bytes. Only the corresponding member is used.
 type ResourceValue struct {
+	// FieldID identifies the field in its configured resource group.
 	FieldID uint16
-	Type    uint8
-	Uint64  uint64
-	Int64   int64
+	// Type is the schema type tag: 1=uint64, 2=int64, 3=Boolean, 4=text, 5=bytes.
+	Type uint8
+	// Uint64 holds an unsigned value for type 1.
+	Uint64 uint64
+	// Int64 holds a signed value for type 2.
+	Int64 int64
+	// Boolean holds a Boolean value for type 3.
 	Boolean bool
-	Text    string
-	Bytes   []byte
+	// Text holds UTF-8 without embedded NUL for type 4.
+	Text string
+	// Bytes holds bounded arbitrary bytes for type 5.
+	Bytes []byte
 }
 
+// UpdateGroup atomically replaces fields owned by this endpoint in id. Values must match the
+// configured schema; invalid, duplicate, decreasing monotonic or wrong-owner updates fail
+// without partial changes.
 func (e *Endpoint) UpdateGroup(id uint16, updates []ResourceValue) error {
 	if err := e.valid(); err != nil {
 		return err
@@ -161,6 +207,9 @@ func (e *Endpoint) UpdateGroup(id uint16, updates []ResourceValue) error {
 	}
 	return check(C.sc_host_update_group(e.handle, C.uint16_t(id), (*C.uint8_t)(unsafe.Pointer(&data[0])), C.size_t(len(data))))
 }
+
+// RequestGroup queues and persists a resource-group snapshot request on an enrolled server.
+// Unknown group IDs fail; no bytes are transferred automatically.
 func (e *Endpoint) RequestGroup(id uint16) error {
 	if err := e.valid(); err != nil {
 		return err
@@ -168,7 +217,9 @@ func (e *Endpoint) RequestGroup(id uint16) error {
 	return check(C.sc_host_request_group(e.handle, C.uint16_t(id)))
 }
 
-// InspectGroup returns copied typed values and exact decimal-string counters.
+// InspectGroup returns a copied diagnostic snapshot of one group. Field values retain exact
+// integer values; revision counters are decimal strings. Device-owned values on the server are
+// last reported values.
 func (e *Endpoint) InspectGroup(id uint16) (map[string]any, error) {
 	if err := e.valid(); err != nil {
 		return nil, err
@@ -228,6 +279,9 @@ func (e *Endpoint) InspectGroup(id uint16) (map[string]any, error) {
 	}
 	return nil, &Error{"invalid"}
 }
+
+// Receive authenticates one complete protocol frame without a trusted clock. Unapproved signed
+// server enrollment fails closed; use ReceiveAt during enrollment.
 func (e *Endpoint) Receive(frame []byte) error {
 	if err := e.valid(); err != nil {
 		return err
@@ -239,7 +293,8 @@ func (e *Endpoint) Receive(frame []byte) error {
 	return check(C.sc_host_receive(e.handle, p, C.size_t(len(frame))))
 }
 
-// Outbound returns nil,nil when idle. Buffer and budget failures retain work.
+// Outbound generates at most one frame within budget and capacity byte limits. An idle endpoint
+// returns no frame. Bounds failures retain pending work. Generating a frame never delivers it.
 func (e *Endpoint) Outbound(budget, capacity int) ([]byte, error) {
 	if err := e.valid(); err != nil {
 		return nil, err
@@ -259,7 +314,8 @@ func (e *Endpoint) Outbound(budget, capacity int) ([]byte, error) {
 	return buffer[:int(size)], nil
 }
 
-// Inspect returns exact decimal strings for 64-bit counters.
+// Inspect returns copied public-state diagnostics with uint64 counters as decimal strings. No
+// private keys are exported, and this snapshot is not a restorable native context.
 func (e *Endpoint) Inspect() (map[string]any, error) {
 	if err := e.valid(); err != nil {
 		return nil, err
@@ -272,6 +328,9 @@ func (e *Endpoint) Inspect() (map[string]any, error) {
 	err := json.Unmarshal([]byte(C.GoString((*C.char)(unsafe.Pointer(&buffer[0])))), &state)
 	return state, err
 }
+
+// Fail injects fixture-only failures into the next count storage, random or crypto operations.
+// Zero clears the selected counter. This is not an application recovery API.
 func (e *Endpoint) Fail(operation string, count uint32) error {
 	if err := e.valid(); err != nil {
 		return err
@@ -284,7 +343,8 @@ func (e *Endpoint) Fail(operation string, count uint32) error {
 	return check(C.sc_host_fail(e.handle, p, C.uint(count)))
 }
 
-// FixturePublicKey derives a public key from a TEST provisioning seed.
+// FixturePublicKey derives a public key from a 32-byte fixture seed. Use independently generated
+// provisioning secrets for real deployments.
 func FixturePublicKey(seed []byte) ([]byte, error) {
 	p, err := ptr32(seed, false)
 	if err != nil {
@@ -296,6 +356,9 @@ func FixturePublicKey(seed []byte) ([]byte, error) {
 	}
 	return result, nil
 }
+
+// FixtureRevision provides fixture-only revision seeding for uint64 boundary tests. Requires an
+// explicitly testing-enabled native library; production builds reject it.
 func (e *Endpoint) FixtureRevision(revision uint64) error {
 	if err := e.valid(); err != nil {
 		return err
@@ -303,11 +366,20 @@ func (e *Endpoint) FixtureRevision(revision uint64) error {
 	return check(C.sc_host_fixture_revision(e.handle, C.uint64_t(revision)))
 }
 
-// Enrollment methods are trusted application operations, never relay commands.
+// EnrollmentEnable persistently enables signed enrollment before registration. This mode cannot
+// be disabled.
 func (e *Endpoint) EnrollmentEnable() error { return check(C.sc_host_enrollment_enable(e.handle)) }
+
+// EnrollmentBegin authorizes a new server enrollment session. now and expires use the same
+// trusted server clock and application-defined units; expires must be greater than now. A fresh
+// challenge replaces any prior candidate.
 func (e *Endpoint) EnrollmentBegin(now, expires uint64) error {
 	return check(C.sc_host_enrollment_begin(e.handle, C.uint64_t(now), C.uint64_t(expires)))
 }
+
+// EnrollmentApprove approves the exact 32-byte challenge and candidate Ed25519 key at trusted
+// server time now. The application must authorize the serial/session/key binding. Stale or
+// expired approvals fail.
 func (e *Endpoint) EnrollmentApprove(challenge, key []byte, now uint64) error {
 	c, err := ptr32(challenge, false)
 	if err != nil {
@@ -319,7 +391,13 @@ func (e *Endpoint) EnrollmentApprove(challenge, key []byte, now uint64) error {
 	}
 	return check(C.sc_host_enrollment_approve(e.handle, c, k, C.uint64_t(now)))
 }
+
+// EnrollmentCancel cancels an unregistered server session durably. This does not revoke an
+// enrolled peer.
 func (e *Endpoint) EnrollmentCancel() error { return check(C.sc_host_enrollment_cancel(e.handle)) }
+
+// ReceiveAt authenticates one complete frame using trusted server time now for enrollment
+// expiry. Accepted changes are persisted; responses remain pending for outbound transport.
 func (e *Endpoint) ReceiveAt(frame []byte, now uint64) error {
 	if len(frame) == 0 {
 		return &Error{"bounds"}

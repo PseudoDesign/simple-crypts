@@ -16,3 +16,12 @@ sdk_binary(
     sdk_marker = "@rust_sdk//:bin/rustc",
     shared = "//providers/host:libsimplecrypts_testing",
 )
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
+)
+
+exports_files(["main.rs"])

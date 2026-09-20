@@ -40,7 +40,10 @@ _lib = _ffi.dlopen(os.environ.get("SIMPLECRYPTS_LIB", str(_default)))
 
 
 class Error(Exception):
+    """Native failure with its numeric code and stable host status token."""
+
     def __init__(self, code):
+        """Construct a native error from its numeric status code."""
         self.code = code
         self.status = _ffi.string(_lib.sc_host_status(code)).decode("ascii")
         super().__init__(self.status)
@@ -60,13 +63,20 @@ def _bytes32(value, optional=False):
 
 
 def fixture_public_key(seed):
-    """Test provisioning helper; never derive a server secret on a real device."""
+    """Derive a 32-byte public key from a 32-byte fixture seed.
+
+    The seed must be bytes. Never derive a server secret on a real device."""
     result = _ffi.new("unsigned char[32]")
     _check(_lib.sc_host_fixture_public(_bytes32(seed), result))
     return bytes(_ffi.buffer(result, 32))
 
 
 class Endpoint:
+    """Single-owner synchronous native endpoint. Use a context manager or close explicitly.
+    Calls may raise Error for native failures or ValueError for invalid Python arguments.
+    Synchronize externally across threads.
+    """
+
     def __init__(
         self,
         role,
@@ -78,6 +88,20 @@ class Endpoint:
         provisioned_seed=None,
         random_unavailable=False,
     ):
+        """Open or create one durable native endpoint under an exclusive store lock.
+
+        Args:
+            role: "device" or "server".
+            storage: Private persistent store directory, accepted by os.fsencode.
+            serial: Between 1 and 32 printable ASCII bytes.
+            secret: Required 32-byte enrollment secret, matching an existing store.
+            server_public_key: Required 32-byte pinned Ed25519 key on devices; None on servers.
+            provisioned_seed: Optional trusted 32-byte identity seed; None generates a new identity.
+            random_unavailable: Fixture-only entropy failure switch; use False in applications.
+
+        Inputs are copied. Missing prerequisites, corrupt or incompatible stores raise Error;
+        existing identities are never silently replaced. Invalid representations raise ValueError.
+        """
         if role not in ("device", "server"):
             raise ValueError("role must be device or server")
         if "\0" in str(storage) or "\0" in serial:
@@ -104,6 +128,9 @@ class Endpoint:
         return self._handle
 
     def close(self):
+        """Close the native handle and release its exclusive store lock. Repeated closes
+        are harmless; do not use the endpoint afterward.
+        """
         if self._handle != _ffi.NULL:
             _lib.sc_host_close(self._handle)
             self._handle = _ffi.NULL
@@ -120,20 +147,40 @@ class Endpoint:
             self.close()
 
     def enrollment_enable(self):
+        """Persistently enable signed enrollment before registration. This mode cannot be disabled.
+        Raises Error on native failure; invalid argument representations raise ValueError.
+        """
         _check(_lib.sc_host_enrollment_enable(self._open()))
 
     def enrollment_begin(self, now, expires):
+        """Authorize a new server enrollment session. now and expires use the same trusted server
+        clock and application-defined units; expires must be greater than now. A fresh challenge
+        replaces any prior candidate. Raises Error on native failure; invalid argument
+        representations raise ValueError.
+        """
         _check(_lib.sc_host_enrollment_begin(self._open(), now, expires))
 
     def enrollment_approve(self, challenge, key, now):
+        """Approve the exact 32-byte challenge and candidate Ed25519 key at trusted server time
+        now. The application must authorize the serial/session/key binding. Stale or expired
+        approvals fail. Raises Error on native failure; invalid argument representations raise
+        ValueError.
+        """
         _check(
             _lib.sc_host_enrollment_approve(self._open(), _bytes32(challenge), _bytes32(key), now)
         )
 
     def enrollment_cancel(self):
+        """Cancel an unregistered server session durably. This does not revoke an enrolled peer.
+        Raises Error on native failure; invalid argument representations raise ValueError.
+        """
         _check(_lib.sc_host_enrollment_cancel(self._open()))
 
     def receive_at(self, frame, now):
+        """Authenticate one complete frame using trusted server time now for enrollment expiry.
+        Accepted changes are persisted; responses remain pending for outbound transport. Raises
+        Error on native failure; invalid argument representations raise ValueError.
+        """
         if not isinstance(frame, bytes):
             raise ValueError("frame must be bytes")
         _check(_lib.sc_host_receive_at(self._open(), frame, len(frame), now))
@@ -145,16 +192,33 @@ class Endpoint:
         return value
 
     def set_credits_issued(self, total):
+        """Set the cumulative issued total on an enrolled server. The uint64 total must not
+        decrease. Success commits locally and queues work; it does not deliver a frame. Raises
+        Error on native failure; invalid argument representations raise ValueError.
+        """
         _check(_lib.sc_host_set_credits_issued(self._open(), self._uint64(total)))
 
     def consume_credits(self, amount):
+        """Consume a positive uint64 amount on an enrolled device. Insufficient credits fail with
+        conflict; overflow fails with exhausted. The server learns consumption through a later
+        requested report. Raises Error on native failure; invalid argument representations raise
+        ValueError.
+        """
         _check(_lib.sc_host_consume_credits(self._open(), self._uint64(amount)))
 
     def request_credit_status(self):
+        """Persist a new credit report request on an enrolled server. Exchange the resulting
+        request, response and receipt through application-owned transport. Raises Error on
+        native failure; invalid argument representations raise ValueError.
+        """
         _check(_lib.sc_host_request_credit_status(self._open()))
 
     def update_group(self, group_id, updates):
-        """Atomically apply [(field_id, type, value)], validated by the schema."""
+        """Atomically apply updates to group_id, validated by the configured schema.
+
+        updates is a sequence of (field_id, type, value) triples. Fields must be
+        locally owned, unique and correctly typed. Accepted updates persist;
+        validation failures leave the group unchanged. Native failures raise Error."""
         types = {"uint64": 1, "int64": 2, "bool": 3, "text": 4, "bytes": 5}
         data = bytearray()
         for field, kind, value in updates:
@@ -181,11 +245,20 @@ class Endpoint:
         _check(_lib.sc_host_update_group(self._open(), group_id, bytes(data), len(data)))
 
     def request_group(self, group_id):
+        """Queue and persist a group_id snapshot request on an enrolled server. Unknown group
+        IDs fail; no bytes are transferred automatically. Raises Error on native failure;
+        invalid argument representations raise ValueError.
+        """
         if not 0 < group_id < 65536:
             raise ValueError("invalid group")
         _check(_lib.sc_host_request_group(self._open(), group_id))
 
     def inspect_group(self, group_id):
+        """Return a copied diagnostic snapshot of group_id. Field values retain exact integer
+        values; revision counters are decimal strings. Device-owned values on the server are
+        last reported values. Raises Error on native failure; invalid argument representations
+        raise ValueError.
+        """
         if not 0 < group_id < 65536:
             raise ValueError("invalid group")
         out = _ffi.new("char[1024]")
@@ -211,11 +284,19 @@ class Endpoint:
         return result
 
     def receive(self, frame):
+        """Authenticate one complete protocol frame without a trusted clock. Unapproved signed
+        server enrollment fails closed; use receive_at during enrollment. Raises Error on native
+        failure; invalid argument representations raise ValueError.
+        """
         if not isinstance(frame, bytes):
             raise ValueError("frame must be bytes")
         _check(_lib.sc_host_receive(self._open(), frame, len(frame)))
 
     def outbound(self, budget=512, capacity=512):
+        """Generate at most one frame within budget and capacity byte limits. An idle endpoint
+        returns no frame. Bounds failures retain pending work. Generating a frame never delivers
+        it. Raises Error on native failure; invalid argument representations raise ValueError.
+        """
         if not 0 <= capacity <= 65536 or not 0 <= budget <= 2**32 - 1:
             raise ValueError("invalid buffer or byte budget")
         output = _ffi.new("unsigned char[]", max(1, capacity))
@@ -227,16 +308,29 @@ class Endpoint:
         return bytes(_ffi.buffer(output, length[0]))
 
     def inspect(self):
+        """Return copied public-state diagnostics with uint64 counters as decimal strings. No
+        private keys are exported, and this snapshot is not a restorable native context. Raises
+        Error on native failure; invalid argument representations raise ValueError.
+        """
         output = _ffi.new("char[4096]")
         _check(_lib.sc_host_inspect(self._open(), output, 4096))
         return json.loads(_ffi.string(output))
 
     def fail(self, operation, count=1):
+        """Fixture-only injection: fail the next count calls of the selected operation
+        (storage, random or crypto fault name). Zero
+        clears the selected counter. This is not an application recovery API. Raises Error on
+        native failure; invalid argument representations raise ValueError.
+        """
         if not 0 <= count <= 2**32 - 1 or "\0" in operation:
             raise ValueError("invalid fault request")
         _check(_lib.sc_host_fail(self._open(), operation.encode(), count))
 
     def fixture_revision(self, revision):
+        """Fixture-only revision seeding for uint64 boundary tests. Requires an explicitly testing-
+        enabled native library; production builds reject it. Raises Error on native failure;
+        invalid argument representations raise ValueError.
+        """
         if not 0 <= revision <= 2**64 - 1:
             raise ValueError("revision out of range")
         _check(_lib.sc_host_fixture_revision(self._open(), revision))

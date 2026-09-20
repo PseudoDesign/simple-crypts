@@ -1,6 +1,17 @@
+/** @module web/endpoint */
 /* The same adapter is exercised in Node tests and isolated browser workers. */
 const encoder = new TextEncoder();
+/**
+ * Encode bytes as lowercase hexadecimal without changing the input.
+ * @param {Uint8Array} bytes Bytes to encode.
+ * @returns {string} Hexadecimal representation.
+ */
 export const hex = (bytes) => Array.from(bytes, (n) => n.toString(16).padStart(2, '0')).join('');
+/**
+ * Decode exactly one 32-byte public key from hexadecimal.
+ * @param {string} text A 64-character hexadecimal key.
+ * @returns {Uint8Array} Fresh key bytes; malformed input throws.
+ */
 export function unhex(text) {
   if (!/^[0-9a-f]{64}$/i.test(text)) throw new Error('Expected a 32-byte key');
   return Uint8Array.from(text.match(/../g), (n) => parseInt(n, 16));
@@ -26,19 +37,41 @@ function validText(value) {
     throw new Error('Text must be valid UTF-8 without NUL');
   return encoder.encode(value);
 }
+/**
+ * Worker-owned adapter for one guided-demo WebAssembly instance. Commands are synchronous native operations wrapped by an async JS interface. State is temporary and belongs to this instance.
+ */
 export class Endpoint {
+  /**
+   * Wrap one isolated guided-demo Wasm instance.
+   * @param {object} module Emscripten module with scw exports.
+   */
   constructor(module) {
     this.m = module;
     this.initialized = false;
   }
+  /**
+   * Copy input bytes into the instance-owned bridge buffer.
+   * @param {Uint8Array} bytes Input bytes.
+   * @param {number} [offset=0] Offset within the 4096-byte buffer.
+   */
   put(bytes, offset = 0) {
     if (!(bytes instanceof Uint8Array) || bytes.length + offset > 4096)
       throw new Error('Input exceeds buffer');
     this.m.HEAPU8.set(bytes, this.m._scw_input() + offset);
   }
+  /**
+   * Copy public diagnostics; this is not a restorable native context.
+   * @returns {object|null} Public state with exact decimal counters.
+   */
   state() {
     return JSON.parse(this.m.UTF8ToString(this.m._scw_state()));
   }
+  /**
+   * Apply one guided-demo command. Generation, initialization, enrollment, credit, receive and transmit commands delegate to the C bridge. Producing a frame does not deliver it.
+   * @param {string} command Command name.
+   * @param {object} [args] Command-specific inputs; uint64 values must be exact.
+   * @returns {Promise<object>} Native status, copied state and optional frame; malformed inputs reject.
+   */
   async command(command, args = {}) {
     const m = this.m;
     let status = 0,

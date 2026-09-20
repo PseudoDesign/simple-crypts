@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bindings" / "python"))
-from simplecrypts import Endpoint, Error, fixture_public_key
+from simplecrypts import Endpoint, Error
 
 
 def fails(operation):
@@ -51,7 +51,7 @@ def main():
                 device.receive(server.outbound())
                 assert server.inspect()["credits_consumed"] == str(2**53 + 9)
                 for value in [2**64, True, 1.5, -1]:
-                    fails(lambda: device.consume_credits(value))
+                    fails(lambda value=value: device.consume_credits(value))
                 fails(lambda: device.outbound(capacity=-1))
                 fails(lambda: device.receive(bytearray(frame)))
                 fails(lambda: device.receive(bytes(513)))

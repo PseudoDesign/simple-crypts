@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Bazel action driver for the pinned Emscripten source build (no network)."""
 
-import json, os, shutil, subprocess, sys, tempfile
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 

@@ -4,10 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 filegroup(
     name = "sources",
-    srcs = glob([
-        "*.go",
-        "go.mod",
-    ]),
+    srcs = ["go.mod"] + glob(["*.go"]),
 )
 
 sdk_test(
@@ -25,3 +22,25 @@ sdk_test(
 )
 
 exports_files(["resources.go"])
+
+# Package-local files avoid following build-output or SDK directory symlinks.
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+    visibility = ["//visibility:public"],
+)
+
+sdk_test(
+    name = "lint",
+    srcs = [
+        ":sources",
+        "//providers/host:sc_host.h",
+    ],
+    kind = "go",
+    module = "bindings/go",
+    quality = True,
+    sdk = "@go_sdk//:files",
+    sdk_marker = "@go_sdk//:bin/go",
+    shared = "//providers/host:libsimplecrypts_testing",
+    test_build = True,
+)

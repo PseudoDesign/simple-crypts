@@ -1,6 +1,8 @@
 """Cross-language resource and credit contract with a hostile deterministic relay."""
 
-import argparse, base64, random
+import argparse
+import base64
+import random
 from coordinator import Relay, replay
 
 
@@ -257,7 +259,7 @@ def generated_schedule(r):
     settle(r)
     consumed = 0
     history = []
-    for i in range(35):
+    for _ in range(35):
         d.ok("consume", amount="1")
         consumed += 1
         if rng.randrange(3) == 0:

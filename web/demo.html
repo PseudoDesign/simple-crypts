@@ -29,9 +29,11 @@
       </nav>
     </header>
     <main>
-      <aside id="guide-popup" class="guide-popup" role="region" aria-label="Step guidance">
+      <aside id="guide-popup" class="guide-popup" aria-label="Step guidance">
         <p id="guide-role" class="guide-role">Device</p>
-        <button id="hide-tip" class="hide-tip" aria-label="Hide step guidance">×</button>
+        <button type="button" id="hide-tip" class="hide-tip" aria-label="Hide step guidance">
+          ×
+        </button>
         <section id="walkthrough" class="walkthrough" aria-labelledby="tour-title">
           <div class="tour-copy" aria-live="polite" aria-atomic="true">
             <p class="eyebrow" id="tour-progress">STEP 1 OF 5</p>
@@ -45,14 +47,14 @@
           <p id="session-status" role="status">Loading the cryptographic library…</p>
           <div>
             <span class="session-label">Temporary session</span
-            ><button id="reset">Reset session ↺</button>
+            ><button type="button" id="reset">Reset session ↺</button>
           </div>
         </div>
         <p id="error" class="error" role="alert" hidden></p>
         <div class="tour-actions">
-          <button id="next" class="primary" disabled>Generate key pair →</button
-          ><button id="restart-enrollment" hidden>Restart enrollment ↺</button
-          ><button id="retry" hidden>Try this message again</button>
+          <button type="button" id="next" class="primary" disabled>Generate key pair →</button
+          ><button type="button" id="restart-enrollment" hidden>Restart enrollment ↺</button
+          ><button type="button" id="retry" hidden>Try this message again</button>
         </div>
         <details id="packet-inspector">
           <summary>Packet details</summary>
@@ -63,7 +65,7 @@
             hidden
           >
             <p class="eyebrow" id="packet-label">PACKET DETAILS</p>
-            <h2 id="packet-title"></h2>
+            <h2 id="packet-title">Packet details</h2>
             <p class="packet-perspective">
               Sender’s view before encryption. The host forwards opaque bytes.
             </p>
@@ -88,14 +90,14 @@
               You choose the order and destination.<br />Dropping a message onto an endpoint calls
               the real receiver.
             </p>
-            <label class="budget" for="budget"
+            <label class="budget"
               >Budget per opportunity
               <span
                 ><input id="budget" type="number" min="0" max="512" step="1" value="512" />
                 bytes</span
               ></label
             >
-            <button class="dropzone hold" data-destination="relay">
+            <button type="button" class="dropzone hold" data-destination="relay">
               <strong>Hold here</strong><span>Delay delivery for as long as you like</span>
             </button>
             <div id="queue" class="queue message-tray">
@@ -152,7 +154,7 @@
           </header>
           <p class="guided-state" id="device-summary"></p>
           <p class="packet-result" id="device-result" role="status" hidden></p>
-          <div class="identity-card" aria-label="Device identity and keys">
+          <div class="identity-card" role="group" aria-label="Device identity and keys">
             <span class="key-label">Unique ID · serial number</span
             ><code id="device-unique-id" class="device-unique-id">mcu-0001</code>
             <span class="key-label">Public key · Ed25519</span
@@ -170,6 +172,7 @@
               <div class="credit-value">
                 <strong id="device-consumed">—</strong
                 ><button
+                  type="button"
                   id="consume-credit"
                   class="credit-plus"
                   aria-label="Consume 25 credits"
@@ -201,8 +204,8 @@
             </div>
           </form>
           <div class="endpoint-actions">
-            <button data-transmit="device" class="send">Create message →</button
-            ><button data-reboot="device" class="quiet">Reboot</button>
+            <button type="button" data-transmit="device" class="send">Create message →</button
+            ><button type="button" data-reboot="device" class="quiet">Reboot</button>
           </div>
           <details>
             <summary>Identity &amp; revisions</summary>
@@ -220,7 +223,7 @@
           </header>
           <p class="guided-state" id="server-summary"></p>
           <p class="packet-result" id="server-result" role="status" hidden></p>
-          <div class="identity-card" aria-label="Server keys">
+          <div class="identity-card" role="group" aria-label="Server keys">
             <span class="key-label">Public key · Ed25519</span
             ><code id="server-public-key" class="public-key">Not generated yet</code>
             <span class="key-label private-label">Private key</span>
@@ -241,6 +244,7 @@
               <div class="credit-value">
                 <strong id="server-issued" class="name">0</strong
                 ><button
+                  type="button"
                   id="add-credit"
                   class="credit-plus"
                   aria-label="Add 100 credits"
@@ -259,14 +263,16 @@
           <form id="issue-form">
             <label for="total">Issue cumulative credits <span>uint64 total</span></label>
             <div class="input-row">
-              <input id="total" value="100" required /><button type="submit">Update</button>
+              <input type="text" id="total" value="100" required /><button type="submit">
+                Update
+              </button>
             </div>
           </form>
           <div class="endpoint-actions">
-            <button id="begin-enrollment">Authorize session</button
-            ><button id="approve-enrollment">Approve proposed key</button
-            ><button data-transmit="server" class="send">← Create message</button
-            ><button data-reboot="server" class="quiet">Reboot</button>
+            <button type="button" id="begin-enrollment">Authorize session</button
+            ><button type="button" id="approve-enrollment">Approve proposed key</button
+            ><button type="button" data-transmit="server" class="send">← Create message</button
+            ><button type="button" data-reboot="server" class="quiet">Reboot</button>
           </div>
           <details>
             <summary>Identity &amp; revisions</summary>
@@ -280,10 +286,10 @@
             <h2>Message log</h2>
             <span>Drag any saved packet to send it again · latest 16 attempts</span>
           </header>
-          <div id="message-log" aria-label="Draggable packet log"></div>
+          <div id="message-log" role="group" aria-label="Draggable packet log"></div>
         </div>
-        <aside class="clock-panel">
-          <button id="advance-time">Server time +10 min</button
+        <aside class="clock-panel" aria-label="Simulated server clock">
+          <button type="button" id="advance-time">Server time +10 min</button
           ><small id="clock-result">Expiration is checked when a response arrives.</small>
         </aside>
       </section>
@@ -293,7 +299,7 @@
             <h2>What happened</h2>
             <span>Latest 200 events</span>
           </div>
-          <ol id="events" aria-label="Exchange history"></ol>
+          <ol id="events"></ol>
         </article>
         <article class="code-panel">
           <p class="eyebrow">THE API BEHIND THE STEP</p>

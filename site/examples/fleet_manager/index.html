@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Simple Crypts · Interactive fleet</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./style.css?v=2642f78c8f6fdbb238be">
+  <link rel="stylesheet" href="./style.css?v=5e06ec5ddfd2505251ca">
 </head>
 <body>
   <nav class="chapter-banner" aria-label="Demo chapters">
@@ -36,7 +36,7 @@
         <tbody id="fleet-rows"></tbody>
       </table></div>
       <p id="empty" class="muted">Create your first device to open its console.</p>
-      <p class="muted">Disconnect to pause delivery while a device keeps running. Reconnect to exchange pending messages.</p>
+      <p class="muted">Use Disconnect in a console’s title bar to pause delivery while its device keeps running. Reconnect to exchange pending messages.</p>
     </section>
     <section>
       <h2>Try it</h2>
@@ -62,7 +62,7 @@
   <template id="row-template">
     <tr class="device-row">
       <td><strong data-field="serial"></strong><p data-field="error" class="error" role="alert"></p><button data-action="open" class="secondary">Open console</button></td>
-      <td><p data-field="running"></p><button data-action="power" class="secondary"></button><p data-field="connection"></p><button data-action="connection" class="secondary"></button></td>
+      <td><p data-field="running"></p><button data-action="power" class="secondary"></button><p data-field="connection"></p></td>
       <td>
         <p data-field="enrollment"></p>
         <div class="row-actions">
@@ -83,6 +83,6 @@
     </tr>
   </template>
   <footer>Real encrypted messages · C++ device consoles · Browser-local storage</footer>
-  <script type="module" src="./app.mjs?v=2642f78c8f6fdbb238be"></script>
+  <script type="module" src="./app.mjs?v=5e06ec5ddfd2505251ca"></script>
 </body>
 </html>

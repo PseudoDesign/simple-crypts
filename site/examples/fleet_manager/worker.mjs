@@ -2,11 +2,11 @@
  * browser device and server peer has its own Wasm instance and identity.
  * The transport runs in response to user actions, never from a retry timer.
  */
-import createServer from './server.mjs?v=2642f78c8f6fdbb238be';
-import createDevice from './device.mjs?v=2642f78c8f6fdbb238be';
-import {Endpoint, validSerial} from './endpoint.mjs?v=2642f78c8f6fdbb238be';
-import {openDatabase, rows, saveRow, endpointStorage, clearFleet} from './storage.mjs?v=2642f78c8f6fdbb238be';
-import {exchange} from './transport.mjs?v=2642f78c8f6fdbb238be';
+import createServer from './server.mjs?v=5e06ec5ddfd2505251ca';
+import createDevice from './device.mjs?v=5e06ec5ddfd2505251ca';
+import {Endpoint, validSerial} from './endpoint.mjs?v=5e06ec5ddfd2505251ca';
+import {openDatabase, rows, saveRow, endpointStorage, clearFleet} from './storage.mjs?v=5e06ec5ddfd2505251ca';
+import {exchange} from './transport.mjs?v=5e06ec5ddfd2505251ca';
 
 const zeroKey = '00'.repeat(32);
 const fleet = new Map();
@@ -16,8 +16,11 @@ let resolveReady, rejectReady;
 const ready = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
 ready.catch(() => {});
 
-function log(entry, text) {
-  entry.activity.push(...text.split('\n'));
+function log(entry, text, level = 'info') {
+  // Debug output is opt-in per running console session. Command results and
+  // errors are always retained; this preference never changes protocol work.
+  if (level === 'debug' && !entry.debug) return;
+  entry.activity.push(...text.split('\n').map(text => ({text, level})));
   entry.activity = entry.activity.slice(-200);
 }
 
@@ -33,7 +36,7 @@ async function synchronize(entry) {
     return;
   }
   try {
-    await exchange(entry.server, entry.device, BigInt(Math.floor(Date.now() / 1000)), text => log(entry, text));
+    await exchange(entry.server, entry.device, BigInt(Math.floor(Date.now() / 1000)), text => log(entry, text, 'debug'));
   } catch (error) {
     log(entry, `error: ${error.message}`);
     throw error;
@@ -47,7 +50,7 @@ async function initialize() {
     // Retired external entries are left untouched on disk. Never repurpose an
     // existing identity or delete user state when removing an example workflow.
     if (row.kind === 'external') continue;
-    const entry = {row, activity: []};
+    const entry = {row, activity: [], debug: false};
     fleet.set(row.serial, entry);
     try {
       validSerial(row.serial);
@@ -76,8 +79,8 @@ else navigator.locks.request('simple-crypts-fleet-v1', {ifAvailable: true}, asyn
 }).catch(rejectReady);
 
 function view() {
-  return Array.from(fleet.values(), ({row, server, device, error, activity}) => ({
-    serial: row.serial, running: Boolean(device), connected: row.connected !== false, error, activity,
+  return Array.from(fleet.values(), ({row, server, device, error, activity, debug}) => ({
+    serial: row.serial, running: Boolean(device), connected: row.connected !== false, error, activity, debug,
     server: server?.state(), device: device?.state(),
   }));
 }
@@ -88,7 +91,7 @@ async function create(serial) {
   const row = {serial, kind: 'browser', phase: 'creating', running: true, connected: true};
   await saveRow(db, row, true);
   savedSerials.add(serial);
-  const entry = {row, activity: []};
+  const entry = {row, activity: [], debug: false};
   fleet.set(serial, entry);
   try {
     entry.server = await openEndpoint(row, 'server', true);
@@ -119,6 +122,11 @@ async function dispatch({command, serial, args = {}}) {
   if (command === 'create') { await create(serial); return {}; }
   const entry = fleet.get(serial);
   if (!entry) throw new Error('Unknown serial.');
+  if (command === 'debug') {
+    if (typeof args.enabled !== 'boolean') throw new Error('Debug setting must be boolean.');
+    entry.debug = args.enabled;
+    return {};
+  }
   if (entry.error) throw new Error(entry.error);
   const now = BigInt(Math.floor(Date.now() / 1000));
   switch (command) {
@@ -137,7 +145,7 @@ async function dispatch({command, serial, args = {}}) {
         request: 'Server requested a fresh consumption report.'};
       if (!Object.hasOwn(labels, args.command)) throw new Error('Unknown server command.');
       await entry.server.server(args.command, args, now);
-      log(entry, labels[args.command]);
+      log(entry, labels[args.command], 'debug');
       if (args.command !== 'cancel') await synchronize(entry);
       return {};
     }

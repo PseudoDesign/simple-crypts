@@ -244,3 +244,5 @@ body[data-mode="tour"] .identity-card .public-key{font-size:9px}
 @media(max-width:800px){body[data-mode="tour"] .identity-card{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:3px 4px}.clock-panel small{font-size:9px}}
 
 .clock-panel{align-self:start;border-style:solid}
+
+.guide-popup #restart-enrollment{font-size:12px;padding:8px 12px;white-space:nowrap}

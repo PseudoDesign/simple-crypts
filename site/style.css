@@ -246,3 +246,6 @@ body[data-mode="tour"] .identity-card .public-key{font-size:9px}
 .clock-panel{align-self:start;border-style:solid}
 
 .guide-popup #restart-enrollment{font-size:12px;padding:8px 12px;white-space:nowrap}
+
+.credit-value{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.credit-plus{font-size:20px;line-height:1;width:36px;min-height:36px;padding:5px;border-color:var(--green);color:var(--green);flex-shrink:0}

@@ -1,9 +1,17 @@
-import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=a7516242d268d5bfa5a3';
-import {resources} from './resources.mjs?v=a7516242d268d5bfa5a3';
-import {hex} from './endpoint.mjs?v=a7516242d268d5bfa5a3';
+import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=ce7f8127533dcfc3d092';
+import {resources} from './resources.mjs?v=ce7f8127533dcfc3d092';
+import {hex} from './endpoint.mjs?v=ce7f8127533dcfc3d092';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0,chapter='trust',consumedLocally=false;
+let errorLesson=-1,errorDone=false,errorOrigin=null;
+const errorLessons=[
+ {role:'device',title:'Try spending more than you have.',text:'Ask the device to consume one more credit than its available balance. The library should reject the debit and keep the total unchanged.',button:'Try overspending',command:'consume',args:()=>({amount:(BigInt(lab.states.device.credits_issued)-BigInt(lab.states.device.credits_consumed)+1n).toString()}),status:'conflict',reason:'The debit exceeds the device’s accepted credit balance.'},
+ {role:'device',title:'Try an invalid amount.',text:'A consumption amount must be greater than zero. Try consuming zero credits.',button:'Try consuming zero',command:'consume',args:()=>({amount:'0'}),status:'argument',reason:'Consumption must be a positive amount.'},
+ {role:'server',title:'Try taking issued credits back.',text:'Issued credits are a cumulative total. Try lowering the server’s total by one.',button:'Try lowering issuance',command:'issue',args:()=>({total:(BigInt(lab.states.server.credits_issued)-1n).toString()}),status:'conflict',reason:'Cumulative issued credits cannot decrease.'},
+ {role:'device',title:'Try a corrupted packet.',text:'Turn Corruption on for the highlighted receipt, then drag it to the device. Altering encrypted bytes should fail authentication.',status:'authentication',reason:'The packet failed authentication; its contents were not accepted.'},
+ {role:'server',title:'Try sending a packet the wrong way.',text:'Drag the highlighted server receipt back onto the server. A packet meant for the device cannot be accepted by its sender.',status:'protocol',reason:'The packet’s direction is wrong for this recipient.'}
+];
 const lab=new Lab(render);
 const logCorruption=new Map();
 function packetView(id){
@@ -21,7 +29,7 @@ function rejectionReason(result){
  return reasons[result.status]??`The library rejected this operation: ${result.status}.`;
 }
 let sandboxRole='device';
-function guideRole(){if(rejectionRole)return rejectionRole;return mode==='sandbox'?sandboxRole:step<0?'server':completed?tour[step].target:original?.from??'server';}
+function guideRole(){if(errorLesson>=0)return errorLessons[errorLesson].role;if(chapter==='credits'&&step===5&&completed&&!consumedLocally)return 'device';if(rejectionRole)return rejectionRole;return mode==='sandbox'?sandboxRole:step<0?'server':completed?tour[step].target:original?.from??'server';}
 function positionTip(){
   const role=guideRole(),popup=$('guide-popup'),panel=$(role+'-panel');
   popup.dataset.role=role;
@@ -166,8 +174,8 @@ function render(){
   for(const el of document.querySelectorAll('.lanes button,.lanes input,#message-log button,#advance-time'))el.disabled=locked;
   for(const el of document.querySelectorAll('.endpoint form button,.endpoint form input,[data-transmit],[data-reboot],#budget'))el.disabled=locked||mode!=='sandbox';
   for(const el of document.querySelectorAll('[data-transmit],[data-action="duplicate"],[data-replay]'))el.disabled=el.disabled||lab.queue.length>=64;
-  for(const el of document.querySelectorAll('[data-select]')){el.querySelector('.packet-title').textContent=`⠿ #${Math.abs(Number(el.dataset.select))} · ${packetView(Number(el.dataset.select)).from==='device'?'Device → Server':'Server → Device'}`;el.draggable=!locked;el.setAttribute('aria-disabled',String(locked));el.tabIndex=locked?-1:0;el.closest('.packet').classList.toggle('selected',Number(el.dataset.select)===selected);el.closest('.packet').classList.toggle('tour-message',mode==='tour'&&!completed&&Number(el.closest('.packet').dataset.origin)===expected);}
-  for(const zone of document.querySelectorAll('[data-destination]')){zone.disabled=locked;zone.dataset.dropEnabled=String(!locked);zone.classList.toggle('suggested',step>=0&&!completed&&zone.dataset.destination===tour[step].target);zone.setAttribute('aria-describedby','move-hint');}
+  for(const el of document.querySelectorAll('[data-select]')){el.querySelector('.packet-title').textContent=`⠿ #${Math.abs(Number(el.dataset.select))} · ${packetView(Number(el.dataset.select)).from==='device'?'Device → Server':'Server → Device'}`;el.draggable=!locked;el.setAttribute('aria-disabled',String(locked));el.tabIndex=locked?-1:0;el.closest('.packet').classList.toggle('selected',Number(el.dataset.select)===selected);el.closest('.packet').classList.toggle('tour-message',mode==='tour'&&(!completed||errorLesson>=3&&!errorDone)&&Number(el.closest('.packet').dataset.origin)===expected);}
+  for(const zone of document.querySelectorAll('[data-destination]')){zone.disabled=locked;zone.dataset.dropEnabled=String(!locked);zone.classList.toggle('suggested',errorLesson>=3&&!errorDone?zone.dataset.destination===errorLessons[errorLesson].role:step>=0&&!completed&&zone.dataset.destination===tour[step].target);zone.setAttribute('aria-describedby','move-hint');}
   $('restart-enrollment').disabled=locked;
   const enrollmentDone=chapter==='trust'&&step===2&&completed;
   $('restart-enrollment').hidden=!enrollmentDone&&!rejectionRole;
@@ -177,14 +185,18 @@ function render(){
   $('approve-enrollment').disabled=locked||mode!=='sandbox'||!lab.states.server||lab.states.server.candidate_revision==='0';
   $('packet-inspector').hidden=mode!=='tour'||step<0;
   $('experiment-tools').hidden=true;
-  $('next').hidden=mode==='tour'&&step>=0&&!completed;
+  const waitForPlus=chapter==='credits'&&(step<0||step===5&&completed&&!consumedLocally);
+  $('add-credit').hidden=$('consume-credit').hidden=chapter!=='credits';
+  $('add-credit').disabled=locked||errorLesson>=0||!(step<0||step===8&&completed);
+  $('consume-credit').disabled=locked||errorLesson>=0||!(step===5&&completed&&!consumedLocally||step===8&&completed);
+  $('next').hidden=waitForPlus||(errorLesson>=0?errorLesson>=3&&!errorDone:mode==='tour'&&step>=0&&!completed);
   $('next').disabled=locked||(mode==='tour'&&step>=0&&!completed);
   $('retry').hidden=true;
   document.body.dataset.busy=String(busy);document.body.dataset.ready=String(lab.ready);
   positionTip();
   text('session-status',!lab.ready?'Initializing local endpoints…':busy?'Running the library…':mode==='sandbox'?'Sandbox · every message may be tried against either endpoint.':step<0?'Start the tour to generate the first message.':completed?'Action complete · continue when you are ready.':'Your turn · move the highlighted message.');
 }
-function intro(){logCorruption.clear();rejectionRole=null;$('restart-enrollment').hidden=true;text('clock-result','Expiration is checked when a response arrives.');for(const role of ['device','server'])$(role+'-result').hidden=true;showTip();$('packet-inspector').open=false;$('experiment-tools').open=false;setup=0;consumedLocally=false;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress',chapter==='credits'?'CREDITS · START':'STEP 1 OF 5');text('tour-title',chapter==='credits'?'Share credits between enrolled endpoints.':'Authorize an enrollment session.');text('tour-text',chapter==='credits'?'Enrollment is already complete. The server issues credits; the device consumes them locally and reports only when asked.':'The server signs a challenge for this device’s unique ID. The device already knows the server’s public key.');text('next',chapter==='credits'?'Issue 100 credits →':'Authorize session & create challenge →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An endpoint receives only when you drop a message onto it.');$('result-changes').replaceChildren();}
+function intro(){errorLesson=-1;errorDone=false;errorOrigin=null;logCorruption.clear();rejectionRole=null;$('restart-enrollment').hidden=true;text('clock-result','Expiration is checked when a response arrives.');for(const role of ['device','server'])$(role+'-result').hidden=true;showTip();$('packet-inspector').open=false;$('experiment-tools').open=false;setup=0;consumedLocally=false;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress',chapter==='credits'?'CREDITS · START':'STEP 1 OF 5');text('tour-title',chapter==='credits'?'Share credits between enrolled endpoints.':'Authorize an enrollment session.');text('tour-text',chapter==='credits'?'Click + beside the server’s Credits issued to add 100 credits and create a message for the device.':'The server signs a challenge for this device’s unique ID. The device already knows the server’s public key.');text('next',chapter==='credits'?'Issue 100 credits →':'Authorize session & create challenge →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An endpoint receives only when you drop a message onto it.');$('result-changes').replaceChildren();}
 async function run(fn){if(busy)return;const id=++operation;busy=true;$('error').hidden=true;render();try{await fn();}catch(error){if(id===operation&&error.name!=='AbortError'){text('error',error.message);$('error').hidden=false;}}finally{if(id===operation){busy=false;render();}}}
 async function place(id,target){
   if(id<0)id=lab.replay(packetView(id));
@@ -199,8 +211,14 @@ async function place(id,target){
     $('result-changes').replaceChildren();for(const change of result.changes){const li=document.createElement('li');li.textContent=`${change.field}: ${JSON.stringify(change.before)} → ${JSON.stringify(change.after)}`;$('result-changes').append(li);}
   }
   selected=null;hint();
+  if(errorLesson>=0){
+    const lesson=errorLessons[errorLesson];
+    if(!errorDone&&errorLesson>=3&&p.origin===errorOrigin&&target===lesson.role&&result?.status===lesson.status)finishError(result);
+    else if(!errorDone){text('tour-text',`${resultLabel(result)}. ${lesson.text}`);showTip();}
+    return;
+  }
   if(mode==='tour'&&step>=0&&!completed&&p.origin===expected&&target===tour[step].target&&result?.code===0){
-    showTip();completed=true;text('tour-title',step===chapterEnd()?(chapter==='credits'?'Credit exchange complete.':'Enrollment complete.') :step===2?'Enrollment complete.':'Delivered.');text('tour-text',tour[step].success);text('next',step===chapterEnd()?(chapter==='credits'?'Restart credits ↺':'On to credits →'):step===0?(lab.states.device?'Create encrypted response →':'Generate key pair & create response →'):step===1?'Approve this serial + key →':step===2?'Issue 100 credits →':step===5?'Consume 25 locally →':'Create next message →');$('progress-fill').style.width=((step-(chapter==='credits'?3:0)+1)/(chapter==='credits'?6:3)*100)+'%';
+    showTip();completed=true;text('tour-title',step===chapterEnd()?(chapter==='credits'?'Credit exchange complete.':'Enrollment complete.') :step===2?'Enrollment complete.':'Delivered.');text('tour-text',tour[step].success);text('next',step===chapterEnd()?(chapter==='credits'?'Explore errors →':'On to credits →'):step===0?(lab.states.device?'Create encrypted response →':'Generate key pair & create response →'):step===1?'Approve this serial + key →':step===2?'Issue 100 credits →':step===5?'Consume 25 locally →':'Create next message →');$('progress-fill').style.width=((step-(chapter==='credits'?3:0)+1)/(chapter==='credits'?6:3)*100)+'%';
   }else{
     showTip();if(result?.code<0)text('tour-title','Packet rejected.');text('tour-text',$('result-text').textContent);
 
@@ -213,11 +231,29 @@ $('restart-enrollment').onclick=()=>run(async()=>{
   lab.queue=[];lab.archive=[];lab.verifiedChallenge=null;intro();
 });
 $('reset').onclick=()=>startChapter(chapter);
-$('next').onclick=()=>run(async()=>{
+function finishError(result){
+  const lesson=errorLessons[errorLesson];errorDone=true;rejectionRole=null;
+  text(lesson.role+'-result',`${resultLabel(result)} · ${lesson.reason}`);$(lesson.role+'-result').hidden=false;$(lesson.role+'-result').dataset.rejected='true';
+  text('tour-title',errorLesson===errorLessons.length-1?'Error tour complete.':'The library rejected it.');
+  text('tour-text',`${resultLabel(result)}: ${lesson.reason} Credit totals stay unchanged.`);
+  text('next',errorLesson===errorLessons.length-1?'Restart credits ↺':'Next error →');showTip();
+}
+function beginError(index){
+  errorLesson=index;errorDone=false;rejectionRole=null;const lesson=errorLessons[index];
+  text('tour-progress',`ERRORS · ${index+1} OF ${errorLessons.length}`);text('tour-title',lesson.title);text('tour-text',lesson.text);text('next',lesson.button??'Deliver the packet');
+  if(index>=3){const id=lab.replay(original);errorOrigin=lab.packet(id).origin;expected=errorOrigin;}
+  showTip();
+}
+async function advanceTour(){
+  if(errorLesson>=0){
+    if(errorDone){if(errorLesson===errorLessons.length-1)await prepareChapter();else beginError(errorLesson+1);}
+    else if(errorLesson<3){const lesson=errorLessons[errorLesson];const result=await lab.command(lesson.role,lesson.command,lesson.args());if(result.status!==lesson.status)throw new Error(`Unexpected library result: ${result.status}`);finishError(result);}
+    return;
+  }
+  if(chapter==='credits'&&step===8&&completed){beginError(0);return;}
   if(mode==='sandbox'||step===chapterEnd()){mode='tour';chapter='credits';await prepareChapter();return;}
 
   if(step===1&&completed&&!lab.states.server.registered){await lab.approveEnrollment();text('tour-progress','STEP 4 OF 5');text('tour-title','The server approved this identity.');text('tour-text','Approval binds the serial and key and consumes the enrollment session.');text('next','Create confirmation →');$('progress-fill').style.width='80%';return;}
-  if(step===5&&completed&&!consumedLocally){await lab.update('device','consume',{amount:'25'});consumedLocally=true;text('tour-title','25 credits consumed locally.');text('tour-text','The device saved its consumption. No packet was created: the server still sees its last report of 0.');text('next','Request current status →');return;}
   rejectionRole=null;$('restart-enrollment').hidden=true;
   const next=step<0&&chapter==='credits'?3:step+1;const id=await tour[next].prepare(lab);if(id===null)throw new Error('No message generated. Reset the tour to start a fresh exchange.');
   step=next;completed=false;expected=lab.packet(id).origin;original={...lab.packet(id),bytes:lab.packet(id).bytes.slice()};
@@ -230,6 +266,18 @@ $('next').onclick=()=>run(async()=>{
   text('packet-wire',`Sender public key: ${sender.public_key}\nRecipient public key: ${(lab.states[original.to]?.public_key??'Not generated yet')}\n\nActual wire frame:\n${hex(original.bytes).match(/.{1,48}/g).join('\n')}`);
   $('enrollment-packet').querySelector('details').open=false;
   text('tour-progress',step<3?`ENROLLMENT · ${step+1} OF 3`:`CREDITS · ${step-2} OF 6`);text('tour-title',tour[step].title);text('tour-text',tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
+}
+$('next').onclick=()=>run(advanceTour);
+$('add-credit').onclick=()=>run(async()=>{
+  if(step<0){await advanceTour();return;}
+  const total=BigInt(lab.states.server.credits_issued)+100n;
+  if(total>18446744073709551615n)throw new Error('Credit total exceeds uint64.');
+  await lab.update('server','issue',{total:total.toString()});await lab.transmit('server');
+});
+$('consume-credit').onclick=()=>run(async()=>{
+  const result=await lab.command('device','consume',{amount:'25'});
+  text('device-result',`${resultLabel(result)} · ${result.code<0?'Not enough available credits.':'25 credits consumed locally.'}`);$('device-result').hidden=false;$('device-result').dataset.rejected=String(result.code<0);
+  if(result.code===0&&step===5){consumedLocally=true;text('tour-title','25 credits consumed locally.');text('tour-text','The device saved its consumption. No packet was created: the server still sees its last report of 0.');text('next','Request current status →');}
 });
 $('advance-time').onclick=()=>run(()=>{lab.time+=601;lab.event('Simulated server clock advanced by 601 seconds; no packet was delivered.');text('clock-result',lab.states.server.registered?'Server time advanced. Completed enrollment stays valid; drag a saved packet to see the response.':'Server time advanced. Replay an enrollment response to test the expired session.');});
 $('begin-enrollment').onclick=()=>run(()=>lab.beginEnrollment());

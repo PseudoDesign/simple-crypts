@@ -110,3 +110,5 @@ as exact strings/BigInt, never floating-point numbers. The recorded `/report/`
 evidence remains a separately attributed historical snapshot.
 
 Establish Trust ends at confirmation with suggestions to corrupt and replay saved packets or advance server time. Completed enrollment stays valid after time advances; reset the session and delay its response to explore expiration. The Credits chapter reuses a freshly enrolled pair when reached from enrollment, or completes a real local enrollment as setup when opened directly. Only credit packets appear in its message log.
+
+In Credits, + beside server issuance adds 100 and + beside device consumption spends 25. The guided exchange ends with five optional error exercises using the actual library: overspending, zero consumption, decreasing issuance, tampered ciphertext, and reflected packets. Packet exercises still require dragging; the local API exercises show their returned status without changing accepted totals.

@@ -54,18 +54,48 @@ async function creditFlow(page,touch=false){
  assert.equal(await page.locator('#chapter-credits').getAttribute('aria-current'),'step');
  assert.equal(await page.locator('#message-log .packet').count(),0);
  assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
- await next(page);const grantId=await pending(page).getAttribute('data-packet');
+ assert(await page.locator('#next').isHidden());
+ await page.locator('#add-credit').click();await ready(page);const grantId=await pending(page).getAttribute('data-packet');
  await dragPacket(page,pending(page),'#device-panel',touch);assert.equal(await page.locator('#device-issued').textContent(),'100');
  const grant=page.locator(`[data-packet="-${grantId}"]`);
  await dragPacket(page,grant,'#device-panel',touch);assert.equal(await page.locator('#device-issued').textContent(),'100');
  await next(page);await dragPacket(page,pending(page),'#server-panel',touch);assert.equal(await page.locator('#server-consumed').textContent(),'0');
  await next(page);assert.match(await pending(page).textContent(),/Receipt for request/);assert(!/Credits consumed/.test(await pending(page).textContent()));await dragPacket(page,pending(page),'#device-panel',touch);
- await next(page);assert.equal(await pending(page).count(),0);assert.equal(await page.locator('#device-consumed').textContent(),'25');assert.equal(await page.locator('#server-consumed').textContent(),'0');
+ assert(await page.locator('#next').isHidden());
+ await page.locator('#consume-credit').click();await ready(page);assert.equal(await pending(page).count(),0);assert.equal(await page.locator('#device-consumed').textContent(),'25');assert.equal(await page.locator('#server-consumed').textContent(),'0');
  await next(page);await dragPacket(page,pending(page),'#device-panel',touch);
  await next(page);await corrupt(pending(page));await dragPacket(page,pending(page),'#server-panel',touch);assert.match(await page.locator('#server-result').textContent(),/authentication/);assert.equal(await page.locator('#server-consumed').textContent(),'0');
  await corrupt(saved(page));await dragPacket(page,saved(page),'#server-panel',touch);assert.equal(await page.locator('#server-consumed').textContent(),'25');
  await next(page);await dragPacket(page,pending(page),'#device-panel',touch);assert.match(await page.locator('#tour-title').textContent(),/Credit exchange complete/);
 }
+async function errorFlow(page,touch=false){
+ if(!touch){
+  await page.locator('#add-credit').click();await ready(page);
+  assert.equal(await page.locator('#server-issued').textContent(),'200');
+  assert.equal(await page.locator('#device-issued').textContent(),'100');
+  await dragPacket(page,pending(page),'#device-panel');
+  await page.locator('#consume-credit').click();await ready(page);
+  assert.equal(await page.locator('#device-consumed').textContent(),'50');
+  assert.equal(await page.locator('#server-consumed').textContent(),'25');
+  assert.equal(await pending(page).count(),0);
+ }
+ const issued=await page.locator('#device-issued').textContent();
+ const before=await page.locator('#device-consumed').textContent();
+ await next(page);
+ for(const expected of ['conflict','argument','conflict']){
+  await next(page);assert((await page.locator('#tour-text').textContent()).startsWith(expected+' (-'));await next(page);
+ }
+ assert.match(await page.locator('#tour-title').textContent(),/corrupted packet/);
+ await corrupt(pending(page));await dragPacket(page,pending(page),'#device-panel',touch);
+ assert.match(await page.locator('#tour-text').textContent(),/authentication/);
+ await next(page);await dragPacket(page,pending(page),'#server-panel',touch);
+ assert.match(await page.locator('#tour-text').textContent(),/protocol/);
+ assert.match(await page.locator('#tour-title').textContent(),/Error tour complete/);
+ assert.equal(await page.locator('#device-consumed').textContent(),before);
+ assert.equal(await page.locator('#device-issued').textContent(),issued);
+ assert.equal(await page.locator('#server-issued').textContent(),issued);
+}
+
 try{
 for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
  const browser=await type.launch({headless:true});
@@ -109,13 +139,13 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    await dragPacket(page,saved(page),'#device-panel');assert.match(await page.locator('#device-result').textContent(),/ok \(0\).*no newer state/i);
    // Reflect the saved server confirmation back to the server and surface its actual error.
    await dragPacket(page,saved(page),'#server-panel');assert.match(await page.locator('#server-result').textContent(),/\(-\d+\).*Rejected/);
-   await creditFlow(page);
+   await creditFlow(page);await errorFlow(page);
    await page.screenshot({path:`/tmp/simple-crypts-${name}-${chapter}-log.png`,fullPage:true});console.log('PASS',name,chapter,'log workflow');
   }
   // Credits is independently accessible, with actual enrollment completed as setup.
   await page.locator('#chapter-trust').click();await ready(page);
   await page.locator('#chapter-credits').click();await ready(page);
-  await creditFlow(page);
+  await creditFlow(page);await errorFlow(page);
   await next(page);assert.equal(await page.locator('#device-issued').textContent(),'0');
   assert.equal(await page.locator('#message-log .packet').count(),0);
   await page.locator('#chapter-trust').click();await ready(page);
@@ -148,7 +178,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    const nextBox=await t.locator('#next').boundingBox(),retryBox=await t.locator('#restart-enrollment').boundingBox();
    assert(Math.abs(nextBox.y-retryBox.y)<4,'Completion actions should be side by side on touchscreens');
    await t.screenshot({path:'/tmp/simple-crypts-enrollment-complete.png',fullPage:true});
-   await creditFlow(t,true);
+   await creditFlow(t,true);await errorFlow(t,true);
    await t.screenshot({path:'/tmp/simple-crypts-touch-log.png',fullPage:true});await touch.close();
   }
   const unavailable=await browser.newContext();await unavailable.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const p=await unavailable.newPage();await p.goto(base);await p.locator('#error').waitFor({state:'visible'});assert.match(await p.locator('#error').textContent(),/randomness/);await unavailable.close();

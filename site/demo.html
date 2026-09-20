@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="Run a real encrypted device/server exchange. Drop packets, change state, and watch the endpoints recover.">
 <meta name="color-scheme" content="light"><title>Simple Crypts · See the exchange</title>
-<link rel="stylesheet" href="./style.css?v=b8984e7f5b3fbea8601f"><script type="module" src="./app.mjs?v=b8984e7f5b3fbea8601f"></script>
+<link rel="stylesheet" href="./style.css?v=43851a847fb842c03057"><script type="module" src="./app.mjs?v=43851a847fb842c03057"></script>
 </head>
 <body data-mode="tour" data-phase="intro">
 <nav class="chapter-banner" aria-label="Demo chapters"><a class="home-link" href="./" aria-label="Simple Crypts home">Home</a><a id="chapter-trust" href="#establish-trust" aria-current="step">1 · Establish trust</a><a id="chapter-credits" href="#credits" title="Issue, consume, and report credits">2 · Credits</a></nav>
@@ -61,6 +61,6 @@
 sc_set_credits_issued(&amp;server, 100);
 // Forward opaque frames when a link is available.</code></pre><p>The same C core powers the language bindings and this demo. Encryption, enrollment, revisions, and receipts run inside the library.</p><div class="code-links"><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/core/sc.h">C API ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/examples/python_api.py">Python example ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/bindings/rust/src/lib.rs">Rust ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/bindings/go/simplecrypts.go">Go ↗</a></div></article></section>
 <section class="notes"><h2>What this demonstrates</h2><div><p><strong>Private contents. Visible delivery.</strong> The host can read signed challenges and public routing information. Device responses and confirmations are encrypted. Endpoint panels show each endpoint’s own knowledge; they are not a host decryption view.</p><p><strong>Agreement needs delivery.</strong> Cryptography detects tampering; it cannot make the host forward a message. Updates stay pending until the required authenticated report or receipt arrives.</p><p><strong>A local simulation with real code.</strong> Both endpoints run in this tab, each in its own worker. Reboot preserves simulated storage; refresh or Reset starts fresh. This is not a hardware keystore or a production server.</p></div></section>
-</main><footer><span>Simple Crypts · show, don’t tell. <a href="./demo.json">Build details</a> · <a href="./THIRD_PARTY_NOTICES.txt?v=b8984e7f5b3fbea8601f">Notices</a></span><a href="./report/">Explore the cross-language test evidence →</a></footer>
+</main><footer><span>Simple Crypts · show, don’t tell. <a href="./demo.json">Build details</a> · <a href="./THIRD_PARTY_NOTICES.txt?v=43851a847fb842c03057">Notices</a></span><a href="./report/">Explore the cross-language test evidence →</a></footer>
 <noscript>This demo needs JavaScript and WebAssembly. The <a href="./report/">test evidence</a> is available separately.</noscript>
 </body></html>

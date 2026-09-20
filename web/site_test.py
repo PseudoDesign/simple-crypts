@@ -21,6 +21,31 @@ class SiteTest(unittest.TestCase):
             self.assertEqual(destination.read_bytes(),b'new')
             self.assertFalse((Path(tmp)/'published.wasm.tmp').exists())
 
+    def test_api_replacement_removes_stale_pages(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/'site'; api=Path(tmp)/'generated'
+            (root/'api').mkdir(parents=True); (api/'html').mkdir(parents=True)
+            (root/'api/obsolete.html').write_text('old')
+            (api/'html/index.html').write_text('new')
+            site.copy_api(api,root)
+            self.assertFalse((root/'api/obsolete.html').exists())
+            self.assertEqual((root/'api/index.html').read_text(),'new')
+
+    def test_api_inventory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/'site';shutil.copytree('web/site',root,copy_function=shutil.copyfile)
+            page=root/'api/index.html'; original=page.read_bytes()
+            page.write_bytes(original+b'changed')
+            with self.assertRaisesRegex(ValueError,'Changed API asset'):
+                site.verify(root,require_commit=False)
+            page.unlink()
+            with self.assertRaisesRegex(ValueError,'API asset inventory'):
+                site.verify(root,require_commit=False)
+            page.write_bytes(original)
+            (root/'api/obsolete.html').write_text('stale')
+            with self.assertRaisesRegex(ValueError,'API asset inventory'):
+                site.verify(root,require_commit=False)
+
     def test_asset_graph_is_versioned(self):
         root=Path('web/site')
         versions=[]

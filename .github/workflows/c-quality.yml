@@ -1,0 +1,52 @@
+name: C library quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install system prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3.12 gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi clang-18 clang-format-18 clang-tidy-18 doxygen
+          clang-format-18 --version | grep -F '18.1.3'
+          clang-tidy-18 --version | grep -F '18.1.3'
+          test "$(doxygen --version)" = '1.9.8'
+      - name: Install checksum-pinned Bazel
+        run: |
+          curl --fail --location --retry 3 https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-linux-x86_64 --output /tmp/sc-bazel
+          echo '7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694  /tmp/sc-bazel' | sha256sum --check
+          sudo install -m 755 /tmp/sc-bazel /usr/local/bin/bazel
+      - name: Bootstrap pinned SDKs
+        run: python3 tools/bootstrap.py
+      - name: Enforce quality and run regressions
+        run: |
+          bazel test //...
+          bazel build //docs:api //platforms/cortex_m4:resource_report
+      - name: Save documentation and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: c-quality
+          path: |
+            bazel-bin/docs/api
+            bazel-testlogs/**/test.log
+            bazel-testlogs/**/test.xml
+          if-no-files-found: ignore
+          retention-days: 14

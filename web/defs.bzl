@@ -12,6 +12,6 @@ wasm_build = rule(implementation = _wasm_impl, attrs = {"output": attr.string(),
 def _site_impl(ctx):
     out = ctx.actions.declare_directory(ctx.label.name)
     module = [f for f in ctx.attr.module[DefaultInfo].files.to_list() if f.extension == "mjs"][0]
-    ctx.actions.run(executable = "/usr/bin/python3", arguments = [ctx.file.driver.path, "--output", out.path, "--module", module.path, "--fleet", ctx.files.fleet[0].path], inputs = depset(ctx.files.inputs + ctx.files.fleet + [ctx.file.driver], transitive = [ctx.attr.module[DefaultInfo].files]), outputs = [out], mnemonic = "AssembleDemoSite")
+    ctx.actions.run(executable = "/usr/bin/python3", arguments = [ctx.file.driver.path, "--output", out.path, "--module", module.path, "--fleet", ctx.files.fleet[0].path, "--api", ctx.files.api[0].path], inputs = depset(ctx.files.inputs + ctx.files.fleet + ctx.files.api + [ctx.file.driver], transitive = [ctx.attr.module[DefaultInfo].files]), outputs = [out], mnemonic = "AssembleDemoSite")
     return [DefaultInfo(files = depset([out]), runfiles = ctx.runfiles(files = [out]))]
-demo_site = rule(implementation = _site_impl, attrs = {"inputs": attr.label_list(allow_files = True), "module": attr.label(default = "//web:module"), "fleet": attr.label(default = "//examples/fleet_manager:site"), "driver": attr.label(default = "//web:site.py", allow_single_file = True)})
+demo_site = rule(implementation = _site_impl, attrs = {"inputs": attr.label_list(allow_files = True), "module": attr.label(default = "//web:module"), "fleet": attr.label(default = "//examples/fleet_manager:site"), "api": attr.label(default = "//docs:api"), "driver": attr.label(default = "//web:site.py", allow_single_file = True)})

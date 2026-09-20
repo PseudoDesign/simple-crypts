@@ -15,6 +15,10 @@ def run(argv, **kwargs):
     subprocess.run(argv, check=True, **kwargs)
 
 
+C_FLAGS = ["-std=c99", "-O2", "-g", "-fPIC", "-Wall", "-Wextra",
+           "-D_POSIX_C_SOURCE=200809L"]
+
+
 def cc(config):
     output = Path(config['output']).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -22,8 +26,7 @@ def cc(config):
         objects = []
         for index, source in enumerate(config['srcs']):
             obj = str(Path(tmp) / (str(index) + '.o'))
-            run(['/usr/bin/cc', '-std=c99', '-O2', '-g', '-fPIC', '-Wall', '-Wextra',
-                 '-D_POSIX_C_SOURCE=200809L', *config['copts'],
+            run(['/usr/bin/cc', *C_FLAGS, *config['copts'],
                  *['-I' + inc for inc in config['includes']], '-c', source, '-o', obj])
             objects.append(obj)
         if config['mode'] == 'archive':

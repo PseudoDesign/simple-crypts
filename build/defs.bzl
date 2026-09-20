@@ -4,7 +4,7 @@ Every source, library, generator, and SDK file is declared as an action input.
 The C and ARM compilers are deliberately system prerequisites, not hermetic.
 """
 
-CLibrary = provider(fields = ["archives", "headers", "includes"])
+CLibrary = provider(fields = ["archives", "headers", "includes", "commands"])
 
 def _inputs(ctx):
     return depset(ctx.files.srcs + ctx.files.hdrs, transitive = [d[CLibrary].headers for d in ctx.attr.deps])
@@ -21,7 +21,7 @@ def _compile(ctx, output, mode):
 def _library_impl(ctx):
     out = ctx.actions.declare_file("lib" + ctx.label.name + ".a")
     _compile(ctx, out, "archive")
-    return [DefaultInfo(files = depset([out])), CLibrary(archives = depset([out], transitive = [d[CLibrary].archives for d in ctx.attr.deps]), headers = _inputs(ctx), includes = _includes(ctx))]
+    return [DefaultInfo(files = depset([out])), CLibrary(archives = depset([out], transitive = [d[CLibrary].archives for d in ctx.attr.deps]), headers = _inputs(ctx), includes = _includes(ctx), commands = [dict(file=f.short_path, includes=_includes(ctx).to_list(), copts=ctx.attr.copts) for f in ctx.files.srcs] + [c for d in ctx.attr.deps for c in d[CLibrary].commands])]
 
 def _binary_impl(ctx):
     out = ctx.actions.declare_file(ctx.attr.output_name or (ctx.label.name + (".so" if ctx.attr.shared else "")))
@@ -43,7 +43,7 @@ def _sodium_impl(ctx):
     stack = ctx.actions.declare_file(ctx.label.name + "_stack.txt")
     config = {"source": ctx.file.configure.dirname, "output": out.path, "stack": stack.path, "arm": ctx.attr.arm}
     ctx.actions.run(executable = "/usr/bin/python3", arguments = [ctx.file._driver.path, "sodium", json.encode(config)], inputs = depset(ctx.files.srcs + [ctx.file._driver]), outputs = [out, stack], mnemonic = "BuildSodium", progress_message = "Building pinned libsodium %s" % ("Cortex-M4" if ctx.attr.arm else "host"))
-    return [DefaultInfo(files = depset([out, stack])), CLibrary(archives = depset([out]), headers = depset(ctx.files.hdrs), includes = depset([ctx.file.configure.dirname + "/src/libsodium/include", ctx.file.configure.dirname + "/src/libsodium/include/sodium"]))]
+    return [DefaultInfo(files = depset([out, stack])), CLibrary(archives = depset([out]), headers = depset(ctx.files.hdrs), includes = depset([ctx.file.configure.dirname + "/src/libsodium/include", ctx.file.configure.dirname + "/src/libsodium/include/sodium"]), commands = [])]
 
 sodium_library = rule(implementation = _sodium_impl, attrs = {"srcs": attr.label_list(allow_files = True), "hdrs": attr.label_list(allow_files = True), "configure": attr.label(allow_single_file = True), "arm": attr.bool(), "_driver": attr.label(default = "//tools:build_action.py", allow_single_file = True)})
 
@@ -117,4 +117,19 @@ cortex_resource_report = rule(implementation = _resource_report_impl, attrs = {
     "srcs": attr.label_list(allow_files = True), "headers": attr.label_list(allow_files = True),
     "sodium": attr.label(providers = [CLibrary]), "linker": attr.label(allow_single_file = True),
     "_driver": attr.label(default = "//tools:build_action.py", allow_single_file = True),
+})
+
+
+def _analysis_database_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".json")
+    records = {}
+    for dep in ctx.attr.deps:
+        for command in dep[CLibrary].commands:
+            records[json.encode(command)] = command
+    ctx.actions.write(out, json.encode(records.values()))
+    return [DefaultInfo(files = depset([out]))]
+
+# Compilation metadata is inherited from the same libraries as the normal build.
+c_analysis_database = rule(implementation = _analysis_database_impl, attrs = {
+    "deps": attr.label_list(providers = [CLibrary]),
 })

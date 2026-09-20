@@ -4,7 +4,7 @@ import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {resolve,extname,sep} from 'node:path';
 import {chromium,firefox} from 'playwright';
 const root=resolve(process.argv[2]||'bazel-bin/web/site');
-const mime={'.html':'text/html','.mjs':'text/javascript','.css':'text/css','.wasm':'application/wasm','.json':'application/json'};
+const mime={'.html':'text/html','.mjs':'text/javascript','.js':'text/javascript','.svg':'image/svg+xml','.png':'image/png','.css':'text/css','.wasm':'application/wasm','.json':'application/json'};
 const server=createServer(async(req,res)=>{try{
  let route=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
  if(!route.startsWith('/simple-crypts/')){res.writeHead(404);return res.end();}
@@ -49,6 +49,23 @@ async function captureFailure(error){
   await writeFile(resolve(artifacts,record.name+'-failure.json'),JSON.stringify({...record,error:error.stack},null,2));
   await context.tracing.stop({path:resolve(artifacts,record.name+'-failure.zip')}).catch(()=>{});
  }
+}
+async function apiReference(page){
+ const manifest=JSON.parse(await readFile(resolve(root,'demo.json'),'utf8'));
+ if(manifest.format_version<4)return;
+ await page.goto(base);
+ await page.getByRole('link',{name:'C API',exact:true}).click();
+ await page.locator('#MSearchField').waitFor();
+ assert.match(await page.title(),/Simple Crypts C API/);
+ await page.locator('#MSearchField').pressSequentially('sc_consume_credits');
+ const result=page.locator('#MSearchResultsWindow a').filter({hasText:'sc_consume_credits'}).first();
+ await result.waitFor({state:'visible'});
+ await result.click();
+ await page.waitForURL(/api\/.*html/);
+ assert.match(await page.locator('body').innerText(),/SC_ERR_CONFLICT/);
+ await page.goto(base+'api/');
+ await page.getByRole('link',{name:'Home and demos',exact:true}).click();
+ assert.equal(new URL(page.url()).pathname,'/simple-crypts/index.html');
 }
 async function landing(page){
  const requests=[];const record=request=>requests.push(request.url());page.on('request',record);
@@ -265,7 +282,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
  const browser=await type.launch({headless:true});
  try{
   const context=await monitoredContext(browser,{viewport:{width:1366,height:768},reducedMotion:'reduce'}),page=await context.newPage(),errors=[];
-  page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));await landing(page);await lifecycle(page);
+  page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));await apiReference(page);await landing(page);await lifecycle(page);
   for(const chapter of ['trust']){
    assert(await page.locator('#message-log').isVisible());assert.equal(await page.locator('#drop-target').count(),0);assert.equal(await page.locator('.inbox,#deliver,.show-tip').count(),0);
    await page.locator('#hide-tip').click();await page.locator('#chapter-'+chapter).click();assert(await page.locator('#guide-popup').isVisible());

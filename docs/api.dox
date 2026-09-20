@@ -1,0 +1,56 @@
+/**
+@mainpage Simple Crypts C API
+
+[Home and demos](../index.html) · [Fleet](../examples/fleet_manager/index.html)
+
+The C99 core uses caller-owned bounded storage and synchronous provider callbacks.
+Applications own transport: producing a frame never delivers it. Each context represents
+one role and one peer. Serialize access externally; callbacks must not reenter that context.
+
+Start with @ref initialization and @ref host. Embedded integrations implement @ref providers.
+Use @ref enrollment before @ref credits or @ref resources; exchange complete frames through
+@ref transport. @ref fixtures contains test helpers, not application provisioning APIs.
+
+@par Working example
+The following Linux example creates a temporary server, authorizes enrollment and generates
+an invitation. A real application retains its private store directory and securely provisions
+its enrollment secret. The example does not transmit or approve anything automatically.
+@include api_example.c
+
+@anchor provider_contract
+@par Provider contract
+Callback inputs are borrowed for the synchronous call; never retain stack or output buffers.
+The provider's user state and schema descriptors must outlive the context. Report success
+only after outputs are complete. Do not publish partial results from failed callbacks.
+
+Commit compares the durable generation, atomically replaces the encoded record and advances
+the generation. Generation zero denotes absence. Reserve persists the nonce high-water mark
+before success. An uncertain storage outcome must fail closed until normal reload reconciles
+it; never roll back reservations. Reinitialize with sc_init(), never a copied sc_context or
+restored runtime nonce cursor. Private keys remain inside the provider.
+
+@par Enrollment and time
+Signed enrollment requires explicit server authorization and approval of the exact
+serial/session/key binding. The application supplies trusted server time in consistent units
+and chooses the expiry interval. sc_receive() has no trusted time and fails closed for
+unapproved signed server sessions; use sc_receive_at() instead.
+
+@par Credits and reporting
+Credits issued and consumed are cumulative uint64 totals. Consumption changes the device's
+local state. The server sees the last reported consumption until a request, response and
+receipt exchange completes. Neither setters nor requests perform transport I/O.
+
+@par Further reading
+[Protocol](https://github.com/PseudoDesign/simple-crypts/blob/main/docs/protocol.md),
+[Platform contracts](https://github.com/PseudoDesign/simple-crypts/blob/main/docs/platforms.md),
+[Resource encoding](https://github.com/PseudoDesign/simple-crypts/blob/main/docs/resources.md),
+and [Quality checks](https://github.com/PseudoDesign/simple-crypts/blob/main/docs/quality.md).
+*/
+/** @defgroup initialization Initialization and public state */
+/** @defgroup providers Provider callbacks and libsodium */
+/** @defgroup enrollment Enrollment authorization and approval */
+/** @defgroup resources Typed resource groups */
+/** @defgroup credits Cumulative credits */
+/** @defgroup transport Frame generation and reception */
+/** @defgroup host Durable Linux host API */
+/** @defgroup fixtures Test and fixture helpers */

@@ -1,7 +1,17 @@
 load("//build:defs.bzl", "py_test")
 package(default_visibility=["//visibility:public"])
-exports_files(["build_action.py", "bootstrap.py", "downloads.lock.json"])
+exports_files(["build_action.py", "bootstrap.py", "downloads.lock.json", "quality.py"])
 py_test(name="schema_check", main="check_schema.py", data=["//schema:sc.proto", "//schema:sc.options", "//schema:sc.pb.c", "//schema:sc.pb.h", "//third_party/nanopb:generator", "@protobuf_sdk//:files"])
 py_test(name="test_report_test", main="test_report_test.py", data=["test_report.py"])
 
 py_test(name="resource_schema_check",main="resource_schema.py",script_args=["--check"],data=["//schema:resources.json","//schema:test_resources.json","//schema:resources.h","//schema:test_resources.h","//bindings/python:resources.py","//bindings/rust:src/resources.rs","//bindings/go:resources.go","//web:resources.mjs"])
+
+load("//build:defs.bzl", "c_analysis_database")
+c_analysis_database(name="analysis_database", deps=["//providers/host:host", "//providers/host:host_testing"])
+QUALITY_INPUTS = ["quality.py", "build_action.py", "//:.clang-format", "//:.clang-tidy",
+    "//core:sources", "//providers/host:sources", "//providers/sodium:sources",
+    "//schema:sources", "//third_party/nanopb:sources", "//third_party/libsodium:headers"]
+py_test(name="format_check", main="quality.py", script_args=["--format-check"], data=QUALITY_INPUTS)
+py_test(name="lint", main="quality.py", script_args=["--lint", "tools/analysis_database.json"], data=QUALITY_INPUTS + [":analysis_database"])
+test_suite(name="quality", tests=[":format_check", ":lint", ":quality_test", "//docs:api_check", "//docs:example"])
+py_test(name="quality_test", main="quality_test.py", data=QUALITY_INPUTS + ["//docs:doc_inputs", "//docs:build_api.py"])

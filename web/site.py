@@ -40,13 +40,22 @@ def verify(root,require_commit=True):
     # Previously committed sites remain verifiable until the next deliberate
     # publication. New manifests must inventory the complete fleet bundle.
     version=m.get('format_version',1)
-    if version not in (1,2,3):raise ValueError('Unsupported demo manifest version')
+    if version not in (1,2,3,4):raise ValueError('Unsupported demo manifest version')
     legacy_fleet = WEB_FILES + tuple('examples/fleet_manager/' + name for name in FLEET_V2_NAMES)
-    expected=set(FILES if version==3 else legacy_fleet if version==2 else WEB_FILES)|{'endpoint.wasm.mjs','endpoint.wasm.wasm'}
+    expected=set(FILES if version>=3 else legacy_fleet if version==2 else WEB_FILES)|{'endpoint.wasm.mjs','endpoint.wasm.wasm'}
     if set(m['assets'])!=expected:raise ValueError('Unexpected or missing demo asset inventory')
     for name,sha in m['assets'].items():
         p=(root/name).resolve()
         if not p.is_relative_to(root) or digest(p)!=sha:raise ValueError('Changed demo asset: '+name)
+    if version >= 4:
+        api_assets = m.get('api_assets', {})
+        actual = {p.relative_to(root).as_posix() for p in (root/'api').rglob('*') if p.is_file()}
+        if not {'api/index.html', 'api/search/search.js'} <= set(api_assets) or set(api_assets) != actual:
+            raise ValueError('Unexpected or missing API asset inventory')
+        for name, sha in api_assets.items():
+            path = (root/name).resolve()
+            if not name.startswith('api/') or not path.is_relative_to(root/'api') or digest(path) != sha:
+                raise ValueError('Changed API asset: ' + name)
     if (root/'endpoint.wasm.wasm').read_bytes()[:4]!=b'\0asm':raise ValueError('Missing WebAssembly module')
     if 'scw_test_' in (root/'endpoint.wasm.mjs').read_text():raise ValueError('Test exports in production module')
     if version>=2:
@@ -61,7 +70,15 @@ def verify(root,require_commit=True):
         if digest(root/name)!=sha:raise ValueError('Legacy evidence asset differs: '+name)
     print('Verified live demo assets and preserved report')
 
-def assemble(output,module,source_commit,fleet="bazel-bin/examples/fleet_manager/site"):
+def copy_api(api, root):
+    """Replace the generated subtree so removed declarations leave no stale pages."""
+    destination = Path(root)/'api'
+    if destination.exists():
+        shutil.rmtree(destination)
+    shutil.copytree(Path(api)/'html', destination, copy_function=shutil.copyfile)
+
+
+def assemble(output,module,source_commit,fleet="bazel-bin/examples/fleet_manager/site",api="bazel-bin/docs/api"):
     root=Path(output);module=Path(module);root.mkdir(parents=True,exist_ok=True)
     # Snapshot inputs before writing so regeneration can target site/ itself.
     with tempfile.TemporaryDirectory() as tmp:
@@ -76,14 +93,16 @@ def assemble(output,module,source_commit,fleet="bazel-bin/examples/fleet_manager
     for name in FLEET_NAMES:copy_asset(Path(fleet)/name,fleet_output/name)
     copy_asset(module,root/'endpoint.wasm.mjs')
     copy_asset(module.with_suffix('.wasm'),root/'endpoint.wasm.wasm')
+    copy_api(api, root)
     version_assets(root)
     (root/'.nojekyll').write_text('')
-    manifest={'format_version':3,'source_commit':source_commit,'runtime':'C core + nanopb + libsodium 1.0.20 / Ed25519 identities + NaCl box / Emscripten 4.0.10','storage':'guided demo: temporary; fleet example: browser-local IndexedDB','assets':{name:digest(root/name) for name in (*FILES,'endpoint.wasm.mjs','endpoint.wasm.wasm')}}
+    manifest={'format_version':4,'source_commit':source_commit,'runtime':'C core + nanopb + libsodium 1.0.20 / Ed25519 identities + NaCl box / Emscripten 4.0.10','storage':'guided demo: temporary; fleet example: browser-local IndexedDB','assets':{name:digest(root/name) for name in (*FILES,'endpoint.wasm.mjs','endpoint.wasm.wasm')}}
+    manifest['api_assets'] = {p.relative_to(root).as_posix(): digest(p) for p in sorted((root/'api').rglob('*')) if p.is_file()}
     (root/'demo.json').write_text(json.dumps(manifest,indent=2)+'\n')
     verify(root,require_commit=source_commit!='working-tree')
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--verify-site');p.add_argument('--output');p.add_argument('--module',default='bazel-bin/web/endpoint.wasm.mjs');p.add_argument('--source-commit',default='working-tree');p.add_argument('--fleet',default='bazel-bin/examples/fleet_manager/site');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--verify-site');p.add_argument('--output');p.add_argument('--module',default='bazel-bin/web/endpoint.wasm.mjs');p.add_argument('--source-commit',default='working-tree');p.add_argument('--fleet',default='bazel-bin/examples/fleet_manager/site');p.add_argument('--api',default='bazel-bin/docs/api');a=p.parse_args()
     if a.verify_site:verify(a.verify_site)
-    elif a.output:assemble(a.output,a.module,a.source_commit,a.fleet)
+    elif a.output:assemble(a.output,a.module,a.source_commit,a.fleet,a.api)
     else:p.error('Specify --output or --verify-site')

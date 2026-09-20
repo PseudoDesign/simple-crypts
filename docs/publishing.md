@@ -71,3 +71,9 @@ and `/report/` agree. Do not attribute hardware results to changed hardware code
 without rebuilding that measurement. Bazel cache hits are labeled and retain
 their original timestamps. No caches, identity stores, or private keys are
 published.
+
+The site build now includes `//docs:api`; install the quality/documentation tools
+listed in [quality.md](quality.md) before assembly. API HTML is published at
+`/api/`, while XML remains a local/CI artifact. Manifest version 4 inventories
+API assets independently of the demo bundle. Assembly replaces the entire API
+subtree to remove obsolete pages. Existing manifest versions remain verifiable.

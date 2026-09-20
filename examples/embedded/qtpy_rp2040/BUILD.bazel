@@ -44,6 +44,8 @@ cc_binary(
     srcs = [
         "app.c",
         "app.h",
+        "controls.c",
+        "controls.h",
         "entropy.c",
         "entropy.h",
         "main.c",
@@ -54,7 +56,9 @@ cc_binary(
     target_compatible_with = ["@pico-sdk//bazel/constraint:rp2040"],
     deps = [
         ":protocol",
+        "@pico-sdk//src/rp2_common/hardware_clocks",
         "@pico-sdk//src/rp2_common/hardware_flash",
+        "@pico-sdk//src/rp2_common/hardware_pio",
         "@pico-sdk//src/rp2_common/hardware_watchdog",
         "@pico-sdk//src/rp2_common/pico_flash",
         "@pico-sdk//src/rp2_common/pico_int64_ops",
@@ -183,4 +187,13 @@ board_analysis(
     name = "board_analysis",
     firmware = ":demo.elf",
     source = "main.c",
+)
+
+c_test(
+    name = "controls_test",
+    srcs = [
+        "controls.c",
+        "controls_test.c",
+    ],
+    hdrs = ["controls.h"],
 )

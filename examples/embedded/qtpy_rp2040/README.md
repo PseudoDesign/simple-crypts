@@ -105,6 +105,36 @@ retried. Reconnect, inspect/obtain fresh status, and reconcile the cumulative
 counters before deciding on another consume or reset. CDC is binary, has no log
 output, and disables CR/LF translation and the SDK's USB reset shortcuts.
 
+## Button and LED controls
+
+The board has an [onboard RGB NeoPixel](https://learn.adafruit.com/adafruit-qt-py-2040/pinouts),
+with data on GPIO12 and power enable on GPIO11, plus the BOOT button on GPIO21.
+After enrollment, credit issuance, and this boot's host-assisted startup:
+
+- **Press and release BOOT:** consume **one credit**, once, after a 30 ms debounce.
+  Consumption happens on release and is committed to flash before success feedback.
+- **One green flash (200 ms):** the credit was consumed successfully.
+- **Three red flashes (150 ms on/off):** consumption failed, including insufficient
+  credit, missing startup/enrollment, or a storage fault. The device never retries
+  automatically. A reset storage failure uses the same red indication.
+- **Hold BOOT for five seconds until reboot:** factory-reset without consuming a
+  credit first. Releasing after reset failure cannot trigger consumption. A button
+  already held when the application starts must be released before it is armed.
+
+Flashes run without sleeping the main loop. The latest result replaces any active
+flash pattern. A PIO state machine transmits low-brightness, 800 kbit/s GRB frames
+using the SDK's instruction encoders and the Raspberry Pi example's 3/3/4-cycle
+waveform; no pioasm build dependency is introduced. Flashes themselves do not
+write NVM. A successful button consumption uses the same one-snapshot commit as
+USB consumption. The server sees the new count on its next protocol exchange,
+for example the operator's `status` command.
+
+Button input is polled: presses entirely during blocking crypto/flash operations
+may be missed. A release observed after the hold deadline is ignored if no held
+sample actually triggered reset; it must not infer a destructive reset from a
+late release. USB startup entropy is still required after every reboot; pressing
+BOOT does not bypass that requirement or generate an identity.
+
 ## Entropy and identity boundary
 
 Each boot accepts 32 fresh bytes from the host OS CSPRNG into a finite private
@@ -205,20 +235,23 @@ flash status/QE setup; this is not a promise of zero flash status-register write
 ## Verification and remaining hardware qualification
 
 ```sh
-bazel test //examples/embedded/qtpy_rp2040:store_test \
+bazel test //examples/embedded/qtpy_rp2040:controls_test \
+  //examples/embedded/qtpy_rp2040:store_test \
   //examples/embedded/qtpy_rp2040:entropy_test \
   //examples/embedded/qtpy_rp2040:image_test \
   //examples/embedded/qtpy_rp2040:integration_test --lockfile_mode=error
 python3 examples/embedded/qtpy_rp2040/qualify.py --bazel bazel --output /tmp/qtpy-fresh-check
 ```
 
-The locally verified Linux x86-64 firmware uses **182,164 bytes of flash**,
-**29,468 bytes of static main SRAM**, and a separately reserved **32,768-byte
+The locally verified Linux x86-64 firmware uses **183,756 bytes of flash**,
+**29,520 bytes of static main SRAM**, and a separately reserved **32,768-byte
 stack**. Its UF2 SHA-256 is
-`3928092a6dc4151831902904766a8564d6896831864c7e983224399b773a6626`.
+`ecc7684cb79a53ae2e6362bc69cd133fdec90381c4baa7d84336abb6423ad608`.
 Two clean output bases produced identical ELF, BIN, UF2, and reports. These are
 build results, not evidence that a physical board has been exercised.
 
+The controls test covers bounce, once-per-release consumption, long-hold reset,
+late releases, startup-held buttons, and green/red flash timing.
 The storage test injects cuts before, during, and after each erase/program in
 snapshot and reset transactions. The process-based simulator exercises the exact
 application, finite RNG, flash store, COBS/RPC codec, production Python server,
@@ -245,8 +278,11 @@ Before treating this as a demonstrated board build, run these physical checks:
    reservations must advance. Reflash the same UF2 and verify the same state.
 4. Exercise USB loss during mutation, full/oversized/truncated packets, and power
    cuts during flash/reset. Ambiguous storage must refuse protocol work.
-5. Exercise both reset methods, confirm identity rotation, and recover with
+5. Confirm each debounced BOOT press consumes exactly one credit and flashes
+   green, and that no credit/unready/storage-error cases flash red. Verify the
+   actual NeoPixel timing and colors on the fitted board.
+6. Exercise both reset methods, confirm identity rotation, and recover with
    BOOTSEL after a bad application. Confirm the reset marker resumes after a cut.
-6. Record maximum stack high-water, operation latency, and USB behavior during
+7. Record maximum stack high-water, operation latency, and USB behavior during
    flash erasure and crypto. The 32 KiB reservation and host tests do not prove a
    worst-case embedded call-stack bound or physical flash timing.

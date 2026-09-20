@@ -1,4 +1,7 @@
 #include "app.h"
+#include "controls.h"
+#include "hardware/clocks.h"
+#include "hardware/pio.h"
 #include "entropy.h"
 #include "hardware/flash.h"
 #include "hardware/watchdog.h"
@@ -11,6 +14,10 @@
 
 static qt_app app;
 static int supported;
+static qt_controls controls;
+static uint led_sm;
+static uint32_t led_color = UINT32_MAX;
+static uint64_t led_next_write;
 static uint8_t rx[1030], decoded[QT_MESSAGE_MAX], reply[QT_MESSAGE_MAX], tx[1030];
 typedef struct {
     uint32_t offset;
@@ -68,6 +75,61 @@ void qt_entropy_fault(void) {
         tight_loop_contents();
     }
 }
+/* Same four-instruction waveform as Raspberry Pi's BSD-3-Clause ws2812 example.
+ * Encode with SDK helpers so this firmware still needs no host pioasm executable.
+ * T1=3, T2=3, T3=4 at 8 MHz: 800 kbit/s, MSB-first GRB, 24 bits per pixel. */
+static void led_init(void) {
+    const uint16_t instructions[] = {
+        pio_encode_out(pio_x, 1) | pio_encode_sideset(1, 0) | pio_encode_delay(3),
+        pio_encode_jmp_not_x(3) | pio_encode_sideset(1, 1) | pio_encode_delay(2),
+        pio_encode_jmp(0) | pio_encode_sideset(1, 1) | pio_encode_delay(2),
+        pio_encode_nop() | pio_encode_sideset(1, 0) | pio_encode_delay(2),
+    };
+    const struct pio_program program = {.instructions = instructions, .length = 4, .origin = -1};
+    uint offset = pio_add_program(pio0, &program);
+    led_sm = (uint)pio_claim_unused_sm(pio0, true);
+    gpio_init(PICO_DEFAULT_WS2812_POWER_PIN);
+    gpio_set_dir(PICO_DEFAULT_WS2812_POWER_PIN, GPIO_OUT);
+    gpio_put(PICO_DEFAULT_WS2812_POWER_PIN, true);
+    pio_gpio_init(pio0, PICO_DEFAULT_WS2812_PIN);
+    pio_sm_set_consecutive_pindirs(pio0, led_sm, PICO_DEFAULT_WS2812_PIN, 1, true);
+    pio_sm_config config = pio_get_default_sm_config();
+    sm_config_set_wrap(&config, offset, offset + 3);
+    sm_config_set_sideset(&config, 1, false, false);
+    sm_config_set_sideset_pins(&config, PICO_DEFAULT_WS2812_PIN);
+    sm_config_set_out_shift(&config, false, true, 24);
+    sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
+    uint32_t divider = (uint32_t)((uint64_t)clock_get_hz(clk_sys) * 256 / 8000000);
+    sm_config_set_clkdiv_int_frac(&config, divider >> 8, divider & 255);
+    pio_sm_init(pio0, led_sm, offset, &config);
+    pio_sm_set_enabled(pio0, led_sm, true);
+    led_next_write = time_us_64() + 1000; /* Power-up settling before the first frame. */
+}
+static void led_poll(void) {
+    uint64_t now = time_us_64();
+    uint32_t color = qt_controls_color(&controls, now / 1000);
+    if (color != led_color && now >= led_next_write && !pio_sm_is_tx_fifo_full(pio0, led_sm)) {
+        pio_sm_put(pio0, led_sm, color << 8);
+        led_color = color;
+        /* 30us data plus at least 300us low latch time, including fast result changes. */
+        led_next_write = now + 1000;
+    }
+}
+static void button_poll(void) {
+    qt_button_event event = qt_controls_poll(&controls, !gpio_get(21), time_us_64() / 1000);
+    if (event == QT_BUTTON_NONE) {
+        return;
+    }
+    uint8_t amount[8] = {0, 0, 0, 0, 0, 0, 0, 1}, unused;
+    size_t length;
+    int rc = qt_app_command(&app, event == QT_BUTTON_RESET ? QT_RESET : QT_CONSUME, amount,
+                            event == QT_BUTTON_RESET ? 0 : sizeof amount, &unused, sizeof unused,
+                            &length);
+    qt_controls_result(&controls, rc == SC_OK, time_us_64() / 1000);
+    if (rc == SC_OK && event == QT_BUTTON_RESET) {
+        qt_entropy_fault();
+    }
+}
 extern uint32_t __StackBottom, __StackTop;
 static void stack_mark(void) {
     uintptr_t sp;
@@ -111,6 +173,8 @@ int main(void) {
     gpio_init(21);
     gpio_set_dir(21, GPIO_IN);
     gpio_pull_up(21);
+    qt_controls_init(&controls, !gpio_get(21), time_us_64() / 1000);
+    led_init();
     flash_job identify = {.op = 2};
     int rc = flash_safe_execute(flash_run, &identify, 1000);
     supported = !rc && (identify.id[1] == 0xef || identify.id[1] == 0xc8) &&
@@ -122,8 +186,7 @@ int main(void) {
     app.flash_jedec =
         (uint32_t)identify.id[1] << 16 | (uint32_t)identify.id[2] << 8 | identify.id[3];
     size_t used = 0;
-    int overflow = 0, held = 0;
-    uint64_t pressed = 0;
+    int overflow = 0;
     for (;;) {
         int ch = getchar_timeout_us(0);
         if (ch >= 0) {
@@ -140,21 +203,8 @@ int main(void) {
                 overflow = 1;
             }
         }
-        if (!gpio_get(21)) {
-            if (!held) {
-                held = 1;
-                pressed = time_us_64();
-            }
-            if (pressed != UINT64_MAX && time_us_64() - pressed >= 5000000) {
-                app.ready = 0;
-                if (!qt_store_reset(&app.store)) {
-                    qt_entropy_fault();
-                }
-                pressed = UINT64_MAX; /* Storage error requires release before another attempt. */
-            }
-        } else {
-            held = 0;
-        }
+        button_poll();
+        led_poll();
         tight_loop_contents();
     }
 }

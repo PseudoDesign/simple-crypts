@@ -104,6 +104,7 @@ c_analysis_database(
         "//docs:example",
         "//examples/device_console:module",
         "//examples/embedded/qtpy_rp2040:board_analysis",
+        "//examples/embedded/qtpy_rp2040:controls_test",
         "//examples/embedded/qtpy_rp2040:entropy_test",
         "//examples/embedded/qtpy_rp2040:sim",
         "//examples/embedded/qtpy_rp2040:store_test",

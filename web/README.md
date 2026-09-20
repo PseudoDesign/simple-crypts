@@ -17,7 +17,7 @@ bazel test //web:protocol_test //web:lab_test
 bazel run //web:preview -- --port 8000
 ```
 
-Open `http://127.0.0.1:8000/` for the project landing page. It introduces the libraries and links to `demo.html` (enrollment) and `demo.html#credits` (an enrolled pair ready for credits). The landing page loads no JavaScript or WebAssembly. The demo chapter bar links back home. The compiler and Node.js need Linux x86-64;
+Open `http://127.0.0.1:8000/` for the project landing page. It introduces the libraries and links to `demo.html` (enrollment) and `demo.html#credits` (an enrolled pair ready for credits). The landing page loads no JavaScript or WebAssembly. The demo chapter bar links to Home, Establish trust, Credits, and Fleet. The compiler and Node.js need Linux x86-64;
 Node.js 18+ is a system prerequisite, like the existing host C compiler.
 The Emscripten archive and sysroot are declared Bazel action inputs. The build
 uses the archive's frozen system-library cache, with no network access.
@@ -59,11 +59,13 @@ Refresh/Reset destroys the session and generates new keys. Nothing is saved to
 localStorage or IndexedDB. Wasm memory sizing is a browser build setting, not an
 MCU resource estimate.
 
-Both chapters use one draggable message log. Drag a packet onto either endpoint
-to deliver it; drag a saved attempt again to replay it. The corruption button
+In both guided chapters, a new message first appears inside the endpoint that
+generated it. Drag it onto either endpoint to attempt delivery. Delivered,
+rejected, and deliberately dropped messages move to the shared message log;
+drag a saved attempt again to replay it. The corruption button
 flips/restores a wire byte. The page shows actual status codes and explains
 rejections. Duplicates may return success with no state change. Leaving a packet
-in the log withholds delivery; there is no receiver call or fabricated timeout.
+in its source endpoint withholds delivery; there is no receiver call or fabricated timeout.
 The explicit server-clock button advances simulated time by 601 seconds to cross
 the ten-minute session deadline. Expiry is checked when a response arrives.
 

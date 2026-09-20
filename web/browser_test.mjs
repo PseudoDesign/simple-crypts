@@ -63,10 +63,16 @@ async function landing(page){
  assert.equal(await page.locator('body').getAttribute('data-chapter'),'credits');
  assert.equal((await state(page,'device')).registered,'true');
  assert.equal(await page.locator('#message-log .packet').count(),0);
+ await page.locator('#chapter-fleet').click();
+ await page.waitForFunction(()=>document.querySelector('#create-form button')?.disabled===false);
+ await page.goBack();await ready(page);
  await page.reload();await ready(page);assert.equal(await page.locator('body').getAttribute('data-chapter'),'credits');
  await page.getByRole('link',{name:'Simple Crypts home',exact:true}).click();
  await page.locator('#start-demo').click();await ready(page);
  assert.equal(await page.locator('body').getAttribute('data-chapter'),'trust');
+ await page.locator('#chapter-fleet').click();
+ await page.waitForFunction(()=>document.querySelector('#create-form button')?.disabled===false);
+ await page.goBack();await ready(page);
  console.log('PASS landing: lightweight overview, direct credits, reload, home and enrollment navigation');
 }
 
@@ -80,9 +86,15 @@ async function state(page,role){return Object.fromEntries((await page.locator('#
 async function assertNext(page,label){assert.equal(await page.locator('#next').textContent(),label);assert(await page.locator('#next').isEnabled());}
 
 async function next(page){await page.locator('#next').click();await ready(page);}
-const pending=page=>page.locator('#message-log .packet[data-pending="true"]').first();
+const pending=page=>page.locator('.outbox .packet[data-pending="true"]').first();
 const saved=page=>page.locator('#message-log .packet[data-pending="false"]').first();
 async function dragPacket(page,packet,target,touch=false){
+ const packetId=await packet.getAttribute('data-packet');
+ if(Number(packetId)>0){
+  const sender=await packet.getAttribute('data-from');
+  assert.equal(await page.locator(`#${sender}-outbox .packet[data-packet="${packetId}"]`).count(),1);
+  assert.equal(await page.locator('#message-log .packet[data-pending="true"]').count(),0);
+ }
  const handle=packet.locator('[data-select]');await handle.scrollIntoViewIfNeeded();
  const from=await handle.boundingBox(),to=await page.locator(target).boundingBox(),viewport=page.viewportSize();
  const a={x:from.x+from.width/2,y:from.y+from.height/2};
@@ -99,6 +111,10 @@ async function dragPacket(page,packet,target,touch=false){
  }
  await page.waitForFunction(old=>document.querySelector('#message-log .packet[data-pending="false"]')?.dataset.packet!==old,before);
  await ready(page);assert.equal(await page.locator('.touch-packet,.drag-over').count(),0);
+ if(Number(packetId)>0){
+  assert.equal(await page.locator(`.outbox .packet[data-packet="${packetId}"]`).count(),0);
+  assert.equal(await page.locator(`#message-log .packet[data-packet="-${packetId}"]`).count(),1);
+ }
 }
 async function generate(page){
  assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
@@ -106,6 +122,8 @@ async function generate(page){
  assert.equal(await page.locator('#pinned-server-key').textContent(),await page.locator('#server-public-key').textContent());
  await next(page);assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
  assert.equal(await pending(page).count(),1);
+ assert.equal(await page.locator('#server-outbox .packet').count(),1);
+ assert.equal(await page.locator('#device-outbox .packet,#message-log .packet').count(),0);
 }
 async function corrupt(packet){const button=packet.locator('[data-action="corrupt"]');await button.click();}
 async function creditFlow(page,touch=false){
@@ -123,7 +141,7 @@ async function creditFlow(page,touch=false){
  assert(await page.locator('#add-credit').isEnabled());assert(await page.locator('#consume-credit').isDisabled());
  await page.locator('#add-credit').click();await ready(page);assert(await page.locator('#add-credit').isDisabled());const grantId=await pending(page).getAttribute('data-packet');
  await dragPacket(page,pending(page),'#device-panel',touch);assert.equal(await page.locator('#device-issued').textContent(),'100');
- const grant=page.locator(`[data-packet="-${grantId}"]`);
+ const grant=page.locator(`.packet[data-packet="-${grantId}"]`);
  await dragPacket(page,grant,'#device-panel',touch);assert.equal(await page.locator('#device-issued').textContent(),'100');
  await assertNext(page,'Create status report →');await next(page);await dragPacket(page,pending(page),'#server-panel',touch);assert.equal(await page.locator('#server-consumed').textContent(),'0');
  await assertNext(page,'Create receipt →');await next(page);assert.match(await pending(page).textContent(),/Receipt for request/);assert(!/Credits consumed/.test(await pending(page).textContent()));await dragPacket(page,pending(page),'#device-panel',touch);
@@ -174,6 +192,7 @@ async function errorFlow(page,touch=false){
  assert.equal(await page.locator('#server-details').textContent(),serverBefore);
  assert.match(await page.locator('#tour-text').textContent(),/no receive error/);
  assert.equal(await pending(page).count(),0);
+ assert.match(await saved(page).textContent(), /dropped/);
  await next(page);assert.notEqual(await pending(page).locator('pre').textContent(),droppedWire,'Retry must use a fresh nonce');assert.equal((await state(page,'server')).request_id,requestId);await dragPacket(page,pending(page),'#device-panel',touch);
  assert.equal(await page.locator('#device-issued').textContent(),grantTotal);
  assert.match(await page.locator('#tour-title').textContent(),/again/);
@@ -191,6 +210,7 @@ async function errorFlow(page,touch=false){
 }
 
 async function cancelledDrag(page,touch=false){
+ const pendingBefore=await page.locator('.outbox').allTextContents();
  const before=await page.locator('#message-log').textContent(),device=await state(page,'device'),server=await state(page,'server');
  const box=await pending(page).locator('[data-select]').boundingBox();
  const a={x:box.x+box.width/2,y:box.y+20},b={x:a.x+20,y:a.y-20};
@@ -205,12 +225,14 @@ async function cancelledDrag(page,touch=false){
   assert(await page.locator('.touch-packet').isVisible());await page.keyboard.press('Escape');await page.mouse.up();
  }
  await ready(page);assert.equal(await page.locator('.touch-packet,.drag-over').count(),0);
+ assert.deepEqual(await page.locator('.outbox').allTextContents(),pendingBefore);
  assert.equal(await page.locator('#message-log').textContent(),before);assert.deepEqual(await state(page,'device'),device);assert.deepEqual(await state(page,'server'),server);
  // A tap/click is not a delivery either.
  await pending(page).locator('[data-select]').click();await ready(page);assert.equal(await pending(page).count(),1);
 }
 async function lifecycle(page,touch=false){
- assert.deepEqual(await page.locator('.chapter-banner a[id]').allTextContents(),['1 · Establish trust','2 · Credits']);
+ assert.deepEqual(await page.locator('.chapter-banner a[id]').allTextContents(),['1 · Establish trust','2 · Credits','3 · Fleet']);
+ assert.match(await page.locator('#chapter-fleet').getAttribute('href'), /examples\/fleet_manager\//);
  assert(await page.locator('#add-credit').isHidden());assert(await page.locator('#consume-credit').isHidden());
  await generate(page);await cancelledDrag(page,touch);
  // The message details are visible on the actual draggable box.
@@ -332,7 +354,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
   const broken=await monitoredContext(browser,{},true);
   const brokenPage=await broken.newPage();await brokenPage.goto(base+'missing-wasm/demo.html');await brokenPage.locator('#error').waitFor({state:'visible'});
   assert.match(await brokenPage.locator('#error').textContent(),/runtime failed|load|fetch|wasm|WebAssembly|Aborted/i);assert(await brokenPage.locator('#next').isDisabled());await closeContext(broken);
-  console.log(`PASS ${name}: common log, reversible corruption, direct replay, real result codes, challenge before keygen, rejection recovery, expiry, bounded history`);
+  console.log(`PASS ${name}: sender outboxes, attempt log, reversible corruption, direct replay, real result codes, challenge before keygen, rejection recovery, expiry, bounded history`);
  }catch(error){await captureFailure(error);throw error;}finally{await browser.close();}
 }
 }finally{server.close();}

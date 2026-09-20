@@ -161,14 +161,24 @@ function render(){
   }
   text('queue-count',`${lab.queue.length} / 64`);
   if(selected!==null&&!lab.queue.some(p=>p.id===selected)){selected=null;hint();}
-  // Pending packets and retained attempts share one draggable log in both chapters.
+  // New frames stay with their sender until an attempted delivery or drop.
+  // Only completed attempts enter the shared replay log.
   for(const id of logCorruption.keys())if(!lab.archive.some(p=>p.id===id))logCorruption.delete(id);
   const key=lab.queue.map(p=>`${p.id}:${p.corrupted}`).join(',')+'|'+lab.archive.map(p=>`${p.id}:${p.outcome}:${logCorruption.get(p.id)}`).join(',')+'|'+lab.epoch+'|'+chapter+'|'+networkPhase;
   if(key!==queueKey){
     queueKey=key;const log=$('message-log');log.replaceChildren();
-    const packets=[...lab.queue].reverse().concat(lab.archive.map(p=>packetView(-p.id)));
-    if(!packets.length){const empty=document.createElement('p');empty.className='log-empty';empty.textContent='Generated messages will appear here.';log.append(empty);}
-    for(const packet of packets)log.append(card(packet));
+    for(const role of ['device','server']){
+      const outbox=$(role+'-outbox');
+      outbox.replaceChildren();
+      const pending=lab.queue.filter(packet=>packet.from===role);
+      outbox.parentElement.hidden=pending.length===0;
+      for(const packet of pending)outbox.append(card(packet));
+    }
+    if(!lab.archive.length){
+      const empty=document.createElement('p');empty.className='log-empty';
+      empty.textContent='Delivered, rejected, or dropped messages will appear here.';log.append(empty);
+    }
+    for(const packet of lab.archive)log.append(card(packetView(-packet.id)));
   }
   const history=$('events');history.replaceChildren();for(const e of lab.events){const li=document.createElement('li');li.className=e.kind;li.textContent=e.message;history.append(li);}history.scrollTop=history.scrollHeight;
   const locked=!lab.ready||busy;

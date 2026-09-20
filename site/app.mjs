@@ -1,12 +1,12 @@
-import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=ce7f8127533dcfc3d092';
-import {resources} from './resources.mjs?v=ce7f8127533dcfc3d092';
-import {hex} from './endpoint.mjs?v=ce7f8127533dcfc3d092';
+import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=ff42f027ba1d3626b68d';
+import {resources} from './resources.mjs?v=ff42f027ba1d3626b68d';
+import {hex} from './endpoint.mjs?v=ff42f027ba1d3626b68d';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0,chapter='trust',consumedLocally=false;
 let errorLesson=-1,errorDone=false,errorOrigin=null;
 const errorLessons=[
- {role:'device',title:'Try spending more than you have.',text:'Ask the device to consume one more credit than its available balance. The library should reject the debit and keep the total unchanged.',button:'Try overspending',command:'consume',args:()=>({amount:(BigInt(lab.states.device.credits_issued)-BigInt(lab.states.device.credits_consumed)+1n).toString()}),status:'conflict',reason:'The debit exceeds the device’s accepted credit balance.'},
+ {role:'device',title:'Try spending more than you have.',text:'Press + beside the device’s Credits consumed to spend 25 at a time. Keep going until the library refuses the next purchase.',status:'conflict',reason:'The debit exceeds the device’s accepted credit balance.'},
  {role:'device',title:'Try an invalid amount.',text:'A consumption amount must be greater than zero. Try consuming zero credits.',button:'Try consuming zero',command:'consume',args:()=>({amount:'0'}),status:'argument',reason:'Consumption must be a positive amount.'},
  {role:'server',title:'Try taking issued credits back.',text:'Issued credits are a cumulative total. Try lowering the server’s total by one.',button:'Try lowering issuance',command:'issue',args:()=>({total:(BigInt(lab.states.server.credits_issued)-1n).toString()}),status:'conflict',reason:'Cumulative issued credits cannot decrease.'},
  {role:'device',title:'Try a corrupted packet.',text:'Turn Corruption on for the highlighted receipt, then drag it to the device. Altering encrypted bytes should fail authentication.',status:'authentication',reason:'The packet failed authentication; its contents were not accepted.'},
@@ -188,8 +188,8 @@ function render(){
   const waitForPlus=chapter==='credits'&&(step<0||step===5&&completed&&!consumedLocally);
   $('add-credit').hidden=$('consume-credit').hidden=chapter!=='credits';
   $('add-credit').disabled=locked||errorLesson>=0||!(step<0||step===8&&completed);
-  $('consume-credit').disabled=locked||errorLesson>=0||!(step===5&&completed&&!consumedLocally||step===8&&completed);
-  $('next').hidden=waitForPlus||(errorLesson>=0?errorLesson>=3&&!errorDone:mode==='tour'&&step>=0&&!completed);
+  $('consume-credit').disabled=locked||(errorLesson>=0?errorLesson!==0||errorDone:!(step===5&&completed&&!consumedLocally||step===8&&completed));
+  $('next').hidden=waitForPlus||(errorLesson>=0?(errorLesson===0||errorLesson>=3)&&!errorDone:mode==='tour'&&step>=0&&!completed);
   $('next').disabled=locked||(mode==='tour'&&step>=0&&!completed);
   $('retry').hidden=true;
   document.body.dataset.busy=String(busy);document.body.dataset.ready=String(lab.ready);
@@ -247,7 +247,7 @@ function beginError(index){
 async function advanceTour(){
   if(errorLesson>=0){
     if(errorDone){if(errorLesson===errorLessons.length-1)await prepareChapter();else beginError(errorLesson+1);}
-    else if(errorLesson<3){const lesson=errorLessons[errorLesson];const result=await lab.command(lesson.role,lesson.command,lesson.args());if(result.status!==lesson.status)throw new Error(`Unexpected library result: ${result.status}`);finishError(result);}
+    else if(errorLesson>0&&errorLesson<3){const lesson=errorLessons[errorLesson];const result=await lab.command(lesson.role,lesson.command,lesson.args());if(result.status!==lesson.status)throw new Error(`Unexpected library result: ${result.status}`);finishError(result);}
     return;
   }
   if(chapter==='credits'&&step===8&&completed){beginError(0);return;}
@@ -277,6 +277,13 @@ $('add-credit').onclick=()=>run(async()=>{
 $('consume-credit').onclick=()=>run(async()=>{
   const result=await lab.command('device','consume',{amount:'25'});
   text('device-result',`${resultLabel(result)} · ${result.code<0?'Not enough available credits.':'25 credits consumed locally.'}`);$('device-result').hidden=false;$('device-result').dataset.rejected=String(result.code<0);
+  if(errorLesson===0&&!errorDone){
+    if(result.status==='conflict')finishError(result);
+    else if(result.code===0){
+      const remaining=BigInt(lab.states.device.credits_issued)-BigInt(lab.states.device.credits_consumed);
+      text('tour-text',`${remaining} credits left. ${remaining>=25n?'Press + again to consume another 25.':'Press + once more to try spending beyond your balance.'}`);showTip();
+    }
+  }
   if(result.code===0&&step===5){consumedLocally=true;text('tour-title','25 credits consumed locally.');text('tour-text','The device saved its consumption. No packet was created: the server still sees its last report of 0.');text('next','Request current status →');}
 });
 $('advance-time').onclick=()=>run(()=>{lab.time+=601;lab.event('Simulated server clock advanced by 601 seconds; no packet was delivered.');text('clock-result',lab.states.server.registered?'Server time advanced. Completed enrollment stays valid; drag a saved packet to see the response.':'Server time advanced. Replay an enrollment response to test the expired session.');});

@@ -269,6 +269,13 @@ state along with the identity and require a new secret provisioning seed.
 
 ## 4. NVM layout, write rate and endurance
 
+Implementation update: the demo now uses a **32-sector snapshot ring plus one
+reset-marker sector (132 KiB)**, with an ideal 3.2 million snapshot-update budget
+at 100,000 erases per sector. The two-sector layout and budgets below record the
+original audit baseline, not the current firmware. See the
+[current storage layout and upgrade/reset instructions](../examples/embedded/qtpy_rp2040/README.md#nvm-recovery-and-endurance).
+
+
 Use ordinary external-flash array sectors. For either documented candidate,
 the relevant geometry is **4 KiB erase sectors and 256-byte program pages**.
 Both candidates publish a 100,000-cycle endurance rating, subject to the exact
@@ -473,3 +480,10 @@ NVM behavior on the board. No connected-board qualification is claimed.
 [recovery]: https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html#reset-flash-memory
 [boot2]: https://github.com/raspberrypi/pico-sdk/blob/079c6f39023649b154152db30f1d781e884879bc/src/rp2040/boot_stage2/boot2_w25q080.S
 [usbstdio]: https://www.raspberrypi.com/documentation/pico-sdk/runtime.html#pico_stdio_usb
+
+## Implementation
+
+The implementation and operator instructions are in
+[`examples/embedded/qtpy_rp2040`](../examples/embedded/qtpy_rp2040/README.md).
+That README records the current-main baseline, concrete targets, storage layout,
+measured write counts, and remaining physical-board qualification.

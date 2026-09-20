@@ -55,3 +55,9 @@ The browser target uses the existing pinned Playwright installation and engines
 from [web/README.md](../web/README.md). It tests the interactive workflow in
 Chromium and Firefox. The production Wasm tests cover message exchange,
 approval, exact counters, persistence failures, and nonce reservation safety.
+
+## QT Py RP2040
+
+The [QT Py RP2040 demo](embedded/qtpy_rp2040/README.md) builds a pinned UF2 firmware
+and provides a Linux USB operator, erasable identity/state storage, and factory
+reset. Entropy provisioning remains an application detail outside the protocol.

@@ -11,7 +11,9 @@ class ProductionBoundariesTest(unittest.TestCase):
     def test_production_compilation_disables_test_hooks(self):
         commands = json.loads(Path("tools/production_analysis_database.json").read_text())
         self.assertTrue(commands, "production compilation metadata is empty")
-        self.assertEqual({command["profile"] for command in commands}, {"native", "arm", "wasm"})
+        self.assertEqual(
+            {command["profile"] for command in commands}, {"native", "arm", "rp2040", "wasm"}
+        )
         for command in commands:
             with self.subTest(file=command["file"], profile=command["profile"]):
                 self.assertFalse(

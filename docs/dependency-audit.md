@@ -74,3 +74,25 @@ References: [BCR platforms](https://registry.bazel.build/modules/platforms/),
   match the previous copies byte-for-byte.
 - The deleted dependency trees contain 1,779 files totaling 17,208,377 bytes.
   Only small project-owned adapters, a version-header patch, and manifests remain.
+
+## QT Py firmware additions
+
+The QT Py application adds a separate standard `CcInfo` firmware graph; the
+existing host, Cortex-M4, and Wasm drivers retain their prerequisites above.
+Pico SDK 2.3.1 is checksum-pinned through an archive override so a small build-only
+patch can replace shell/Python-launcher generators with direct hermetic Python
+actions. CPython 3.11.14 resolves through rules_python 1.7.0 for the execution host.
+The SDK's registered Arm GNU 13.2.Rel1 toolchains pin their five host archives.
+
+TinyUSB uses an `http_archive` at SDK-compatible commit
+`86ad6e56c1700e85f1c5678607a762cfe3aa2f47`, with SHA-256 and the SDK's BUILD overlay.
+This replaces the selected USB dependency's Git fetch with Bazel's archive cache;
+unselected radio/PIO/picotool dependencies are absent from the firmware actions.
+The nanopb BCR patch adds its exported include directory for standard CcInfo
+consumers. The existing libsodium archive gains an MCU-only portable source
+closure/configuration while keeping the native host build unchanged. No complete
+vendor source trees were added.
+
+See the [demo README](../examples/embedded/qtpy_rp2040/README.md) for the exact
+build, qualification, provenance, and licensing details. The owned linker script
+is derived from Pico SDK 2.3.1 and retains its BSD-3-Clause license beside it.

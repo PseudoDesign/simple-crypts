@@ -1,4 +1,7 @@
-"""Source-only overlay for the pinned libsodium release archive."""
+"""Source overlay for the pinned libsodium release and portable MCU subset."""
+
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@simple_crypts//third_party:sodium_mcu_sources.bzl", "SODIUM_MCU_SOURCES")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -13,3 +16,13 @@ filegroup(
 )
 
 exports_files(["configure", "src/libsodium/include/sodium.h"])
+
+cc_library(
+    name = "mcu",
+    srcs = SODIUM_MCU_SOURCES,
+    hdrs = glob(["src/libsodium/**/*.h"]),
+    includes = ["src/libsodium/include", "src/libsodium/include/sodium"],
+    copts = ["-Os", "-fno-lto", "-fno-strict-aliasing", "-fno-strict-overflow", "-include", "$(location @simple_crypts//examples/embedded/qtpy_rp2040:sodium_config.h)"],
+    additional_compiler_inputs = ["@simple_crypts//examples/embedded/qtpy_rp2040:sodium_config.h"],
+    target_compatible_with = ["@pico-sdk//bazel/constraint:rp2040"],
+)

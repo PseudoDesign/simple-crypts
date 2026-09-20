@@ -3,5 +3,22 @@ common --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 test --test_output=errors
 build --incompatible_autoload_externally=
 
+build:qtpy --platforms=@pico-sdk//bazel/platform:rp2040
+build:qtpy --@pico-sdk//bazel/config:PICO_BOARD=adafruit_qtpy_rp2040
+build:qtpy --@pico-sdk//bazel/config:PICO_STDIO_USB=true
+build:qtpy --@pico-sdk//bazel/config:PICO_STDIO_UART=false
+build:qtpy --@pico-sdk//bazel/config:PICO_DEFAULT_LINKER_SCRIPT=//examples/embedded/qtpy_rp2040:linker
+build:qtpy --copt=-Os
+build:qtpy --copt=-fno-lto
+build:qtpy --copt=-fstack-usage
+
+build:qtpy --copt=-DPICO_STACK_SIZE=32768
+build:qtpy --copt=-DPICO_FLASH_ASSUME_CORE1_SAFE=1
+build:qtpy --copt=-DPICO_STDIO_USB_DEFAULT_CRLF=0
+build:qtpy --copt=-DPICO_ENABLE_USB_RESET_VIA_BAUD_RATE=0
+build:qtpy --copt=-DPICO_ENABLE_USB_RESET_VIA_VENDOR_INTERFACE=0
+build:qtpy --@pico-sdk//bazel/config:PICO_TINYUSB_LIB=@qtpy_tinyusb//:tinyusb
+build:qtpy --copt=-DPICO_CORE1_STACK_SIZE=0
+
 # Machine-specific cache paths, resource limits and sandbox workarounds stay local.
 try-import %workspace%/.bazelrc.local

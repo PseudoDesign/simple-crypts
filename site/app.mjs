@@ -1,6 +1,6 @@
-import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=e574c95ce10839c1155f';
-import {resources} from './resources.mjs?v=e574c95ce10839c1155f';
-import {hex} from './endpoint.mjs?v=e574c95ce10839c1155f';
+import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=ebd9e8afe1f1db83b370';
+import {resources} from './resources.mjs?v=ebd9e8afe1f1db83b370';
+import {hex} from './endpoint.mjs?v=ebd9e8afe1f1db83b370';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0,chapter='trust',consumedLocally=false;

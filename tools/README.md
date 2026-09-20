@@ -1,6 +1,6 @@
 # Reproducible sample build profile
 
-The supported development profile is **Linux x86_64, CPython 3.12, Bazel 9.2.0**. Install Node.js 18+, system GCC/binutils, make, and the ARM bare-metal GCC/newlib tools before bootstrapping. The recorded Cortex run uses `arm-none-eabi-gcc 13.2.1`. On Debian/Ubuntu the relevant package names are `build-essential`, `python3.12`, `gcc-arm-none-eabi`, `binutils-arm-none-eabi`, and `libnewlib-arm-none-eabi`; install Bazel 9.2.0 or use Bazelisk with the root `.bazelversion`.
+The supported development profile is **Linux x86_64, CPython 3.12, Bazel 9.2.0**. Install Node.js 18+ at `/usr/bin/node`, system GCC/binutils, make, and the ARM bare-metal GCC/newlib tools before bootstrapping. The recorded Cortex run uses `arm-none-eabi-gcc 13.2.1`. On Debian/Ubuntu the relevant package names are `build-essential`, `python3.12`, `gcc-arm-none-eabi`, `binutils-arm-none-eabi`, and `libnewlib-arm-none-eabi`; install Bazel 9.2.0 or use Bazelisk with the root `.bazelversion`.
 
 ```sh
 python3 tools/bootstrap.py

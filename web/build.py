@@ -47,6 +47,12 @@ def main(c):
                             *objects, c['sodium'], '-o', str(out)]
                     subprocess.run(argv, env=env, stdout=stream, stderr=subprocess.STDOUT, check=True)
         except subprocess.CalledProcessError:
-            print(log.read_text()[-20000:],file=sys.stderr);raise
+            print(log.read_text()[-20000:],file=sys.stderr)
+            # Autoconf's summary omits the compiler/linker error. Retain that
+            # diagnostic before TemporaryDirectory removes the failed build.
+            configure_log = root/'sodium/config.log'
+            if configure_log.exists():
+                print(configure_log.read_text()[-30000:],file=sys.stderr)
+            raise
 
 if __name__=='__main__':main(json.loads(sys.argv[1]))

@@ -10,7 +10,7 @@ Use Linux x86_64 with the normal [build prerequisites](../tools/README.md), plus
 these versions in `clang-format-18`, `clang-tidy-18`, and `doxygen`:
 
 ```sh
-sudo apt-get install clang-18 clang-format-18 clang-tidy-18 doxygen
+sudo apt-get install nodejs clang-18 clang-format-18 clang-tidy-18 doxygen
 python3 tools/bootstrap.py
 bazel test //tools:quality
 bazel build //docs:api

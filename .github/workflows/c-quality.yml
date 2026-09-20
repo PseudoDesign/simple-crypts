@@ -24,7 +24,8 @@ jobs:
       - name: Install system prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential python3.12 gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi clang-18 clang-format-18 clang-tidy-18 doxygen
+          sudo apt-get install -y build-essential python3.12 nodejs gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi clang-18 clang-format-18 clang-tidy-18 doxygen
+          /usr/bin/node --version
           clang-format-18 --version | grep -F '18.1.3'
           clang-tidy-18 --version | grep -F '18.1.3'
           test "$(doxygen --version)" = '1.9.8'

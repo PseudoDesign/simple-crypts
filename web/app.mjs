@@ -231,7 +231,7 @@ async function place(id,target){
     return;
   }
   if(mode==='tour'&&step>=0&&!completed&&p.origin===expected&&target===tour[step].target&&result?.code===0){
-    showTip();completed=true;text('tour-title',step===chapterEnd()?(chapter==='credits'?'Credit exchange complete.':'Enrollment complete.') :step===2?'Enrollment complete.':'Delivered.');text('tour-text',tour[step].success);text('next',step===chapterEnd()?(chapter==='credits'?'Explore errors →':'On to credits →'):step===0?(lab.states.device?'Create encrypted response →':'Generate key pair & create response →'):step===1?'Approve this serial + key →':step===2?'Issue 100 credits →':step===5?'Consume 25 locally →':'Create next message →');$('progress-fill').style.width=((step-(chapter==='credits'?3:0)+1)/(chapter==='credits'?6:3)*100)+'%';
+    showTip();completed=true;text('tour-title',step===chapterEnd()?(chapter==='credits'?'Credit exchange complete.':'Enrollment complete.') :step===2?'Enrollment complete.':'Delivered.');text('tour-text',tour[step].success);text('next',step===chapterEnd()?(chapter==='credits'?'Explore errors →':'On to credits →'):step===0?(lab.states.device?'Create encrypted response →':'Generate key pair & create response →'):step===1?'Approve this serial + key →':step===2?'Issue 100 credits →':step===5?'Consume 25 locally →':(step===3||step===6?'Create status report →':'Create receipt →'));$('progress-fill').style.width=((step-(chapter==='credits'?3:0)+1)/(chapter==='credits'?6:3)*100)+'%';
   }else{
     showTip();if(result?.code<0)text('tour-title','Packet rejected.');text('tour-text',$('result-text').textContent);
 

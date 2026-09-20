@@ -53,20 +53,19 @@ typedef struct {
     void *user;
     sc_status (*public_key)(void *, sc_key_handle, uint8_t out[SC_KEY_BYTES]);
     sc_status (*seal)(void *, sc_key_handle, const uint8_t peer[SC_KEY_BYTES],
-                      const uint8_t nonce[SC_NONCE_BYTES], const uint8_t *plain,
-                      size_t plain_len, uint8_t *cipher, size_t capacity);
+                      const uint8_t nonce[SC_NONCE_BYTES], const uint8_t *plain, size_t plain_len,
+                      uint8_t *cipher, size_t capacity);
     sc_status (*open)(void *, sc_key_handle, const uint8_t peer[SC_KEY_BYTES],
-                      const uint8_t nonce[SC_NONCE_BYTES], const uint8_t *cipher,
-                      size_t cipher_len, uint8_t *plain, size_t capacity);
+                      const uint8_t nonce[SC_NONCE_BYTES], const uint8_t *cipher, size_t cipher_len,
+                      uint8_t *plain, size_t capacity);
     sc_status (*random)(void *, uint8_t *out, size_t length);
     sc_status (*enrollment_secret)(void *, uint8_t out[SC_TOKEN_BYTES]);
-    sc_status (*load)(void *, uint8_t *out, size_t capacity,
-                      size_t *length, uint64_t *generation);
-    sc_status (*commit)(void *, uint64_t expected_generation,
-                        const uint8_t *record, size_t length);
+    sc_status (*load)(void *, uint8_t *out, size_t capacity, size_t *length, uint64_t *generation);
+    sc_status (*commit)(void *, uint64_t expected_generation, const uint8_t *record, size_t length);
     sc_status (*reserve)(void *, uint32_t domain, uint64_t count, uint64_t *first);
-    sc_status (*sign)(void *,sc_key_handle,const uint8_t *,size_t,uint8_t signature[64]);
-    sc_status (*verify)(void *,const uint8_t key[32],const uint8_t *,size_t,const uint8_t signature[64]);
+    sc_status (*sign)(void *, sc_key_handle, const uint8_t *, size_t, uint8_t signature[64]);
+    sc_status (*verify)(void *, const uint8_t key[32], const uint8_t *, size_t,
+                        const uint8_t signature[64]);
 } sc_provider;
 
 typedef struct {
@@ -118,28 +117,30 @@ typedef struct {
  * server challenge; application updates require confirmed enrollment.
  * Contexts are single-owner; callers supply external synchronization. */
 sc_status sc_init(sc_context *ctx, const sc_config *config, const sc_provider *provider);
-sc_status sc_data_inspect(const sc_context *,uint16_t group_id,sc_group_state *out);
-sc_status sc_data_update_group(sc_context *,uint16_t group_id,const sc_data_update *,size_t count);
-sc_status sc_data_update_encoded(sc_context *,uint16_t,const uint8_t *,size_t);
-sc_status sc_data_encode_values(const sc_context *,uint16_t,uint8_t *,size_t,size_t *);
-sc_status sc_data_request(sc_context *,uint16_t group_id);
-sc_status sc_set_credits_issued(sc_context *,uint64_t total);
-sc_status sc_consume_credits(sc_context *,uint64_t amount);
+sc_status sc_data_inspect(const sc_context *, uint16_t group_id, sc_group_state *out);
+sc_status sc_data_update_group(sc_context *, uint16_t group_id, const sc_data_update *,
+                               size_t count);
+sc_status sc_data_update_encoded(sc_context *, uint16_t, const uint8_t *, size_t);
+sc_status sc_data_encode_values(const sc_context *, uint16_t, uint8_t *, size_t, size_t *);
+sc_status sc_data_request(sc_context *, uint16_t group_id);
+sc_status sc_set_credits_issued(sc_context *, uint64_t total);
+sc_status sc_consume_credits(sc_context *, uint64_t amount);
 sc_status sc_request_credit_status(sc_context *);
 sc_status sc_receive(sc_context *ctx, const uint8_t *frame, size_t length);
 /* One complete opaque object, excluding UART/COBS framing. No output if no
  * work is pending. Budget/capacity failure does not consume an output. */
-sc_status sc_outbound(sc_context *ctx, size_t byte_budget, uint8_t *frame,
-                      size_t capacity, size_t *length);
+sc_status sc_outbound(sc_context *ctx, size_t byte_budget, uint8_t *frame, size_t capacity,
+                      size_t *length);
 /* Opt into signed server-initiated enrollment before sending any report.
  * Persisted mode cannot be disabled. now/expires use the SERVER's trusted time.
  * Approval is an externally authorized operation over the exact session + key.
  * Never expose begin/approve/cancel to the untrusted relay. */
 sc_status sc_enrollment_enable(sc_context *ctx);
-sc_status sc_enrollment_begin(sc_context *ctx,uint64_t now,uint64_t expires);
-sc_status sc_enrollment_approve(sc_context *ctx,const uint8_t challenge[32],const uint8_t key[32],uint64_t now);
+sc_status sc_enrollment_begin(sc_context *ctx, uint64_t now, uint64_t expires);
+sc_status sc_enrollment_approve(sc_context *ctx, const uint8_t challenge[32], const uint8_t key[32],
+                                uint64_t now);
 sc_status sc_enrollment_cancel(sc_context *ctx);
-sc_status sc_receive_at(sc_context *ctx,const uint8_t *frame,size_t length,uint64_t now);
+sc_status sc_receive_at(sc_context *ctx, const uint8_t *frame, size_t length, uint64_t now);
 sc_status sc_inspect(const sc_context *ctx, sc_state *out);
 const char *sc_status_string(sc_status status);
 

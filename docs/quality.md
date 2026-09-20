@@ -20,6 +20,14 @@ bazel test //tools:quality
 bazel build //docs:api
 ```
 
+Pull-request CI runs this suite with `--lockfile_mode=error`, then explicitly
+runs `//web:browser_test` and `//examples/fleet_manager:browser_test` in Chromium
+and Firefox against their freshly built Bazel site outputs. These targets remain
+`manual` for local checkouts without browser engines. CI installs the pinned
+Playwright browsers, passes `PLAYWRIGHT_BROWSERS_PATH` to the tests, and uploads
+their logs, screenshots, and traces from Bazel's undeclared test outputs even on
+failure. The Pages workflow separately checks the published site snapshot.
+
 | Source | Formatting | Analysis and documentation |
 | --- | --- | --- |
 | C/C++ and headers/includes | clang-format 18.1.3 | clang-tidy 18.1.3, Clang Static Analyzer; Doxygen 1.9.8 for application APIs |

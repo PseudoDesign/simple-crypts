@@ -26,7 +26,10 @@ const server = createServer(async (request, response) => {
 });
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const url = `http://127.0.0.1:${server.address().port}/`;
-const artifacts = process.env.BROWSER_ARTIFACTS_DIR ?? '/tmp/simple-crypts-fleet-browser';
+const artifacts =
+  process.env.TEST_UNDECLARED_OUTPUTS_DIR ??
+  process.env.BROWSER_ARTIFACTS_DIR ??
+  '/tmp/simple-crypts-fleet-browser';
 await mkdir(artifacts, { recursive: true });
 
 async function wait(page) {

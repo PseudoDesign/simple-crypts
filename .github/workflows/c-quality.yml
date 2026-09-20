@@ -17,6 +17,8 @@ jobs:
   quality:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -24,7 +26,7 @@ jobs:
       - name: Install system prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential python3.12 nodejs gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi clang-18 clang-format-18 clang-tidy-18 doxygen
+          sudo apt-get install -y build-essential python3.12 nodejs npm gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi clang-18 clang-format-18 clang-tidy-18 doxygen
           /usr/bin/node --version
           clang-format-18 --version | grep -F '18.1.3'
           clang-tidy-18 --version | grep -F '18.1.3'
@@ -38,10 +40,18 @@ jobs:
         run: python3 tools/bootstrap.py
       - name: Install pinned browser and quality tools
         run: npm ci --prefix web --ignore-scripts --no-audit --no-fund
+      - name: Install browser engines and system libraries
+        run: web/node_modules/.bin/playwright install --with-deps chromium firefox
       - name: Enforce quality and run regressions
         run: |
-          bazel test //...
-          bazel build //docs:api //platforms/cortex_m4:resource_report
+          bazel test //... --lockfile_mode=error
+          bazel build //docs:api //platforms/cortex_m4:resource_report --lockfile_mode=error
+      - name: Test freshly built browser applications
+        run: |
+          bazel test //web:browser_test //examples/fleet_manager:browser_test \
+            --lockfile_mode=error \
+            --test_env=PLAYWRIGHT_BROWSERS_PATH \
+            --nocache_test_results
       - name: Save documentation and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -51,5 +61,6 @@ jobs:
             bazel-bin/docs/api
             bazel-testlogs/**/test.log
             bazel-testlogs/**/test.xml
+            bazel-testlogs/**/test.outputs/**
           if-no-files-found: ignore
           retention-days: 14

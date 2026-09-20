@@ -1,4 +1,4 @@
-import {hex} from './endpoint.mjs?v=ff42f027ba1d3626b68d';
+import {hex} from './endpoint.mjs?v=201b53982a0438e33414';
 export const MAX_QUEUE=64, MAX_EVENTS=200;
 // The demo device has a fixed serial before it generates keys or enrolls.
 export const DEVICE_SERIAL='mcu-0001';
@@ -23,7 +23,7 @@ export class Lab {
       // Compatibility slot only: signed enrollment uses no shared enrollment secret.
       const secret='00'.repeat(32);
       for(const role of ['device','server']){
-        const worker=this.workerFactory(new URL('./worker.mjs?v=ff42f027ba1d3626b68d',import.meta.url));this.workers[role]=worker;
+        const worker=this.workerFactory(new URL('./worker.mjs?v=201b53982a0438e33414',import.meta.url));this.workers[role]=worker;
         worker.onmessage=({data})=>{const p=this.pending.get(data.id);if(!p)return;this.pending.delete(data.id);data.error?p.reject(new Error(data.error)):p.resolve(data.result);};
         worker.onerror=()=>{for(const [id,p]of this.pending){if(p.role===role){this.pending.delete(id);p.reject(new Error(`${role} runtime failed to load or execute`));}}};
       }
@@ -129,5 +129,5 @@ export const tour=[
  {title:'Deliver the receipt.',text:'The server acknowledges this exact snapshot. The receipt asks for no additional report.',target:'device',success:'Click + beside the device’s Credits consumed to spend 25 credits locally. No message is sent.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')},
  {title:'Deliver the status request.',text:'The server requests current consumption. Until this reaches the device, its last report remains 0.',target:'device',success:'The device captured a new snapshot: 100 issued, 25 consumed.',code:'sc_request_credit_status(&server);',prepare:async l=>{await l.update('server','request',{});return l.transmit('server');}},
  {title:'Deliver the updated snapshot.',text:'The encrypted response links 25 consumed credits to this request. Older snapshots cannot roll it back.',target:'server',success:'The server’s last reported consumption is now 25.',code:'sc_receive(&server, frame, length);',prepare:l=>l.transmit('device')},
- {title:'Deliver the final receipt.',text:'The device can stop retrying this snapshot once it receives the authenticated receipt.',target:'device',success:'Both sides agree on the last report. Use the + buttons to add or consume more credits, or explore five error cases: overspending, invalid amounts, decreasing totals, corrupted packets, and packets sent the wrong way.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')}
+ {title:'Deliver the final receipt.',text:'The device can stop retrying this snapshot once it receives the authenticated receipt.',target:'device',success:'Both sides agree on the last report. Use the + buttons to add or consume more credits, or try overspending followed by dropped and repeated packets.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')}
 ];

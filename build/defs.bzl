@@ -4,18 +4,20 @@ Every source, library, generator, and SDK file is declared as an action input.
 The C and ARM compilers are deliberately system prerequisites, not hermetic.
 """
 
-CLibraryInfo = provider("Compiled C archives, headers, include paths and analysis commands.", fields = ["archives", "headers", "includes", "commands"])
+CLibraryInfo = provider("Compiled C archives, headers, include paths and analysis commands.", fields = ["archives", "headers", "includes", "runfiles_includes", "commands"])
 
 AnalysisInfo = provider("Compilation commands for native, ARM and Wasm analysis.", fields = ["commands"])
 
 def _commands(ctx):
-    return [dict(file = f.short_path, includes = _includes(ctx).to_list(), copts = ctx.attr.copts, profile = "native") for f in ctx.files.srcs] + [c for d in ctx.attr.deps for c in d[CLibraryInfo].commands]
+    return [dict(file = f.short_path, includes = _includes(ctx, runfiles = True).to_list(), copts = ctx.attr.copts, profile = "native") for f in ctx.files.srcs] + [c for d in ctx.attr.deps for c in d[CLibraryInfo].commands]
 
 def _inputs(ctx):
     return depset(ctx.files.srcs + ctx.files.hdrs, transitive = [d[CLibraryInfo].headers for d in ctx.attr.deps])
 
-def _includes(ctx):
-    return depset(["."] + ctx.attr.includes, transitive = [d[CLibraryInfo].includes for d in ctx.attr.deps])
+def _includes(ctx, runfiles = False):
+    roots = [f.short_path.rsplit("/", 1)[0] if runfiles else f.dirname for f in ctx.files.include_roots]
+    inherited = [d[CLibraryInfo].runfiles_includes if runfiles else d[CLibraryInfo].includes for d in ctx.attr.deps]
+    return depset(["."] + ctx.attr.includes + roots, transitive = inherited)
 
 def _compile(ctx, output, mode):
     archives = depset(transitive = [d[CLibraryInfo].archives for d in ctx.attr.deps])
@@ -26,7 +28,7 @@ def _compile(ctx, output, mode):
 def _library_impl(ctx):
     out = ctx.actions.declare_file("lib" + ctx.label.name + ".a")
     _compile(ctx, out, "archive")
-    return [DefaultInfo(files = depset([out])), CLibraryInfo(archives = depset([out], transitive = [d[CLibraryInfo].archives for d in ctx.attr.deps]), headers = _inputs(ctx), includes = _includes(ctx), commands = _commands(ctx)), AnalysisInfo(commands = _commands(ctx))]
+    return [DefaultInfo(files = depset([out])), CLibraryInfo(archives = depset([out], transitive = [d[CLibraryInfo].archives for d in ctx.attr.deps]), headers = _inputs(ctx), includes = _includes(ctx), runfiles_includes = _includes(ctx, runfiles = True), commands = _commands(ctx)), AnalysisInfo(commands = _commands(ctx))]
 
 def _binary_impl(ctx):
     out = ctx.actions.declare_file(ctx.attr.output_name or (ctx.label.name + (".so" if ctx.attr.shared else "")))
@@ -38,6 +40,7 @@ _c_attrs = {
     "hdrs": attr.label_list(allow_files = True),
     "deps": attr.label_list(providers = [CLibraryInfo]),
     "includes": attr.string_list(),
+    "include_roots": attr.label_list(allow_files = True),
     "copts": attr.string_list(),
     "linkopts": attr.string_list(),
     "_driver": attr.label(default = "//tools:build_action.py", allow_single_file = True),
@@ -51,7 +54,7 @@ def _sodium_impl(ctx):
     stack = ctx.actions.declare_file(ctx.label.name + "_stack.txt")
     config = {"source": ctx.file.configure.dirname, "output": out.path, "stack": stack.path, "arm": ctx.attr.arm}
     ctx.actions.run(executable = "/usr/bin/python3", arguments = [ctx.file._driver.path, "sodium", json.encode(config)], inputs = depset(ctx.files.srcs + [ctx.file._driver]), outputs = [out, stack], mnemonic = "BuildSodium", progress_message = "Building pinned libsodium %s" % ("Cortex-M4" if ctx.attr.arm else "host"))
-    return [DefaultInfo(files = depset([out, stack])), CLibraryInfo(archives = depset([out]), headers = depset(ctx.files.hdrs), includes = depset([ctx.file.configure.dirname + "/src/libsodium/include", ctx.file.configure.dirname + "/src/libsodium/include/sodium"]), commands = [])]
+    return [DefaultInfo(files = depset([out, stack])), CLibraryInfo(archives = depset([out]), headers = depset(ctx.files.hdrs), includes = depset([ctx.file.configure.dirname + "/src/libsodium/include", ctx.file.configure.dirname + "/src/libsodium/include/sodium"]), runfiles_includes = depset([ctx.file.configure.short_path.rsplit("/", 1)[0] + "/src/libsodium/include", ctx.file.configure.short_path.rsplit("/", 1)[0] + "/src/libsodium/include/sodium"]), commands = [])]
 
 sodium_library = rule(implementation = _sodium_impl, attrs = {"srcs": attr.label_list(allow_files = True), "hdrs": attr.label_list(allow_files = True), "configure": attr.label(allow_single_file = True), "arm": attr.bool(), "_driver": attr.label(default = "//tools:build_action.py", allow_single_file = True)})
 
@@ -60,7 +63,7 @@ def _script_impl(ctx):
     main = ctx.file.main.short_path
     python_root = ctx.file._python_marker.short_path.rsplit("/", 2)[0]
     shared = ctx.file.shared.short_path if ctx.file.shared else ""
-    code = "#!/usr/bin/python3\nimport os,runpy,sys\nfrom pathlib import Path\nr=Path(os.environ.get('RUNFILES_DIR',str(Path(__file__))+'.runfiles'))/'_main'\np=r/%r\nos.chdir(r)\npaths=[str(p),str(r),str(r/'tests'),str((r/%r).parent),str(r/'bindings/python')]\nsys.path[:0]=paths\nos.environ['PYTHONPATH']=os.pathsep.join(paths+[os.environ.get('PYTHONPATH','')])\nshared=%r\nif shared:\n os.environ['SIMPLECRYPTS_LIB']=str(r/shared)\n os.environ['LD_LIBRARY_PATH']=str((r/shared).parent)+os.pathsep+os.environ.get('LD_LIBRARY_PATH','')\nsys.argv=[str(r/%r)]+%r+sys.argv[1:]\nrunpy.run_path(str(r/%r),run_name='__main__')\n" % (python_root, main, shared, main, ctx.attr.script_args, main)
+    code = "#!/usr/bin/python3\nimport os,runpy,sys\nfrom pathlib import Path\nr=Path(os.environ.get('RUNFILES_DIR',str(Path(__file__))+'.runfiles'))/'_main'\np=r/%r\nos.chdir(r)\npaths=[str(p),str(r),str(r/'tests'),str(r/'tools'),str((r/%r).parent),str(r/'bindings/python')]\nsys.path[:0]=paths\nos.environ['PYTHONPATH']=os.pathsep.join(paths+[os.environ.get('PYTHONPATH','')])\nshared=%r\nif shared:\n os.environ['SIMPLECRYPTS_LIB']=str(r/shared)\n os.environ['LD_LIBRARY_PATH']=str((r/shared).parent)+os.pathsep+os.environ.get('LD_LIBRARY_PATH','')\nsys.argv=[str(r/%r)]+%r+sys.argv[1:]\nrunpy.run_path(str(r/%r),run_name='__main__')\n" % (python_root, main, shared, main, ctx.attr.script_args, main)
 
     # Nested adapters share this executable's declared runfiles. Bazel test
     # supplies RUNFILES_DIR, but bazel run need not; export the resolved root.
@@ -89,13 +92,19 @@ def _sdk_binary_impl(ctx):
         "test_build": ctx.attr.test_build,
         "quality": ctx.attr.quality,
         "sources": [s.path for s in ctx.files.srcs],
+        "rust_crates": ctx.file._rust_marker.dirname if ctx.attr.kind == "rust" else "",
+        "go_proxy": ctx.file._go_marker.dirname if ctx.attr.kind == "go" else "",
     }
-    ctx.actions.run(executable = "/usr/bin/python3", arguments = [ctx.file._driver.path, "sdk_binary", json.encode(config)], inputs = depset(ctx.files.srcs + ctx.files.sdk + [ctx.file._driver] + ([shared] if shared else [])), outputs = [out], mnemonic = "CompileSDK", progress_message = "Compiling %s adapter" % ctx.attr.kind)
+    ctx.actions.run(executable = "/usr/bin/python3", arguments = [ctx.file._driver.path, "sdk_binary", json.encode(config)], inputs = depset(ctx.files.srcs + ctx.files.sdk + (ctx.files._rust_sources if ctx.attr.kind == "rust" else ctx.files._go_sources) + [ctx.file._driver] + ([shared] if shared else [])), outputs = [out], mnemonic = "CompileSDK", progress_message = "Compiling %s adapter" % ctx.attr.kind)
     code = "#!/usr/bin/python3\nimport os,sys\nfrom pathlib import Path\nr=Path(os.environ.get('RUNFILES_DIR',str(Path(__file__))+'.runfiles'))/'_main'\ns=%r\nif s: os.environ['LD_LIBRARY_PATH']=str((r/s).parent)+os.pathsep+os.environ.get('LD_LIBRARY_PATH','')\nos.execv(str(r/%r),[str(r/%r)]+sys.argv[1:])\n" % (shared.short_path if shared else "", out.short_path, out.short_path)
     ctx.actions.write(launcher, code, is_executable = True)
     return [DefaultInfo(executable = launcher, runfiles = ctx.runfiles(files = [out] + ([shared] if shared else [])))]
 
 _sdk_attrs = {
+    "_rust_marker": attr.label(default = "@language_sources//:rust/ROOT", allow_single_file = True),
+    "_go_marker": attr.label(default = "@language_sources//:go/ROOT", allow_single_file = True),
+    "_rust_sources": attr.label(default = "@language_sources//:rust"),
+    "_go_sources": attr.label(default = "@language_sources//:go"),
     "kind": attr.string(),
     "module": attr.string(),
     "binary": attr.string(),
@@ -132,6 +141,7 @@ def _resource_report_impl(ctx):
         "sources": [f.path for f in ctx.files.srcs if f.extension == "c"],
         "archive": archive.path,
         "sodium_stack": stack.path,
+        "includes": [".", ctx.file._nanopb_header.dirname, ctx.file._sodium_header.dirname],
         "linker": ctx.file.linker.path,
         "outputs": {f.basename: f.path for f in outputs},
     }
@@ -143,9 +153,11 @@ def _resource_report_impl(ctx):
         mnemonic = "CortexResourceReport",
         progress_message = "Linking Cortex-M4 core and reference crypto provider",
     )
-    return [DefaultInfo(files = depset(outputs)), AnalysisInfo(commands = [dict(file = f.short_path, includes = [".", "third_party/nanopb", "third_party/libsodium/src/libsodium/include"], copts = [], profile = "arm") for f in ctx.files.srcs if f.extension == "c"])]
+    return [DefaultInfo(files = depset(outputs)), AnalysisInfo(commands = [dict(file = f.short_path, includes = [".", ctx.file._nanopb_header.short_path.rsplit("/", 1)[0], ctx.file._sodium_header.short_path.rsplit("/", 1)[0]], copts = [], profile = "arm") for f in ctx.files.srcs if f.extension == "c"])]
 
 cortex_resource_report = rule(implementation = _resource_report_impl, attrs = {
+    "_nanopb_header": attr.label(default = "@nanopb//:pb.h", allow_single_file = True),
+    "_sodium_header": attr.label(default = "@libsodium//:src/libsodium/include/sodium.h", allow_single_file = True),
     "srcs": attr.label_list(allow_files = True),
     "headers": attr.label_list(allow_files = True),
     "sodium": attr.label(providers = [CLibraryInfo]),

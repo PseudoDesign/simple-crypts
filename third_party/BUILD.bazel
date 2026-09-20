@@ -1,0 +1,11 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "libsodium.BUILD.bazel",
+    "libsodium-version.patch",
+])
+
+filegroup(
+    name = "quality_sources",
+    srcs = glob(["*"]),
+)

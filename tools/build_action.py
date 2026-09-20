@@ -128,16 +128,15 @@ def sdk_binary(config):
             env.update(
                 GOROOT=str(sdk),
                 GOTOOLCHAIN="local",
-                GOPROXY="off",
+                GOPROXY=Path(config["go_proxy"]).resolve().as_uri(),
+                GOMODCACHE=str(root / ".gomodcache"),
                 GOSUMDB="off",
                 GOCACHE=str(root / ".gocache"),
                 GOPATH=str(root / ".gopath"),
                 CGO_ENABLED="1",
                 CGO_LDFLAGS=("-L" + str(shared.parent)) if shared else "",
             )
-            module_mode = (
-                "-mod=vendor" if (root / config["module"] / "vendor").is_dir() else "-mod=readonly"
-            )
+            module_mode = "-mod=readonly"
             if config.get("quality"):
                 run(
                     [str(sdk / "bin/go"), "vet", module_mode, "./..."],
@@ -158,11 +157,12 @@ def sdk_binary(config):
                 CARGO_HOME=str(root / ".cargo-home"),
                 RUSTFLAGS=("-L native=" + str(shared.parent)) if shared else "",
             )
+            shutil.copytree(config["rust_crates"], root / "vendor")
             cargo_config = root / ".cargo/config.toml"
             cargo_config.parent.mkdir()
             cargo_config.write_text(
                 '[source.crates-io]\nreplace-with="vendored-sources"\n[source.vendored-sources]\ndirectory="'
-                + str(root / "third_party/rust_crates")
+                + str(root / "vendor")
                 + '"\n'
             )
             common = [
@@ -255,7 +255,7 @@ def resource_report(config):
         "-Wall",
         "-Wextra",
     ]
-    includes = ["-I.", "-Ithird_party/nanopb", "-Ithird_party/libsodium/src/libsodium/include"]
+    includes = ["-I" + path for path in config["includes"]]
     with tempfile.TemporaryDirectory(dir=outputs["probe.elf"].parent, prefix="cortex-") as tmp:
         temporary = Path(tmp)
         objects = []

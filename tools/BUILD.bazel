@@ -1,8 +1,9 @@
-load("//build:defs.bzl", "c_analysis_database", "py_test")
+load("//build:defs.bzl", "c_analysis_database", "py_binary", "py_test")
 
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
+    "dependency_paths.py",
     "build_action.py",
     "bootstrap.py",
     "downloads.lock.json",
@@ -12,8 +13,21 @@ exports_files([
 ])
 
 py_test(
+    name = "dependency_lock_check",
+    data = [
+        "//bindings/rust:Cargo.lock",
+        "//build:dependencies.lock.json",
+        "//tests/crypto:go.sum",
+    ],
+    main = "lock_dependencies.py",
+    script_args = ["--check"],
+)
+
+py_test(
     name = "schema_check",
     data = [
+        "dependency_paths.py",
+        "//build:dependency_paths",
         "//schema:sc.options",
         "//schema:sc.pb.c",
         "//schema:sc.pb.h",
@@ -22,6 +36,20 @@ py_test(
         "@protobuf_sdk//:files",
     ],
     main = "check_schema.py",
+)
+
+py_binary(
+    name = "schema_generate",
+    data = [
+        "dependency_paths.py",
+        "//build:dependency_paths",
+        "//schema:sc.options",
+        "//schema:sc.proto",
+        "//third_party/nanopb:generator",
+        "@protobuf_sdk//:files",
+    ],
+    main = "check_schema.py",
+    script_args = ["--write"],
 )
 
 py_test(

@@ -23,9 +23,9 @@ wasm_build(
         "//core:sc.c",
         "//providers/sodium:sc_sodium.c",
         "//schema:sc.pb.c",
-        "//third_party/nanopb:pb_common.c",
-        "//third_party/nanopb:pb_encode.c",
-        "//third_party/nanopb:pb_decode.c",
+        "@nanopb//:pb_common.c",
+        "@nanopb//:pb_encode.c",
+        "@nanopb//:pb_decode.c",
     ],
 )
 

@@ -1,0 +1,15 @@
+"""Source-only overlay for the pinned libsodium release archive."""
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "sources",
+    srcs = glob(["**"], exclude = ["BUILD.bazel"]),
+)
+
+filegroup(
+    name = "headers",
+    srcs = glob(["src/libsodium/include/**/*.h"]),
+)
+
+exports_files(["configure", "src/libsodium/include/sodium.h"])

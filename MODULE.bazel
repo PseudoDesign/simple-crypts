@@ -3,11 +3,9 @@ module(
     version = "0.1.0",
 )
 
-bazel_dep(name = "platforms", version = "0.0.11")
-local_path_override(
-    module_name = "platforms",
-    path = "third_party/platforms",
-)
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "nanopb", version = "0.4.9.1.bcr.3")
+bazel_dep(name = "rules_cc", version = "0.2.25")
 
 local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
 
@@ -39,4 +37,25 @@ local_repository(
 local_repository(
     name = "quality_sdk",
     path = ".toolchains/quality",
+)
+
+# The required libsodium release is not in BCR. Preserve the audited version
+# and portable configure flags; only its source storage changes.
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "libsodium",
+    build_file = "//third_party:libsodium.BUILD.bazel",
+    patch_args = ["-p1"],
+    patches = ["//third_party:libsodium-version.patch"],
+    sha256 = "ebb65ef6ca439333c2bb41a0c1990587288da07f6c7fd07cb3a18cc18d30ce19",
+    strip_prefix = "libsodium-1.0.20",
+    urls = ["https://download.libsodium.org/libsodium/releases/libsodium-1.0.20.tar.gz"],
+)
+
+language_sources = use_repo_rule("//build:dependencies.bzl", "language_sources")
+
+language_sources(
+    name = "language_sources",
+    lock = "//build:dependencies.lock.json",
 )

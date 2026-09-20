@@ -73,8 +73,6 @@ def main():
     rows = json.loads((ROOT / "tools/downloads.lock.json").read_text())
     for row in rows:
         name = row["file"]
-        if name.startswith(("libsodium-", "nanopb-", "platforms-")):
-            continue  # Source snapshots are committed, not rebuilt by bootstrap.
         if options.verify_only and not (CACHE / "downloads" / name).is_file():
             raise SystemExit("Missing cached archive: " + name)
         archive = download(row)

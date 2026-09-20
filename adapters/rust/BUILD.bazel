@@ -7,7 +7,6 @@ sdk_binary(
     srcs = [
         "main.rs",
         "//bindings/rust:sources",
-        "//third_party/rust_crates:sources",
     ],
     binary = "simplecrypts-rust",
     kind = "rust",

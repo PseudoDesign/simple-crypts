@@ -27,7 +27,7 @@ def main(c):
             with log.open("w") as stream:
                 if c["kind"] == "sodium":
                     source = root / "sodium"
-                    shutil.copytree("third_party/libsodium", source)
+                    shutil.copytree(c["sodium_source"], source)
                     env.update(
                         CC=str(em / "emcc"),
                         AR=str(em / "emar"),
@@ -77,9 +77,7 @@ def main(c):
                             "-Wall",
                             "-Wextra",
                             "-Werror",
-                            "-I.",
-                            "-Ithird_party/nanopb",
-                            "-Ithird_party/libsodium/src/libsodium/include",
+                            *["-I" + path for path in c["includes"]],
                             *(["-DSC_ENABLE_TESTING"] if c.get("testing") else []),
                             "-c",
                             source,

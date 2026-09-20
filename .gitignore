@@ -7,3 +7,4 @@ target/
 web/node_modules/
 web/test-results/
 .ruff_cache/
+.bazelrc.local

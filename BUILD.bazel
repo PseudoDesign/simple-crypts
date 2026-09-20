@@ -10,10 +10,13 @@ exports_files([
 # Package-local files avoid following build-output or SDK directory symlinks.
 filegroup(
     name = "quality_sources",
-    srcs = glob([
-        "*",
-        ".github/workflows/*",
-    ]),
+    srcs = glob(
+        [
+            "*",
+            ".github/workflows/*",
+        ],
+        exclude = [".bazelrc.local"],
+    ),
     visibility = ["//visibility:public"],
 )
 
@@ -42,6 +45,9 @@ filegroup(
         "//schema:quality_sources",
         "//tests:quality_sources",
         "//tests/crypto:quality_sources",
+        "//third_party:quality_sources",
+        "//third_party/libsodium:quality_sources",
+        "//third_party/nanopb:quality_sources",
         "//tools:quality_sources",
         "//web:quality_sources",
     ],

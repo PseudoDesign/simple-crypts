@@ -15,21 +15,6 @@
     "url": "https://go.dev/dl/go1.24.4.linux-amd64.tar.gz"
   },
   {
-    "file": "libsodium-1.0.20.tar.gz",
-    "sha256": "ebb65ef6ca439333c2bb41a0c1990587288da07f6c7fd07cb3a18cc18d30ce19",
-    "url": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.20.tar.gz"
-  },
-  {
-    "file": "nanopb-0.4.9.1.tar.gz",
-    "sha256": "4575944a468718ef25f05eb01d994364650b581563089a9841986bb1e460eac3",
-    "url": "https://codeload.github.com/nanopb/nanopb/tar.gz/refs/tags/0.4.9.1"
-  },
-  {
-    "file": "platforms-0.0.11.tar.gz",
-    "sha256": "ace459f5d033c86e6578df817f739b21101c0ebcd409a97badc2979c22ce9fdc",
-    "url": "https://codeload.github.com/bazelbuild/platforms/tar.gz/refs/tags/0.0.11"
-  },
-  {
     "file": "protobuf-5.29.3-cp38-abi3-manylinux2014_x86_64.whl",
     "sha256": "c027e08a08be10b67c06bf2370b99c811c466398c357e615ca88c91c07f0910f",
     "url": "https://files.pythonhosted.org/packages/a8/45/2ebbde52ad2be18d3675b6bee50e68cd73c9e0654de77d595540b5129df8/protobuf-5.29.3-cp38-abi3-manylinux2014_x86_64.whl"

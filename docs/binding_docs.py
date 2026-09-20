@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 
 from build_action import sdk_binary
+from dependency_paths import dependency
 from repository_quality import sdk
 
 
@@ -145,10 +146,7 @@ def build_bindings(output):
     render(output, "go", entries)
     render(output, "javascript", javascript_entries())
     rust_sources = [
-        str(path)
-        for root in ("bindings/rust", "third_party/rust_crates")
-        for path in Path(root).rglob("*")
-        if path.is_file()
+        str(path) for root in ("bindings/rust",) for path in Path(root).rglob("*") if path.is_file()
     ]
     sdk_binary(
         dict(
@@ -159,6 +157,7 @@ def build_bindings(output):
             kind="rust",
             module="bindings/rust",
             documentation=True,
+            rust_crates=str(dependency("rust_crates")),
         )
     )
     (output / "html/rust/index.html").write_text(

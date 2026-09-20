@@ -51,6 +51,16 @@ round trip do not define the current signed-enrollment flow.
 
 ## Evaluation and extensions
 
+The [STM32WBA65 demo implementation plan](docs/stm32wba65-demo-plan.md) defines
+the next hardware application: portable Bazel firmware builds, a Linux serial
+CLI, erasable persistent state, and factory reset without OTP or option-byte
+changes. It includes the NVM write/endurance budget and acceptance criteria.
+
+The [QT Py RP2040 demo audit](docs/qtpy-rp2040-demo-audit.md) evaluates a second
+board using Pico SDK's Bazel support, native USB, erasable external flash, and
+trusted-host entropy provisioning. It records build probes and the remaining
+qualification work; it does not replace the STM32 implementation plan.
+
 The [test harness](docs/testing.md) covers all sixteen language pairings and
 reproducible relay schedules. The [browser demo](web/README.md) exposes messages,
 endpoint state, and library results. The [MCU evaluation notes](MCU_FEASIBILITY.md)

@@ -1,5 +1,44 @@
 load("//build:defs.bzl", "c_library")
+
 package(default_visibility = ["//visibility:public"])
-c_library(name = "runtime", srcs = ["pb_common.c", "pb_encode.c", "pb_decode.c"], hdrs = ["pb.h", "pb_common.h", "pb_encode.h", "pb_decode.h"], includes = ["third_party/nanopb"])
-filegroup(name = "generator", srcs = glob(["generator/**"], exclude=["generator/**/__pycache__/**", "generator/**/*.pyc"]))
-filegroup(name = "sources", srcs = ["pb_common.c", "pb_encode.c", "pb_decode.c", "pb.h", "pb_common.h", "pb_encode.h", "pb_decode.h"])
+
+# The existing C/Arm/Wasm drivers share BCR's unmodified runtime sources.
+SOURCES = ["@nanopb//:" + name for name in [
+    "pb_common.c",
+    "pb_encode.c",
+    "pb_decode.c",
+]]
+
+HEADERS = ["@nanopb//:" + name for name in [
+    "pb.h",
+    "pb_common.h",
+    "pb_encode.h",
+    "pb_decode.h",
+]]
+
+c_library(
+    name = "runtime",
+    srcs = SOURCES,
+    hdrs = HEADERS,
+    include_roots = ["@nanopb//:pb.h"],
+)
+
+filegroup(
+    name = "sources",
+    srcs = SOURCES + HEADERS,
+)
+
+filegroup(
+    name = "generator",
+    srcs = ["@nanopb//:" + name for name in [
+        "generator/nanopb_generator.py",
+        "generator/proto/__init__.py",
+        "generator/proto/_utils.py",
+        "generator/proto/nanopb.proto",
+    ]],
+)
+
+filegroup(
+    name = "quality_sources",
+    srcs = ["BUILD.bazel"],
+)

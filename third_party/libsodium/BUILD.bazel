@@ -1,6 +1,33 @@
 load("//build:defs.bzl", "sodium_library")
+
 package(default_visibility = ["//visibility:public"])
-filegroup(name = "sources", srcs = glob(["**"], exclude = ["BUILD.bazel"]))
-filegroup(name = "headers", srcs = glob(["src/libsodium/include/**/*.h"]))
-sodium_library(name = "sodium", srcs = [":sources"], hdrs = [":headers"], configure = "configure")
-sodium_library(name = "sodium_arm", srcs = [":sources"], hdrs = [":headers"], configure = "configure", arm = True)
+
+alias(
+    name = "sources",
+    actual = "@libsodium//:sources",
+)
+
+alias(
+    name = "headers",
+    actual = "@libsodium//:headers",
+)
+
+sodium_library(
+    name = "sodium",
+    srcs = [":sources"],
+    hdrs = [":headers"],
+    configure = "@libsodium//:configure",
+)
+
+sodium_library(
+    name = "sodium_arm",
+    srcs = [":sources"],
+    hdrs = [":headers"],
+    arm = True,
+    configure = "@libsodium//:configure",
+)
+
+filegroup(
+    name = "quality_sources",
+    srcs = ["BUILD.bazel"],
+)

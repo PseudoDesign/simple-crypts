@@ -14,6 +14,8 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+from dependency_paths import dependency
+
 
 def run(arguments: list[str], *, env: dict[str, str]) -> None:
     subprocess.run(arguments, check=True, env=env)
@@ -43,15 +45,15 @@ def main() -> None:
         "-fno-pie",
         "-DSC_ENABLE_TESTING",
         "-I" + str(root),
-        "-I" + str(root / "third_party/nanopb"),
-        "-I" + str(root / "third_party/libsodium/src/libsodium/include"),
+        "-I" + str(dependency("nanopb")),
+        "-I" + str(dependency("sodium_headers")),
     ]
     core_sources = [
         "core/sc.c",
         "schema/sc.pb.c",
-        "third_party/nanopb/pb_common.c",
-        "third_party/nanopb/pb_encode.c",
-        "third_party/nanopb/pb_decode.c",
+        str(dependency("nanopb") / "pb_common.c"),
+        str(dependency("nanopb") / "pb_encode.c"),
+        str(dependency("nanopb") / "pb_decode.c"),
     ]
     adapter_sources = [
         "providers/sodium/sc_sodium.c",

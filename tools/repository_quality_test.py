@@ -26,7 +26,9 @@ class RepositoryQualityTest(unittest.TestCase):
                 "tests/test.py",
                 "examples/app.cpp",
                 "web/main.mjs",
-                "third_party/library.c",
+                "vendor/library.c",
+                "external/library.c",
+                "third_party/BUILD.bazel",
                 "site/app.mjs",
                 "bazel-bin/output.c",
                 "schema/sc.pb.c",
@@ -37,7 +39,7 @@ class RepositoryQualityTest(unittest.TestCase):
                 path.write_text("")
             self.assertEqual(
                 {str(p) for p in sources(root)},
-                {"tests/test.py", "examples/app.cpp", "web/main.mjs"},
+                {"tests/test.py", "examples/app.cpp", "web/main.mjs", "third_party/BUILD.bazel"},
             )
 
     def test_python_analysis_and_format(self):

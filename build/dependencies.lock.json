@@ -1,0 +1,87 @@
+{
+  "crates": [
+    {
+      "name": "itoa",
+      "version": "1.0.18",
+      "checksum": "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
+    },
+    {
+      "name": "memchr",
+      "version": "2.8.3",
+      "checksum": "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+    },
+    {
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "checksum": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
+    },
+    {
+      "name": "quote",
+      "version": "1.0.47",
+      "checksum": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
+    },
+    {
+      "name": "ryu",
+      "version": "1.0.23",
+      "checksum": "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
+    },
+    {
+      "name": "serde",
+      "version": "1.0.229",
+      "checksum": "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
+    },
+    {
+      "name": "serde_core",
+      "version": "1.0.229",
+      "checksum": "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48"
+    },
+    {
+      "name": "serde_derive",
+      "version": "1.0.229",
+      "checksum": "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
+    },
+    {
+      "name": "serde_json",
+      "version": "1.0.140",
+      "checksum": "20068b6e96dc6c9bd23e01df8827e6c7e1f2fddd43c21810382803c136b99373"
+    },
+    {
+      "name": "syn",
+      "version": "3.0.6",
+      "checksum": "8593e8e72159ed2257d083c7a454a85cbf854f37a0966d8d483aff8c8a3ebcee"
+    },
+    {
+      "name": "unicode-ident",
+      "version": "1.0.26",
+      "checksum": "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954"
+    }
+  ],
+  "go_modules": [
+    {
+      "name": "golang.org/x/crypto",
+      "version": "v0.36.0",
+      "go_sum": {
+        "zip": "h1:AnAEvhDddvBdpY+uR+MyHmuZzzNqXSe/GvuDeob5L34=",
+        "mod": "h1:Y4J0ReaxCR1IMaabaSMugxJES1EpwhBHhv2bDHklZvc="
+      },
+      "sha256": {
+        "info": "99586782bd8e27f6ee3950e47382131f0517d86b1724a3e2dd239531a602562e",
+        "mod": "d03539b6f5aa57442503fa0a9151ed81407bf71f90192d0da2fa2c06ff790ab2",
+        "zip": "86bb4875b3d2bd173b820d2d81d4ae630508fa65183a44dac2cb915e4f904180"
+      }
+    },
+    {
+      "name": "golang.org/x/sys",
+      "version": "v0.31.0",
+      "go_sum": {
+        "zip": "h1:ioabZlmFYtWhL+TRYpcnNlLwhyxaM9kWTDEmfnprqik=",
+        "mod": "h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k="
+      },
+      "sha256": {
+        "info": "b7e5a85b2761255a48945d8a3d6325065009348e1f48a74967f4705b93dcca20",
+        "mod": "f67e3e18f4c08e60a7e80726ab36b691fdcea5b81ae1c696ff64caf518bcfe3d",
+        "zip": "55f8255602c7a68419745943298893f0a83d6d6696199cfe6b644054669509f3"
+      }
+    }
+  ]
+}

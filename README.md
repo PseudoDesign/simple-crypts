@@ -20,14 +20,16 @@ number; a fleet service supplies the registry and routes frames to contexts.
 
 ## Build and run
 
-The build targets Linux x86-64. Install Bazel 9.2.0, a C compiler and binutils,
-Python 3.12, GNU Make, and the Arm GNU bare-metal toolchain. Pinned dependency
-sources are included; `tools/bootstrap.py` installs the pinned Go, Rust,
-protobuf, and Python tools used by Bazel. Downloads happen during bootstrap,
-not during tests.
+The supported build profile is Linux x86-64 with Python 3.12 and Bazel 9.2.0.
+Install the [system prerequisites](tools/README.md), including the C/Arm tools,
+Node.js/npm, clang-format/clang-tidy, and Doxygen required by the full test suite.
+`tools/bootstrap.py` installs pinned SDKs and tools; Bazel fetches pinned external
+dependencies on first use. Build and test actions use the prepared dependencies
+without downloading packages.
 
 ```sh
 python3 tools/bootstrap.py
+npm ci --prefix web --ignore-scripts --no-audit --no-fund
 bazel test //...
 bazel run //examples:device_server_demo
 bazel build //platforms/cortex_m4:resource_report
@@ -99,6 +101,7 @@ base64 belong only to diagnostics and test adapters.
 - The Cortex-M4 report links the core and libsodium provider and records code,
   static RAM, declared workspaces, and compiler stack-usage information.
 
+[Dependency policy and audit](docs/dependency-audit.md) records BCR pins, archive exceptions, and repository footprint decisions.
 [Testing and replay](docs/testing.md) explains the harness and failure artifacts.
 [Publishing the report](docs/publishing.md) explains how to refresh Pages from a tested commit.
 [The protocol](docs/protocol.md) specifies the frame and state rules.

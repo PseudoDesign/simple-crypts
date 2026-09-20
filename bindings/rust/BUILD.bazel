@@ -14,7 +14,6 @@ sdk_test(
     name = "sdk_test",
     srcs = [
         ":sources",
-        "//third_party/rust_crates:sources",
     ],
     kind = "rust",
     module = "bindings/rust",
@@ -41,7 +40,6 @@ sdk_test(
     srcs = [
         ":sources",
         "//adapters/rust:main.rs",
-        "//third_party/rust_crates:sources",
     ],
     kind = "rust",
     module = "bindings/rust",

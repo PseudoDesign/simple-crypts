@@ -1,3 +1,5 @@
+load(":dependencies.bzl", "dependency_paths")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(["defs.bzl"])
@@ -7,4 +9,20 @@ filegroup(
     name = "quality_sources",
     srcs = glob(["*"]),
     visibility = ["//visibility:public"],
+)
+
+exports_files([
+    "dependencies.bzl",
+    "dependencies.lock.json",
+])
+
+dependency_paths(
+    name = "dependency_paths",
+    markers = {
+        "@nanopb//:pb.h": "nanopb",
+        "@libsodium//:src/libsodium/include/sodium.h": "sodium_headers",
+        "@language_sources//:rust/ROOT": "rust_crates",
+        "@language_sources//:go/ROOT": "go_modules",
+        "@protobuf_sdk//:bin/protoc": "protoc",
+    },
 )

@@ -4,7 +4,7 @@ Quality rules cover all maintained first-party code: the C library and providers
 C/C++ adapters, tests and browser bridges, Python, Go, Rust, JavaScript, HTML,
 CSS, Bazel/Starlark, and configuration/schema files. Tests and examples follow
 the same rules as production code. `tools/source_policy.py` defines ownership;
-vendored dependencies, toolchains, generated schema bindings, and published site
+external dependencies, toolchains, generated schema bindings, and published site
 artifacts are excluded from source rewriting. Schema/codec regeneration checks
 and site asset manifests validate generated outputs separately. Recorded evidence
 is retained unchanged.
@@ -63,7 +63,7 @@ Clang analysis uses compilation metadata from the Bazel rules, including C99,
 C++17, transitive includes, production/testing defines, Emscripten headers and
 Cortex-M4 targeting. Included `.inc` implementations are analyzed through their
 containing translation unit. Dependency headers remain available to analysis,
-but diagnostics from vendored sources are not lint targets. Any suppression
+but diagnostics from external dependency sources are not lint targets. Any suppression
 must name one check and explain the false positive next to the code. Do not
 add blanket baselines. The generated Rust resource constants have a narrowly
 scoped documentation exemption because the schema generator owns that file.

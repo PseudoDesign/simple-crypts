@@ -84,6 +84,15 @@ Fixture helpers are identified as test-only; example interfaces are separate fro
 the stable C library API. None of these rules changes the public C ABI, wire
 format, storage format or C99 requirement.
 
+Bazel marks fixture libraries, conformance adapters, the test Wasm module, and
+the fixture-based `//examples:device_server_demo` as `testonly`, with visibility
+limited to their consumers. Production targets cannot depend on them. The demo
+remains runnable with `bazel run`; use `//examples:python_api` for a production
+SDK example. `//tools:production_boundaries_test` checks production native, Arm,
+and Wasm compilation metadata for test defines and verifies that the host shared
+library does not export the revision-seeding hook. Its compilation database is
+also a production target, so Bazel rejects fixture dependencies during analysis.
+
 `bazel-bin/docs/api/html/index.html` links the C reference to the Python, Go,
 JavaScript and Rust references. C also emits XML; Python/Go/JS emit `api.json`
 with parsed signatures and contracts. All references support search. Generation

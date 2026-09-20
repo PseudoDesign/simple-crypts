@@ -4,9 +4,14 @@ package(default_visibility = ["//visibility:public"])
 
 py_binary(
     name = "adapter",
+    testonly = True,
     data = ["//bindings/python:simplecrypts.py"],
     main = "main.py",
     shared = "//providers/host:libsimplecrypts_testing",
+    visibility = [
+        "//examples:__pkg__",
+        "//tests:__pkg__",
+    ],
 )
 
 # Package-local files avoid following build-output or SDK directory symlinks.

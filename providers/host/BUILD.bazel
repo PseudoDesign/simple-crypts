@@ -14,9 +14,14 @@ c_library(
 
 c_library(
     name = "host_testing",
+    testonly = True,
     srcs = ["sc_host.c"],
     hdrs = ["sc_host.h"],
     copts = ["-DSC_ENABLE_TESTING"],
+    visibility = [
+        "//adapters/c:__pkg__",
+        "//tools:__pkg__",
+    ],
     deps = [
         "//core:sc_testing",
         "//providers/sodium",
@@ -31,8 +36,17 @@ c_binary(
 
 c_binary(
     name = "libsimplecrypts_testing",
+    testonly = True,
     output_name = "testing/libsimplecrypts.so",
     shared = True,
+    visibility = [
+        "//adapters/go:__pkg__",
+        "//adapters/python:__pkg__",
+        "//adapters/rust:__pkg__",
+        "//bindings/go:__pkg__",
+        "//bindings/rust:__pkg__",
+        "//tests:__pkg__",
+    ],
     deps = [":host_testing"],
 )
 

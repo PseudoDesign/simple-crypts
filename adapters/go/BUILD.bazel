@@ -4,6 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 sdk_binary(
     name = "adapter",
+    testonly = True,
     srcs = ["go.mod"] + glob(["*.go"]) + [
         "//bindings/go:sources",
         "//core:sources",
@@ -14,6 +15,9 @@ sdk_binary(
     sdk = "@go_sdk//:files",
     sdk_marker = "@go_sdk//:bin/go",
     shared = "//providers/host:libsimplecrypts_testing",
+    visibility = [
+        "//tests:__pkg__",
+    ],
 )
 
 # Package-local files avoid following build-output or SDK directory symlinks.

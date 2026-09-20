@@ -41,12 +41,16 @@ wasm_build(
 
 wasm_build(
     name = "test_module",
+    testonly = True,
     inputs = HEADERS,
     kind = "module",
     output = "endpoint.test.mjs",
     sodium = ":sodium",
     sources = SOURCES,
     testing = True,
+    visibility = [
+        "//tools:__pkg__",
+    ],
 )
 
 py_test(

@@ -75,6 +75,27 @@ py_test(
 )
 
 c_analysis_database(
+    name = "production_analysis_database",
+    deps = [
+        "//core:sc",
+        "//examples/device_console:module",
+        "//examples/fleet_manager:module",
+        "//platforms/cortex_m4:resource_report",
+        "//providers/host:libsimplecrypts",
+        "//web:module",
+    ],
+)
+
+py_test(
+    name = "production_boundaries_test",
+    data = [
+        ":production_analysis_database",
+        "//providers/host:libsimplecrypts",
+    ],
+    main = "production_boundaries_test.py",
+)
+
+c_analysis_database(
     name = "analysis_database",
     testonly = True,
     deps = [
@@ -134,6 +155,7 @@ test_suite(
     tests = [
         ":format_check",
         ":lint",
+        ":production_boundaries_test",
         ":quality_test",
         ":repository_quality_test",
         "//docs:api_check",

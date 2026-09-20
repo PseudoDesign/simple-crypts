@@ -4,6 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 sdk_binary(
     name = "adapter",
+    testonly = True,
     srcs = [
         "main.rs",
         "//bindings/rust:sources",
@@ -14,6 +15,9 @@ sdk_binary(
     sdk = "@rust_sdk//:files",
     sdk_marker = "@rust_sdk//:bin/rustc",
     shared = "//providers/host:libsimplecrypts_testing",
+    visibility = [
+        "//tests:__pkg__",
+    ],
 )
 
 # Package-local files avoid following build-output or SDK directory symlinks.

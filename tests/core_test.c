@@ -152,4 +152,33 @@ static void exhaustion(void){
  d.nonce_next=d.nonce_limit;dm.fail_reserve=1;n=0;CHECK(sc_outbound(&d,512,f,512,&n)==SC_ERR_STORAGE&&n==0);dm.fail_reserve=0;transfer(&d,&s);transfer(&s,&d);
  puts("PASS revision exhaustion and failed nonce reservations preserve state");
 }
-int main(void){credits();generic();exhaustion();return 0;}
+/* A repeated response must not commit inactive value members or padding. */
+static void semantic_replay(void) {
+    sc_context d, s;
+    memory_store dm, sm;
+    uint8_t frame[SC_MAX_FRAME];
+    size_t length;
+    uint64_t generation;
+    pair(&d, &dm, &s, &sm);
+    enroll(&d, &s);
+    OK(sc_set_credits_issued(&s, 10));
+    transfer(&s, &d);
+    length = outbound(&d, frame);
+    OK(sc_receive(&s, frame, length));
+    generation = sm.generation;
+    /* i64 is inactive for credits' uint64 fields. */
+    s.state.data.groups[0].values[0].i64 = 42;
+    s.state.data.groups[0].snapshot[0].bytes[0] = 7;
+    sm.fail_commit = 1;
+    OK(sc_receive(&s, frame, length));
+    CHECK(sm.generation == generation);
+    sm.fail_commit = 0;
+    generation = dm.generation;
+    dm.fail_commit = 1;
+    length = outbound(&d, frame);
+    CHECK(length > 0 && dm.generation == generation);
+    dm.fail_commit = 0;
+    transfer(&s, &d);
+    puts("PASS semantic replay avoids redundant durable writes");
+}
+int main(void){semantic_replay();credits();generic();exhaustion();return 0;}

@@ -562,6 +562,27 @@ static sc_status make_packet(sc_context *ctx, simplecrypts_Packet *p) {
     return SC_NO_OUTPUT;
 }
 
+/* Only schema-selected values and synchronization counters are meaningful.
+ * Struct padding and inactive sc_value members must not trigger durable writes. */
+static int group_equal(const sc_group_definition *d, const sc_group_state *a,
+                       const sc_group_state *b) {
+    unsigned i;
+    if (a->local_revision != b->local_revision || a->request_id != b->request_id ||
+        a->snapshot_id != b->snapshot_id || a->acknowledged_id != b->acknowledged_id ||
+        a->last_sent_id != b->last_sent_id || a->request_pending != b->request_pending ||
+        a->response_pending != b->response_pending || a->receipt_pending != b->receipt_pending ||
+        a->has_snapshot != b->has_snapshot) {
+        return 0;
+    }
+    for (i = 0; i < d->count; ++i) {
+        if (!value_equal(&d->fields[i], &a->values[i], &b->values[i]) ||
+            (a->has_snapshot && !value_equal(&d->fields[i], &a->snapshot[i], &b->snapshot[i]))) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static sc_status receive_data(sc_context *ctx, const simplecrypts_Packet *p) {
     int index;
     unsigned j;
@@ -665,7 +686,7 @@ static sc_status receive_data(sc_context *ctx, const simplecrypts_Packet *p) {
         g->receipt_pending = 1;
         memcpy(g->snapshot, incoming, sizeof g->snapshot);
     }
-    return memcmp(&next, &ctx->state, sizeof next) ? save(ctx, &next) : SC_OK;
+    return group_equal(d, g, &ctx->state.data.groups[index]) ? SC_OK : save(ctx, &next);
 }
 
 static sc_status next_nonce(sc_context *ctx, uint8_t out[SC_NONCE_BYTES]) {
@@ -700,6 +721,7 @@ sc_status sc_outbound(sc_context *ctx, size_t byte_budget, uint8_t *frame, size_
     pb_ostream_t stream;
     sc_status status;
     size_t total;
+    int changed = 0;
     sc_state next;
     uint8_t nonce[SC_NONCE_BYTES];
     if (length) {
@@ -750,6 +772,7 @@ sc_status sc_outbound(sc_context *ctx, size_t byte_budget, uint8_t *frame, size_
     if (status == SC_OK) {
         next = ctx->state;
         if (ctx->config.role == SC_DEVICE) {
+            changed = next.last_sent_reported_revision != 1 || next.reported_revision != 1;
             next.last_sent_reported_revision = 1;
             next.reported_revision = 1;
         }
@@ -757,12 +780,14 @@ sc_status sc_outbound(sc_context *ctx, size_t byte_budget, uint8_t *frame, size_
             int index = group_index(ctx, (uint16_t)packet.group_id);
             sc_group_state *g = &next.data.groups[index];
             if (packet.data_kind != 3) {
+                changed |= g->last_sent_id != packet.request_id;
                 g->last_sent_id = packet.request_id;
             } else {
+                changed |= g->receipt_pending != 0;
                 g->receipt_pending = 0;
             }
         }
-        if (memcmp(&next, &ctx->state, sizeof next)) {
+        if (changed) {
             status = save(ctx, &next);
         }
     }

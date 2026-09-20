@@ -37,6 +37,7 @@ filegroup(
         "//examples:quality_sources",
         "//examples/common:quality_sources",
         "//examples/device_console:quality_sources",
+        "//examples/embedded/qtpy_rp2040:quality_sources",
         "//examples/fleet_manager:quality_sources",
         "//modules/credits:quality_sources",
         "//platforms/cortex_m4:quality_sources",

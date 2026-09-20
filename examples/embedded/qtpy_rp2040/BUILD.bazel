@@ -1,0 +1,186 @@
+load("@pico-sdk//bazel/toolchain:objcopy.bzl", "objcopy_to_bin")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("//build:defs.bzl", "c_binary", "c_test", "py_binary", "py_test")
+load(":actions.bzl", "python_action", "runtime_tool")
+load(":analysis.bzl", "board_analysis")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["sodium_config.h"])
+
+runtime_tool(name = "python_runtime")
+
+cc_library(
+    name = "protocol",
+    srcs = [
+        "//core:sc.c",
+        "//providers/sodium:sc_sodium.c",
+        "//schema:sc.pb.c",
+    ],
+    hdrs = [
+        "//core:sources",
+        "//providers/sodium:sources",
+        "//schema:sources",
+    ],
+    copts = ["-std=c99"],
+    includes = ["../../.."],
+    target_compatible_with = ["@pico-sdk//bazel/constraint:rp2040"],
+    deps = [
+        "@libsodium//:mcu",
+        "@nanopb",
+    ],
+)
+
+cc_library(
+    name = "linker",
+    additional_linker_inputs = ["memmap.ld"],
+    linkopts = ["-T$(location memmap.ld)"],
+    target_compatible_with = ["@pico-sdk//bazel/constraint:rp2040"],
+)
+
+cc_binary(
+    name = "demo.elf",
+    srcs = [
+        "app.c",
+        "app.h",
+        "entropy.c",
+        "entropy.h",
+        "main.c",
+        "store.c",
+        "store.h",
+        "wire.c",
+    ],
+    target_compatible_with = ["@pico-sdk//bazel/constraint:rp2040"],
+    deps = [
+        ":protocol",
+        "@pico-sdk//src/rp2_common/hardware_flash",
+        "@pico-sdk//src/rp2_common/hardware_watchdog",
+        "@pico-sdk//src/rp2_common/pico_flash",
+        "@pico-sdk//src/rp2_common/pico_int64_ops",
+        "@pico-sdk//src/rp2_common/pico_stdlib",
+        "@pico-sdk//src/rp2_common/pico_unique_id",
+    ],
+)
+
+objcopy_to_bin(
+    name = "bin",
+    src = ":demo.elf",
+    out = "demo.bin",
+    target_compatible_with = ["@pico-sdk//bazel/constraint:rp2040"],
+)
+
+python_action(
+    name = "firmware",
+    srcs = [
+        ":bin",
+        ":demo.elf",
+    ],
+    outs = [
+        "demo.uf2",
+        "image-report.json",
+        "symbol-map.txt",
+    ],
+    args = [
+        "$(location :demo.elf)",
+        "$(location :bin)",
+        "$(location demo.uf2)",
+        "$(location image-report.json)",
+        "$(location symbol-map.txt)",
+    ],
+    script = "image.py",
+    target_compatible_with = ["@pico-sdk//bazel/constraint:rp2040"],
+)
+
+filegroup(
+    name = "quality_sources",
+    srcs = glob(
+        ["*"],
+        exclude = ["LICENSE.pico-sdk"],
+    ),
+)
+
+c_binary(
+    name = "sim",
+    testonly = True,
+    srcs = [
+        "app.c",
+        "entropy.c",
+        "sim.c",
+        "store.c",
+        "wire.c",
+    ],
+    hdrs = [
+        "app.h",
+        "entropy.h",
+        "store.h",
+    ],
+    deps = [
+        "//core:sc",
+        "//providers/sodium",
+    ],
+)
+
+py_binary(
+    name = "operator",
+    data = [
+        "//bindings/python:resources.py",
+        "//bindings/python:simplecrypts.py",
+    ],
+    main = "cli.py",
+    shared = "//providers/host:libsimplecrypts",
+)
+
+c_test(
+    name = "store_test",
+    srcs = [
+        "store.c",
+        "store_test.c",
+    ],
+    hdrs = ["store.h"],
+    deps = ["//core:sc"],
+)
+
+py_test(
+    name = "integration_test",
+    data = [
+        "cli.py",
+        ":sim",
+        "//bindings/python:resources.py",
+        "//bindings/python:simplecrypts.py",
+    ],
+    main = "integration_test.py",
+    shared = "//providers/host:libsimplecrypts",
+)
+
+py_binary(
+    name = "flash",
+    data = ["image.py"],
+    main = "flash.py",
+)
+
+py_test(
+    name = "image_test",
+    data = [
+        "cli.py",
+        "flash.py",
+        "image.py",
+    ],
+    main = "image_test.py",
+)
+
+c_test(
+    name = "entropy_test",
+    srcs = [
+        "entropy.c",
+        "entropy_test.c",
+    ],
+    hdrs = ["entropy.h"],
+    deps = ["//third_party/libsodium:sodium"],
+)
+
+board_analysis(
+    name = "board_analysis",
+    firmware = ":demo.elf",
+    source = "main.c",
+)

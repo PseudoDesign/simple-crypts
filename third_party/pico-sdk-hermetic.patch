@@ -1,0 +1,128 @@
+diff --git a/bazel/direct_python.bzl b/bazel/direct_python.bzl
+new file mode 100644
+--- /dev/null
++++ b/bazel/direct_python.bzl
+@@ -0,0 +1,15 @@
++"""Direct hermetic Python actions, without platform launcher binaries."""
++def _runtime_impl(ctx):
++    return [ctx.toolchains["@rules_python//python:toolchain_type"]]
++
++runtime_tool = rule(implementation = _runtime_impl, toolchains = ["@rules_python//python:toolchain_type"])
++
++def _python_impl(ctx):
++    runtime = ctx.attr._runtime[platform_common.ToolchainInfo].py3_runtime
++    args = [ctx.file.script.path] + [ctx.expand_location(a, targets = ctx.attr.srcs) for a in ctx.attr.args]
++    ctx.actions.run(executable = runtime.interpreter, arguments = args, inputs = depset([ctx.file.script] + ctx.files.srcs, transitive = [runtime.files]), outputs = ctx.outputs.outs, mnemonic = "FirmwarePython")
++    return [DefaultInfo(files = depset(ctx.outputs.outs))]
++python_action = rule(implementation = _python_impl, attrs = {"script": attr.label(allow_single_file = True), "srcs": attr.label_list(allow_files = True), "outs": attr.output_list(), "args": attr.string_list(), "_runtime": attr.label(default = Label("//bazel:python_runtime"), cfg = "exec")})
++def _empty_impl(ctx):
++    ctx.actions.write(ctx.outputs.out, "")
++empty_file = rule(implementation = _empty_impl, attrs = {"out": attr.output()})
+diff --git a/bazel/BUILD.bazel b/bazel/BUILD.bazel
+--- a/bazel/BUILD.bazel
++++ b/bazel/BUILD.bazel
+@@ -1,3 +1,4 @@
++load(":direct_python.bzl", "empty_file", "runtime_tool")
+ load("@rules_cc//cc:cc_library.bzl", "cc_library")
+ load("@rules_python//python:defs.bzl", "py_binary")
+ 
+@@ -37,11 +38,9 @@
+     ],
+ )
+ 
+-genrule(
++empty_file(
+     name = "empty_extra_headers_file",
+-    outs = ["generated_extra_include/pico_config_extra_headers.h"],
+-    cmd = "echo > $@",
+-    cmd_bat = "copy NUL $@",
++    out = "generated_extra_include/pico_config_extra_headers.h",
+     visibility = ["//visibility:private"],
+ )
+ 
+@@ -63,3 +62,6 @@
+     name = "incompatible_cc_lib",
+     target_compatible_with = ["@platforms//:incompatible"],
+ )
++
++exports_files(["generate_version_header.py"])
++runtime_tool(name = "python_runtime", visibility = ["//visibility:public"])
+diff --git a/src/common/pico_base_headers/BUILD.bazel b/src/common/pico_base_headers/BUILD.bazel
+--- a/src/common/pico_base_headers/BUILD.bazel
++++ b/src/common/pico_base_headers/BUILD.bazel
+@@ -1,4 +1,4 @@
+-load("@bazel_skylib//rules:run_binary.bzl", "run_binary")
++load("//bazel:direct_python.bzl", "python_action")
+ load("@rules_cc//cc:cc_library.bzl", "cc_library")
+ 
+ package(default_visibility = ["//visibility:public"])
+@@ -22,7 +22,7 @@
+ # PICO_BAZEL_CONFIG: PICO_SDK_VERSION_PRE_RELEASE_ID, Optional SDK pre-release version identifier, default=Current SDK pre-release identifier, type=string, group=pico_base
+ PICO_SDK_VERSION_PRE_RELEASE_ID = _revision_parts[1] if len(_revision_parts) > 1 else None
+ 
+-run_binary(
++python_action(
+     name = "version_header",
+     srcs = ["include/pico/version.h.in"],
+     outs = ["generated_include/pico/version.h"],
+@@ -31,7 +31,7 @@
+         "--template=$(location include/pico/version.h.in)",
+         "--output=$(location generated_include/pico/version.h)",
+     ],
+-    tool = "//bazel:generate_version_header",
++    script = "//bazel:generate_version_header.py",
+     visibility = ["//visibility:private"],
+ )
+ 
+diff --git a/src/rp2040/boot_stage2/BUILD.bazel b/src/rp2040/boot_stage2/BUILD.bazel
+--- a/src/rp2040/boot_stage2/BUILD.bazel
++++ b/src/rp2040/boot_stage2/BUILD.bazel
+@@ -1,11 +1,9 @@
+ # Always include these libraries through //src/rp2_common:*!
+ # This ensures that you'll get the right headers for the MCU you're targeting.
+ 
+-load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+-load("@bazel_skylib//rules:run_binary.bzl", "run_binary")
++load("//bazel:direct_python.bzl", "python_action")
+ load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+ load("@rules_cc//cc:cc_library.bzl", "cc_library")
+-load("@rules_python//python:defs.bzl", "py_binary")
+ load("//bazel/toolchain:objcopy.bzl", "objcopy_to_bin")
+ load("//bazel/util:multiple_choice_flag.bzl", "declare_flag_choices", "flag_choice")
+ load("//bazel/util:transition.bzl", "rp2040_bootloader_binary")
+@@ -115,32 +113,17 @@
+     target_compatible_with = ["//bazel/constraint:rp2040"],
+ )
+ 
+-# WORKAROUND: Python rules always require a .py extension.
+-copy_file(
+-    name = "copy_tool_to_py",
+-    src = "pad_checksum",
+-    out = "pad_checksum_tool.py",
+-    target_compatible_with = ["//bazel/constraint:host"],
+-)
+-
+-py_binary(
+-    name = "pad_checksum_tool",
+-    srcs = ["pad_checksum_tool.py"],
+-    legacy_create_init = False,
+-    target_compatible_with = ["//bazel/constraint:host"],
+-)
+-
+-run_binary(
++python_action(
+     name = "boot_stage2_padded",
+     srcs = [":boot_stage2_bin"],
+     outs = ["boot_stage2.S"],
+     args = [
+-        "-s 0xffffffff",
++        "-s", "0xffffffff",
+         "$(location boot_stage2_bin)",
+         "$(location boot_stage2.S)",
+     ],
+     target_compatible_with = ["//bazel/constraint:rp2040"],
+-    tool = ":pad_checksum_tool",
++    script = "pad_checksum",
+ )
+ 
+ cc_library(

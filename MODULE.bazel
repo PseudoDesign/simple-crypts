@@ -6,6 +6,27 @@ module(
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "nanopb", version = "0.4.9.1.bcr.3")
 bazel_dep(name = "rules_cc", version = "0.2.25")
+bazel_dep(name = "rules_python", version = "1.7.0")
+bazel_dep(name = "pico-sdk", version = "2.3.1")
+archive_override(
+    module_name = "pico-sdk",
+    integrity = "sha256-TNnx82/rNLaFPKhmteDZd+PTRKNhubfJSuODaTMDWRo=",
+    patch_strip = 1,
+    patches = ["//third_party:pico-sdk-hermetic.patch"],
+    strip_prefix = "pico-sdk-2.3.1",
+    urls = ["https://github.com/raspberrypi/pico-sdk/releases/download/2.3.1/pico-sdk-2.3.1.tar.gz"],
+)
+
+register_toolchains(
+    "@pico-sdk//bazel/toolchain:linux-x86_64-rp2040",
+    "@pico-sdk//bazel/toolchain:linux-aarch64-rp2040",
+    "@pico-sdk//bazel/toolchain:mac-x86_64-rp2040",
+    "@pico-sdk//bazel/toolchain:mac-aarch64-rp2040",
+    "@pico-sdk//bazel/toolchain:win-x86_64-rp2040",
+)
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.11.14")
 
 local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
 
@@ -58,4 +79,20 @@ language_sources = use_repo_rule("//build:dependencies.bzl", "language_sources")
 language_sources(
     name = "language_sources",
     lock = "//build:dependencies.lock.json",
+)
+
+http_archive(
+    name = "qtpy_tinyusb",
+    build_file = "@pico-sdk//src/rp2_common/tinyusb:tinyusb.BUILD",
+    sha256 = "9f43fd2a745e2543a42ac79b99774c24155e6ef1e0d2ae3cb16ed4ffacf5c517",
+    strip_prefix = "tinyusb-86ad6e56c1700e85f1c5678607a762cfe3aa2f47",
+    type = "tar.gz",
+    urls = ["https://codeload.github.com/hathach/tinyusb/tar.gz/86ad6e56c1700e85f1c5678607a762cfe3aa2f47"],
+)
+
+single_version_override(
+    module_name = "nanopb",
+    patch_strip = 1,
+    patches = ["//third_party:nanopb-include.patch"],
+    version = "0.4.9.1.bcr.3",
 )

@@ -3,9 +3,13 @@ package(default_visibility = ["//visibility:public"])
 exports_files([
     "libsodium.BUILD.bazel",
     "libsodium-version.patch",
+    "pico-sdk-hermetic.patch",
+    "sodium_mcu_sources.bzl",
 ])
 
 filegroup(
     name = "quality_sources",
     srcs = glob(["*"]),
 )
+
+exports_files(["nanopb-include.patch"])

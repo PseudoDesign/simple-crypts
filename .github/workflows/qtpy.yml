@@ -1,0 +1,33 @@
+name: QT Py firmware
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-15, windows-2022]
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build twice with pinned tools
+        run: python3 examples/embedded/qtpy_rp2040/qualify.py --output "${{ runner.temp }}/qtpy"
+      - name: Save firmware and action manifests
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: qtpy-${{ matrix.host }}
+          path: ${{ runner.temp }}/qtpy/artifacts
+          if-no-files-found: ignore
+          retention-days: 14

@@ -79,6 +79,7 @@ c_analysis_database(
     deps = [
         "//core:sc",
         "//examples/device_console:module",
+        "//examples/embedded/qtpy_rp2040:board_analysis",
         "//examples/fleet_manager:module",
         "//platforms/cortex_m4:resource_report",
         "//providers/host:libsimplecrypts",
@@ -102,6 +103,10 @@ c_analysis_database(
         "//adapters/c:adapter",
         "//docs:example",
         "//examples/device_console:module",
+        "//examples/embedded/qtpy_rp2040:board_analysis",
+        "//examples/embedded/qtpy_rp2040:entropy_test",
+        "//examples/embedded/qtpy_rp2040:sim",
+        "//examples/embedded/qtpy_rp2040:store_test",
         "//examples/fleet_manager:module",
         "//platforms/cortex_m4:resource_report",
         "//providers/host",
@@ -142,7 +147,10 @@ py_test(
 
 py_test(
     name = "c_lint",
-    data = QUALITY_INPUTS + [":analysis_database"],
+    data = QUALITY_INPUTS + [
+        ":analysis_database",
+        "//examples/embedded/qtpy_rp2040:board_analysis",
+    ],
     main = "quality.py",
     script_args = [
         "--lint",

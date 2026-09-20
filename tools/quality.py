@@ -62,10 +62,10 @@ def lint(database):
             if record["file"].endswith(".cpp"):
                 flags = [f for f in flags if f != "-std=c99"]
                 flags += ["-std=c++17", "-nostdinc++", "-isystem", sysroot + "/include/c++/v1"]
-        elif profile == "arm":
+        elif profile in ("arm", "rp2040"):
             flags += [
                 "--target=arm-none-eabi",
-                "-mcpu=cortex-m4",
+                "-mcpu=cortex-m0plus" if profile == "rp2040" else "-mcpu=cortex-m4",
                 "-mthumb",
                 "-isystem",
                 "/usr/include/newlib",

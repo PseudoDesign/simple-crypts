@@ -473,3 +473,10 @@ NVM behavior on the board. No connected-board qualification is claimed.
 [recovery]: https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html#reset-flash-memory
 [boot2]: https://github.com/raspberrypi/pico-sdk/blob/079c6f39023649b154152db30f1d781e884879bc/src/rp2040/boot_stage2/boot2_w25q080.S
 [usbstdio]: https://www.raspberrypi.com/documentation/pico-sdk/runtime.html#pico_stdio_usb
+
+## Implementation
+
+The implementation and operator instructions are in
+[`examples/embedded/qtpy_rp2040`](../examples/embedded/qtpy_rp2040/README.md).
+That README records the current-main baseline, concrete targets, storage layout,
+measured write counts, and remaining physical-board qualification.

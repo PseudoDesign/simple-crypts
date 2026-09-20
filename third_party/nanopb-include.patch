@@ -1,0 +1,11 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -19,6 +19,7 @@
+ 
+ cc_library(
+     name = "nanopb",
++    includes = ["."],
+     srcs = [
+         "pb_common.c",
+         "pb_decode.c",

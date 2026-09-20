@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Simple Crypts · Fleet example</title>
+  <title>Simple Crypts · Interactive fleet</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <header>
-    <p class="eyebrow">SIMPLE CRYPTS / DOCUMENTED EXAMPLES</p>
-    <h1>A small fleet. Real messages.</h1>
-    <p>Register devices and exchange credits by copying frames yourself.</p>
-    <p class="muted">Saved in this browser. The server is simulated locally; there is no remote database.</p>
+    <p class="eyebrow">SIMPLE CRYPTS / INTERACTIVE CONSOLE DEMO</p>
+    <h1>Your fleet, at the console.</h1>
+    <p>Create a device, type commands, and watch it talk to the server.</p>
+    <p class="muted">Saved in this browser. Each console runs a C++ device; the fleet server runs locally too.</p>
   </header>
   <main>
     <p id="notice" role="status" aria-live="polite">Opening saved fleet…</p>
@@ -20,79 +20,71 @@
       <h2 id="fleet-title">Fleet</h2>
       <form id="create-form">
         <label>Serial <input id="serial" value="mcu-0001" maxlength="32" required autocomplete="off"></label>
-        <button name="kind" value="browser">Create simulated device</button>
-        <button name="kind" value="external" class="secondary">Add external device</button>
+        <button>Create device</button>
       </form>
       <div class="table-scroll"><table>
-        <thead><tr><th>Serial</th><th>Console</th><th>Registration</th><th>Issued</th><th>Last reported consumed</th></tr></thead>
+        <thead><tr><th>Serial</th><th>Device</th><th>Registration</th><th>Issued</th><th>Last reported consumed</th></tr></thead>
         <tbody id="fleet-rows"></tbody>
       </table></div>
-      <p id="empty" class="muted">Create a browser device, or add a serial for a Python console.</p>
+      <p id="empty" class="muted">Create your first device to open its console.</p>
     </section>
     <section id="details" hidden aria-labelledby="selected-title">
-      <div class="section-title"><h2 id="selected-title"></h2><span id="kind-label" class="badge"></span></div>
+      <h2 id="selected-title"></h2>
       <p id="entry-error" role="alert"></p>
-      <p><strong>Pinned server public key</strong><code id="server-key" class="wrap"></code></p>
-      <div id="external-help" hidden>
-        <p>Run from the repository root. Use a different private store for every device.</p>
-        <pre id="launch-command"></pre>
-      </div>
       <div class="columns">
         <div>
-          <h3>1. Authorize and approve</h3>
+          <h3>Enrollment</h3>
+          <p id="enrollment-status"></p>
           <div class="actions">
-            <button id="begin">Authorize / restart enrollment</button>
+            <button id="begin">Authorize enrollment</button>
+            <button id="approve">Approve device</button>
             <button id="cancel" class="secondary">Cancel session</button>
           </div>
-          <p class="muted">Copy the challenge to the device, then paste its response below. Approval never happens automatically.</p>
-          <p id="expires"></p>
-          <label>Candidate public key <code id="candidate" class="wrap"></code></label>
-          <label>Session challenge <code id="challenge" class="wrap"></code></label>
-          <button id="approve">Approve displayed candidate</button>
-          <h3>2. Manage credits</h3>
+          <p id="expires" class="muted"></p>
+          <details>
+            <summary>Enrollment identity</summary>
+            <p>Compare the candidate with the public key shown by device <code>status</code> before approving.</p>
+            <label>Candidate public key <code id="candidate" class="wrap"></code></label>
+            <label>Session challenge <code id="challenge" class="wrap"></code></label>
+            <label>Pinned server public key <code id="server-key" class="wrap"></code></label>
+          </details>
+        </div>
+        <div>
+          <h3>Credits</h3>
           <form id="issue-form">
             <label>Cumulative credits issued <input id="total" value="100" inputmode="numeric" pattern="[0-9]+" required></label>
             <button>Set issued total</button>
           </form>
           <button id="request" class="secondary">Request consumption report</button>
           <p id="totals"></p>
-        </div>
-        <div>
-          <h3>Manual server transport</h3>
-          <p class="muted">Each button performs one API call. Copying, receiving, issuing, and consuming never sends another frame.</p>
-          <div class="actions"><button id="tx">Generate next frame</button><button id="copy" class="secondary">Copy frame</button></div>
-          <label>Outbound frame <textarea id="outbound" rows="5" readonly spellcheck="false"></textarea></label>
-          <form id="receive-form">
-            <label>Paste device frame <textarea id="incoming" rows="5" required spellcheck="false"></textarea></label>
-            <button>Receive pasted frame</button>
-          </form>
+          <p class="muted">Consumption happens on the device. Request a report to update the server’s view.</p>
         </div>
       </div>
-      <details><summary>Public server state</summary><pre id="server-state"></pre></details>
-      <div id="device-controls" class="actions" hidden>
+      <div class="actions">
         <button id="show-console">Open console</button>
         <button id="start" class="secondary">Start saved device</button>
         <button id="stop" class="secondary">Stop device</button>
       </div>
+      <details><summary>Public server state</summary><pre id="server-state"></pre></details>
     </section>
     <section aria-labelledby="consoles-title">
       <h2 id="consoles-title">Device consoles</h2>
-      <p class="muted">C++ compiled to WebAssembly. Use <code>help</code>, <code>status</code>, <code>rx HEX</code>, <code>tx</code>, and <code>consume 25</code>.</p>
+      <p class="muted">Type a command and press Enter. Use ↑ / ↓ for command history.</p>
       <div id="consoles"></div>
     </section>
     <section>
-      <h2>Try a full exchange</h2>
+      <h2>Try it</h2>
       <ol>
-        <li>Authorize enrollment, generate a server frame, and run <code>rx HEX</code> in the device console.</li>
-        <li>Run <code>tx</code> on the device. Paste that frame into the server and receive it.</li>
-        <li>Check the candidate key against device <code>status</code>, approve it, then generate and deliver the server confirmation.</li>
-        <li>Set issued total to 100. Deliver the server frame, the device response, and the server receipt.</li>
-        <li>Run <code>consume 25</code>. Request a report and repeat the three-frame exchange.</li>
+        <li><strong>Create device</strong>, then <strong>Authorize enrollment</strong>. Watch the challenge and response in its console.</li>
+        <li>Run <code>status</code> to inspect its identity, then <strong>Approve device</strong>.</li>
+        <li>Set issued total to <strong>100</strong>. The device receives its credits and replies.</li>
+        <li>Type <code>consume 25</code>, then <code>status</code> to see the remaining balance.</li>
+        <li><strong>Request consumption report</strong> to update the server. Try <code>reboot</code> or stop/start to resume saved state.</li>
       </ol>
-      <p class="muted">After a server reload during confirmation, resend the device enrollment response and generate the confirmation again. Stop/start preserves identities and counters; hiding a console only hides its display.</p>
+      <p class="muted">Messages travel over the demo’s simulated link. Use <code>sync</code> to retry pending work. Enrollment approval is always your choice.</p>
     </section>
   </main>
-  <footer>Production protocol API · Manual transport · Browser-local storage</footer>
+  <footer>Real encrypted messages · C++ device consoles · Browser-local storage</footer>
   <script type="module" src="./app.mjs"></script>
 </body>
 </html>

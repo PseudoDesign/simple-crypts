@@ -38,8 +38,9 @@ pre, .wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
 #consoles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr)); gap: 16px; }
 .console { background: #142b28; color: #cfedda; padding: 16px; border-radius: 8px; min-width: 0; }
 .console h3 { margin: 0; }
-.console pre { height: 220px; overflow-y: auto; user-select: text; }
+.console pre { height: 300px; overflow-y: auto; user-select: text; }
 .console form { display: block; }
+.console label { font-family: ui-monospace, monospace; }
 .console input { width: 100%; background: #213e38; color: white; border-color: #668478; font-family: ui-monospace, monospace; }
 .console button { padding: 5px 10px; font-size: .8rem; }
 [hidden] { display: none !important; }

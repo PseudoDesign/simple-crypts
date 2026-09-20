@@ -22,7 +22,7 @@ wasm_build(
 
 fleet_site(
     name = "site",
-    assets = ["index.html", "style.css", "app.mjs", "worker.mjs",
+    assets = ["index.html", "style.css", "app.mjs", "worker.mjs", "transport.mjs",
               "//examples/common:endpoint.mjs", "//examples/common:storage.mjs"],
 )
 
@@ -31,7 +31,7 @@ py_test(
     name = "protocol_test",
     main = "run_protocol_test.py",
     data = ["protocol_test.mjs", "//examples/common:endpoint.mjs", ":module",
-            "//examples/device_console:module", "//examples/python_device:console"],
+            "//examples/device_console:module", "transport.mjs"],
 )
 exports_files(["site.py"])
 py_test(

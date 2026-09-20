@@ -57,8 +57,8 @@ endpoint state, and library results. The [MCU evaluation notes](MCU_FEASIBILITY.
 describe optional platform measurements and their limits.
 
 The application examples now include a browser-local multi-device registry,
-C++ WebAssembly consoles, and a native Python console, with manual frame transfer
-and saved identities. Key rotation, event history, and production fleet services
+interactive C++ WebAssembly consoles, action-driven message exchange, and saved
+identities. Enrollment approval remains an explicit application action. Key rotation, event history, and production fleet services
 remain possible extensions. Future application
 models should preserve explicit ownership, bounded storage, and authenticated
 state transitions without changing the transport boundary.

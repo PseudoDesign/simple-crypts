@@ -1,9 +1,9 @@
-// This application is compiled only to WebAssembly. The browser supplies a
-// line of text; all command parsing and device operations happen here in C++.
+// WebAssembly-only application. The browser supplies a line of text; command
+// parsing and local device operations run here in C++. The return value tells
+// the owning worker when to synchronize the simulated transport or stop.
 #include "examples/common/endpoint.h"
 #include <emscripten/emscripten.h>
 #include <cstdint>
-#include <cstring>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -12,7 +12,12 @@ namespace {
 char line[4097];
 std::string output;
 constexpr const char *help =
-    "help | status | consume <amount> | rx <hex> | tx | reboot | quit";
+    "help                Show commands\n"
+    "status              Show identity and credit balance\n"
+    "consume <amount>    Spend credits on this device\n"
+    "sync                Exchange pending messages with the server\n"
+    "reboot              Restart with saved identity and credits\n"
+    "quit                Stop this device";
 
 bool amount(const std::string &text, uint64_t &value) {
     value = 0;
@@ -25,75 +30,57 @@ bool amount(const std::string &text, uint64_t &value) {
     }
     return true;
 }
-
-int nibble(char c) {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-    return -1;
-}
 }
 
 extern "C" {
 EMSCRIPTEN_KEEPALIVE char *device_line() { return line; }
 EMSCRIPTEN_KEEPALIVE const char *device_output() { return output.c_str(); }
 
-// Return 1 only for quit. The owner then discards this instance while retaining
-// its saved identity. Output is read only after the awaited call completes.
+// 0=local result, 1=quit, 2=error, 3=synchronize. The worker reads output only
+// after this awaited call returns, including any durable storage operations.
 EMSCRIPTEN_KEEPALIVE int device_command(void) {
     output.clear();
     std::istringstream stream(line);
     std::string command, argument, extra;
     stream >> command;
     if (command.empty()) return 0;
-    stream >> argument;
-    stream >> extra;
-    const bool unary = command == "consume" || command == "rx";
-    if (!extra.empty() || (unary ? argument.empty() : !argument.empty())) {
-        output = std::string("error: ") + help;
-        return 0;
+    stream >> argument >> extra;
+    if (!extra.empty() || (command == "consume" ? argument.empty() : !argument.empty())) {
+        output = std::string("error: Usage\n") + help;
+        return 2;
     }
     int status = 0;
     if (command == "help") output = help;
-    else if (command == "status") output = ex_state();
-    else if (command == "quit") {
+    else if (command == "status") output = ex_device_summary();
+    else if (command == "sync") {
+        output = "Synchronizing with server...";
+        return 3;
+    } else if (command == "quit") {
         output = "Stopped. Saved device state retained.";
         return 1;
-    } else if (command == "reboot") status = ex_reboot();
-    else if (command == "consume") {
+    } else if (command == "reboot") {
+        status = ex_reboot();
+        if (status == 0) {
+            output = "Rebooted. Identity and credits restored.";
+            return 3;
+        }
+    } else if (command == "consume") {
         uint64_t value;
         if (!amount(argument, value)) {
             output = "error: Expected an unsigned decimal uint64";
-            return 0;
+            return 2;
         }
         status = ex_consume(value);
-    } else if (command == "rx") {
-        if (argument.size() > 1024 || argument.size() % 2) {
-            output = "error: Expected 1–512 bytes of contiguous hexadecimal text";
-            return 0;
-        }
-        for (size_t i = 0; i < argument.size(); i += 2) {
-            int high = nibble(argument[i]), low = nibble(argument[i + 1]);
-            if (high < 0 || low < 0) {
-                output = "error: Invalid hexadecimal frame";
-                return 0;
-            }
-            ex_input()[i / 2] = static_cast<uint8_t>((high << 4) | low);
-        }
-        status = ex_receive(argument.size() / 2);
-    } else if (command == "tx") {
-        status = ex_outbound();
-        if (status == 1) output = "No output.";
-        else if (status == 0) {
-            const char *digits = "0123456789abcdef";
-            for (size_t i = 0; i < ex_frame_length(); ++i) {
-                output += digits[ex_frame()[i] >> 4];
-                output += digits[ex_frame()[i] & 15];
-            }
-        }
-    } else output = std::string("error: ") + help;
-    if (status < 0) output = std::string("error: ") + ex_status(status);
-    else if (output.empty()) output = "ok";
+        if (status == 0)
+            output = "Consumed " + std::to_string(value) + " credits. Server learns this on its next report request.";
+    } else {
+        output = "error: Unknown command. Type help for available commands.";
+        return 2;
+    }
+    if (status < 0) {
+        output = std::string("error: ") + ex_status(status);
+        return 2;
+    }
     return 0;
 }
 }

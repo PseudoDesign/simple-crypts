@@ -1,20 +1,19 @@
 # Application examples
 
-Start here for small applications that consume the production Simple Crypts
-APIs. The applications decide when to transmit and who may register; the
-library owns authentication, enrollment state, credit invariants, and replay
-handling. None of these examples uses fixture identities or test adapters.
+Start here for small, documented applications consuming the production Simple
+Crypts APIs. The application decides who may register and when to exchange
+messages; the library supplies authentication, credit invariants, and replay
+handling. These examples do not use fixture identities or test adapters.
 
 | Project | What it demonstrates |
 | --- | --- |
-| [Fleet manager](fleet_manager/README.md) | A browser-local device registry, explicit enrollment approval, manual messages, and saved fleet state |
-| [C++ device console](device_console/README.md) | A WebAssembly-only application with serial-style commands, embedded in the fleet webpage |
-| [Python device console](python_device/README.md) | A native terminal application using the Python SDK and durable host storage |
+| [Fleet manager](fleet_manager/README.md) | A browser-local registry, explicit enrollment approval, interactive consoles, and saved fleet state |
+| [C++ device console](device_console/README.md) | A WebAssembly device application with typed commands and a simulated connection to the fleet server |
 | [Direct Python API](python_api.py) | A short, noninteractive SDK walkthrough |
 
-The older `device_server_demo.py` is a test-harness demonstration of packet loss
-and reboot. The [guided browser demo](../web/README.md) remains available
-separately, with drag-and-drop packets and temporary state.
+The older `device_server_demo.py` demonstrates packet loss and reboot through
+the test harness. The [guided browser demo](../web/README.md) remains available
+separately for manually exploring packet delivery and attacks.
 
 ## Quick start
 
@@ -25,26 +24,25 @@ python3 tools/bootstrap.py
 bazel run //examples/fleet_manager:preview
 ```
 
-Open `http://127.0.0.1:8001/`. Create a simulated device and follow the walkthrough
-below the consoles. To use a terminal instead, choose **Add external device**
-and run the Python command displayed for that serial. Copy hexadecimal frames
-between the webpage and the terminal using `rx HEX` and `tx`.
-
-The C++ application is **WebAssembly-only**; Python is the native console. Both
-support the same command vocabulary, but each calls its own API boundary.
+Open `http://127.0.0.1:8001/`. **Create device**, **Authorize enrollment**, and
+**Approve device**. Set issued credits to 100, type `consume 25` in its console,
+and request a consumption report. The console shows the actual exchange; there
+is no copy/paste transport and no external device application to launch.
 
 ## Read the code
 
-Each project README explains the application entry points. Shared browser
-support lives in `common/`: `endpoint.c` implements the public C provider
-contract; `endpoint.mjs` translates worker requests into awaited Wasm calls;
-`storage.mjs` implements IndexedDB transactions. These files are platform glue,
-not a second protocol implementation.
+`device_console/console.cpp` implements commands. `fleet_manager/worker.mjs`
+owns the fleet and serializes actions. `fleet_manager/transport.mjs` exchanges
+opaque frames and pauses enrollment for explicit approval. `app.mjs` renders
+public state and the console transcript.
 
-The fleet database belongs to the browser origin (including its port). Browser
-refresh and normal close/reopen retain identities. Clearing site data removes
-them; a saved Python device still pins its original server identity. There is
-no remote service, account system, real UART, or automatic transport here.
+Shared browser support lives in `common/`: `endpoint.c` implements the public C
+provider contract; `endpoint.mjs` makes awaited Wasm calls; `storage.mjs` supplies
+atomic IndexedDB transactions. This is platform glue, not a second protocol.
+
+The database belongs to the browser origin, including its port. Refresh and
+ordinary close/reopen retain identities. Clearing site data removes them. There
+is no remote service, account system, or physical UART in these examples.
 
 ## Check the examples
 
@@ -53,7 +51,7 @@ bazel test //examples/...
 bazel test //examples/fleet_manager:browser_test --test_output=errors
 ```
 
-The browser target uses the existing pinned Playwright installation and browser
-engines described in [web/README.md](../web/README.md). It tests Chromium and
-Firefox. Protocol tests also run the native Python console against a Wasm
-server through its real stdin/stdout interface.
+The browser target uses the existing pinned Playwright installation and engines
+from [web/README.md](../web/README.md). It tests the interactive workflow in
+Chromium and Firefox. The production Wasm tests cover message exchange,
+approval, exact counters, persistence failures, and nonce reservation safety.

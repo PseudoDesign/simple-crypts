@@ -44,9 +44,9 @@ library, with no test hooks.
 
 For documented application projects, start with [examples/README.md](examples/README.md).
 Run `bazel run //examples/fleet_manager:preview` for a browser-local fleet
-database with C++ WebAssembly device consoles. Use **Add external device** to
-connect a native Python console. Both workflows use manual copy-and-paste
-frames; the browser fleet and native device stores retain their identities.
+database with interactive C++ WebAssembly device consoles. Type commands and
+watch encrypted messages travel over the simulated link. Enrollment approval
+remains explicit, and saved browser devices retain their identities.
 
 ## Application model
 

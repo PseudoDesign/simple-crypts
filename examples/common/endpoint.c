@@ -236,6 +236,25 @@ API int ex_outbound(void) {
 API const uint8_t *ex_frame(void) { return frame; }
 API size_t ex_frame_length(void) { return frame_length; }
 
+/* Human-readable device status for the C++ console. The JS inspector below
+ * remains structured so the fleet can render exact counters without parsing
+ * terminal output. Both views read the public core inspection API. */
+const char *ex_device_summary(void) {
+    sc_state state;
+    if (sc_inspect(&context, &state) != SC_OK) return "Device unavailable.";
+    const sc_group_state *group = &state.data.groups[0];
+    uint64_t issued = group->values[0].u64, consumed = group->values[1].u64;
+    char key[65];
+    sodium_bin2hex(key, sizeof key, saved.public_key, 32);
+    snprintf(state_json, sizeof state_json,
+             "Device: %s\nRegistration: %s\nCredits issued: %" PRIu64
+             "\nCredits consumed: %" PRIu64 "\nCredits remaining: %" PRIu64
+             "\nPublic key: %s",
+             state.serial, state.registered ? "registered" : "awaiting enrollment",
+             issued, consumed, issued - consumed, key);
+    return state_json;
+}
+
 API const char *ex_state(void) {
     sc_state state;
     if (sc_inspect(&context, &state) != SC_OK) return "null";

@@ -24,6 +24,7 @@ int ex_outbound(void);
 const uint8_t *ex_frame(void);
 size_t ex_frame_length(void);
 const char *ex_state(void);
+const char *ex_device_summary(void);
 const char *ex_status(int status);
 #ifdef __cplusplus
 }

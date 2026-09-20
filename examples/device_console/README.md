@@ -1,41 +1,42 @@
-# C++ device console (WebAssembly only)
+# Interactive C++ device console
 
-This application is a small C++17 command interpreter compiled to WebAssembly.
-It runs inside the [fleet manager](../fleet_manager/README.md); it does not open
-an OS terminal or connect to hardware. For a native terminal application, use
-the [Python example](../python_device/README.md).
+A C++17 command interpreter compiled to WebAssembly and embedded in the
+[fleet manager](../fleet_manager/README.md). Each console runs a separate device
+instance with its own saved identity and credit state.
 
 ```sh
 bazel build //examples/device_console:module
 bazel run //examples/fleet_manager:preview
 ```
 
-Choose **Create simulated device**. The webpage starts an independent Wasm
-instance and opens a small console. The JavaScript renderer passes text to
-`device_command()` in `console.cpp`; parsing and device operations run in C++.
-`examples/common/endpoint.c` supplies the platform and calls the public C API.
+Choose **Create device**, type a command, and press Enter. Use the up/down arrow
+keys to recall commands. The console shows both application output and messages
+exchanged with the server; no frame copying or terminal setup is required.
 
 | Command | Operation |
 | --- | --- |
-| `help` | Show the command vocabulary |
-| `status` | Inspect public identity, registration, and exact decimal totals |
-| `consume 25` | Persist a local debit; do not transmit |
-| `rx HEX` | Receive one manually pasted frame; do not transmit a reply |
-| `tx` | Generate one frame, or print `No output.` |
-| `reboot` | Reload the protocol from saved state and burn unused nonce values |
-| `quit` | Stop the instance while keeping its persistent identity and state |
+| `help` | Show commands |
+| `status` | Show identity, registration, issued/consumed credits, and remaining balance |
+| `consume 25` | Persist a local debit |
+| `sync` | Exchange pending messages with the server |
+| `reboot` | Restore saved identity and credits, then synchronize |
+| `quit` | Stop the device, retaining its saved state |
 
-Frames are contiguous hexadecimal strings of at most 512 bytes. Amounts are
-unsigned decimal uint64 values. Protocol errors appear as `error: STATUS`;
-invalid commands never silently become zero-valued credit operations.
+The server's **Authorize enrollment** action sends a signed challenge and
+receives the device response. **Approve device** explicitly approves the exact
+candidate/session binding and delivers confirmation. Issuing credits or
+requesting a report completes its message exchange automatically. Local
+consumption stays local until the server requests a fresh report; `sync` does
+not create such a request.
 
-**Copy last frame** copies only a generated frame. It never delivers it. **Hide**
-hides the console; **Open console** restores it. **Stop device** and **Start saved
-device** discard and restore the instance without replacing the identity.
-Console history is bounded and temporary; protocol state is saved.
+`console.cpp` parses commands and calls the public C API through the example
+platform. Its result tells the worker whether to stop or synchronize. Transport
+lives in `fleet_manager/transport.mjs`, which forwards real opaque binary frames
+between the two endpoints. It never bypasses enrollment approval or synthesizes
+protocol responses. Amounts are exact unsigned decimal uint64 values.
 
-The C++ output buffer is read only after the awaited command completes. Asyncify
-suspends storage calls until IndexedDB commits, so no successful debit or
-outbound frame is exposed before its required durable writes complete. Private
-keys remain in the worker's provider/storage boundary. See the fleet README
-for storage behavior and the complete manual exchange.
+**Hide** only hides a console; **Open console** restores it. **Stop device** and
+**Start saved device** discard and restore the instance. Successful output is
+read only after awaited storage calls complete. Console activity is bounded to
+200 lines and command history to 50 entries; both are temporary. Persistent
+identity and protocol records remain in the provider's browser-local storage.

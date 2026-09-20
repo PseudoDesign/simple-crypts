@@ -7,7 +7,7 @@ package downloads are used. Only static assets are requested.
 
 The site also links to the [fleet application example](../examples/fleet_manager/README.md)
 at `examples/fleet_manager/`. That example has persistent browser-local storage,
-C++ WebAssembly consoles, and a native Python console counterpart. The temporary
+interactive C++ WebAssembly consoles and a simulated message link. The temporary
 storage behavior below describes the original guided demo only.
 
 ```sh

@@ -6,8 +6,9 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from test_report import verify_site as verify_report
 WEB_FILES=('index.html','landing.css','demo.html','style.css','app.mjs','lab.mjs','endpoint.mjs','worker.mjs','resources.mjs','THIRD_PARTY_NOTICES.txt')
 
-FLEET_NAMES = ('index.html', 'style.css', 'app.mjs', 'worker.mjs', 'endpoint.mjs',
+FLEET_V2_NAMES = ('index.html', 'style.css', 'app.mjs', 'worker.mjs', 'endpoint.mjs',
                'storage.mjs', 'server.mjs', 'server.wasm', 'device.mjs', 'device.wasm')
+FLEET_NAMES = (*FLEET_V2_NAMES, 'transport.mjs')
 FILES = WEB_FILES + tuple('examples/fleet_manager/' + name for name in FLEET_NAMES)
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -39,15 +40,16 @@ def verify(root,require_commit=True):
     # Previously committed sites remain verifiable until the next deliberate
     # publication. New manifests must inventory the complete fleet bundle.
     version=m.get('format_version',1)
-    if version not in (1,2):raise ValueError('Unsupported demo manifest version')
-    expected=set(FILES if version==2 else WEB_FILES)|{'endpoint.wasm.mjs','endpoint.wasm.wasm'}
+    if version not in (1,2,3):raise ValueError('Unsupported demo manifest version')
+    legacy_fleet = WEB_FILES + tuple('examples/fleet_manager/' + name for name in FLEET_V2_NAMES)
+    expected=set(FILES if version==3 else legacy_fleet if version==2 else WEB_FILES)|{'endpoint.wasm.mjs','endpoint.wasm.wasm'}
     if set(m['assets'])!=expected:raise ValueError('Unexpected or missing demo asset inventory')
     for name,sha in m['assets'].items():
         p=(root/name).resolve()
         if not p.is_relative_to(root) or digest(p)!=sha:raise ValueError('Changed demo asset: '+name)
     if (root/'endpoint.wasm.wasm').read_bytes()[:4]!=b'\0asm':raise ValueError('Missing WebAssembly module')
     if 'scw_test_' in (root/'endpoint.wasm.mjs').read_text():raise ValueError('Test exports in production module')
-    if version==2:
+    if version>=2:
         for module in ('server','device'):
             prefix=root/'examples/fleet_manager'/module
             if prefix.with_suffix('.wasm').read_bytes()[:4]!=b'\0asm':raise ValueError('Missing fleet Wasm module')
@@ -76,7 +78,7 @@ def assemble(output,module,source_commit,fleet="bazel-bin/examples/fleet_manager
     copy_asset(module.with_suffix('.wasm'),root/'endpoint.wasm.wasm')
     version_assets(root)
     (root/'.nojekyll').write_text('')
-    manifest={'format_version':2,'source_commit':source_commit,'runtime':'C core + nanopb + libsodium 1.0.20 / Ed25519 identities + NaCl box / Emscripten 4.0.10','storage':'guided demo: temporary; fleet example: browser-local IndexedDB','assets':{name:digest(root/name) for name in (*FILES,'endpoint.wasm.mjs','endpoint.wasm.wasm')}}
+    manifest={'format_version':3,'source_commit':source_commit,'runtime':'C core + nanopb + libsodium 1.0.20 / Ed25519 identities + NaCl box / Emscripten 4.0.10','storage':'guided demo: temporary; fleet example: browser-local IndexedDB','assets':{name:digest(root/name) for name in (*FILES,'endpoint.wasm.mjs','endpoint.wasm.wasm')}}
     (root/'demo.json').write_text(json.dumps(manifest,indent=2)+'\n')
     verify(root,require_commit=source_commit!='working-tree')
 

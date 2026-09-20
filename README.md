@@ -42,6 +42,12 @@ For a short example calling the SDK directly, read
 `bazel run //examples:python_api`. It uses fresh identities and the production
 library, with no test hooks.
 
+For documented application projects, start with [examples/README.md](examples/README.md).
+Run `bazel run //examples/fleet_manager:preview` for a browser-local fleet
+database with C++ WebAssembly device consoles. Use **Add external device** to
+connect a native Python console. Both workflows use manual copy-and-paste
+frames; the browser fleet and native device stores retain their identities.
+
 ## Application model
 
 ```text
@@ -115,8 +121,9 @@ limitations for Cortex-M0/M3/M4 deployment; selecting a production backend and
 qualifying a physical board remain separate work.
 [Upstream MCU guidance](https://doc.libsodium.org/installation#cross-compiling-to-arm-microcontrollers).
 
-Physical-board qualification, key rotation, fleet registry integration, and
-telemetry history are outside the current implementation.
+Physical-board qualification, key rotation, production fleet services, and
+telemetry history are outside the current implementation. The examples provide
+a browser-local fleet registry for learning the application API.
 The [design notes](PLAN.md) summarize architecture choices and historical
 alternatives. [Embedded evaluation notes](MCU_FEASIBILITY.md) describe optional
 platform integrations; the protocol documents define the implemented profile.

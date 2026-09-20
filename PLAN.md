@@ -56,7 +56,9 @@ reproducible relay schedules. The [browser demo](web/README.md) exposes messages
 endpoint state, and library results. The [MCU evaluation notes](MCU_FEASIBILITY.md)
 describe optional platform measurements and their limits.
 
-Key rotation, event history, and multi-device registry integration are possible
-extensions. They are not supplied by the current sample. Future application
+The application examples now include a browser-local multi-device registry,
+C++ WebAssembly consoles, and a native Python console, with manual frame transfer
+and saved identities. Key rotation, event history, and production fleet services
+remain possible extensions. Future application
 models should preserve explicit ownership, bounded storage, and authenticated
 state transitions without changing the transport boundary.

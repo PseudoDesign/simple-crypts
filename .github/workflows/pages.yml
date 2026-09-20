@@ -9,6 +9,7 @@ on:
       - 'tools/test_report.py'
       - 'web/site.py'
       - 'web/browser_test.mjs'
+      - 'examples/fleet_manager/browser_test.mjs'
       - 'web/package.json'
       - 'web/package-lock.json'
   workflow_dispatch:
@@ -44,7 +45,12 @@ jobs:
       - name: Browser acceptance gate
         env:
           BROWSER_ARTIFACTS_DIR: ${{ runner.temp }}/browser-artifacts
-        run: node web/browser_test.mjs site
+        run: |
+          node web/browser_test.mjs site
+          # Older committed manifests intentionally have no fleet bundle yet.
+          if [ -d site/examples/fleet_manager ]; then
+            node examples/fleet_manager/browser_test.mjs site/examples/fleet_manager
+          fi
       - name: Save browser traces and failure diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

@@ -1,0 +1,20 @@
+load("//web:defs.bzl", "wasm_build")
+package(default_visibility = ["//visibility:public"])
+
+wasm_build(
+    name = "module",
+    kind = "module",
+    output = "device.mjs",
+    persistent = True,
+    sources = [
+        "console.cpp", "//examples/common:endpoint.c", "//core:sc.c",
+        "//providers/sodium:sc_sodium.c", "//schema:sc.pb.c",
+        "//third_party/nanopb:pb_common.c", "//third_party/nanopb:pb_encode.c",
+        "//third_party/nanopb:pb_decode.c",
+    ],
+    inputs = [
+        "//examples/common:endpoint.h", "//core:sources", "//providers/sodium:sources",
+        "//schema:sources", "//third_party/nanopb:sources", "//third_party/libsodium:headers",
+    ],
+    sodium = "//web:sodium",
+)

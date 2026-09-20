@@ -11,6 +11,12 @@ The recorded report under `site/report/` supplies existing evidence without
 rerunning the hardware build. Demo builds do not change its source revision,
 test timestamps, cache labels, or result counts.
 
+The fleet application's editable sources live under `examples/`; `//web:site`
+includes its static bundle at `examples/fleet_manager/`. New demo manifests
+inventory both examples. The verifier continues to accept the previous manifest
+format so the existing committed site can remain published until intentionally
+regenerated. No saved browser database or native identity store is packaged.
+
 ## Publish a tested demo revision
 
 1. Bootstrap the pinned SDKs and run the library and web checks:
@@ -21,6 +27,7 @@ test timestamps, cache labels, or result counts.
    npm ci --prefix web --ignore-scripts --no-audit --no-fund
    PLAYWRIGHT_BROWSERS_PATH=/tmp/simple-crypts-browsers web/node_modules/.bin/playwright install chromium firefox
    bazel test //web:browser_test --test_output=errors
+   bazel test //examples/fleet_manager:browser_test --test_output=errors
    ```
 
 2. Commit the tested implementation. Assemble the publishable assets using
@@ -30,6 +37,7 @@ test timestamps, cache labels, or result counts.
    python3 web/site.py --output site --source-commit "$(git rev-parse HEAD)"
    python3 web/site.py --verify-site site
    PLAYWRIGHT_BROWSERS_PATH=/tmp/simple-crypts-browsers node web/browser_test.mjs site
+   PLAYWRIGHT_BROWSERS_PATH=/tmp/simple-crypts-browsers node examples/fleet_manager/browser_test.mjs site/examples/fleet_manager
    ```
 
 3. Commit the generated assets and push to `main`. The existing Pages workflow

@@ -20,10 +20,32 @@ def main(c):
                     subprocess.run(['make','-j4','-C','src/libsodium'],cwd=source,env=env,stdout=stream,stderr=subprocess.STDOUT,check=True)
                     shutil.copyfile(source/'src/libsodium/.libs/libsodium.a',out)
                 else:
-                    argv=[str(em/'emcc'),'-std=c99','-Oz','-Wall','-Wextra','-Werror','-I.','-Ithird_party/nanopb','-Ithird_party/libsodium/src/libsodium/include',
-                          '-sMODULARIZE=1','-sEXPORT_ES6=1','-sENVIRONMENT=web,worker,node','-sWASM_BIGINT=1','-sFILESYSTEM=0','-sALLOW_MEMORY_GROWTH=0','-sINITIAL_MEMORY=4194304','-sSTACK_SIZE=131072','-sEXPORTED_RUNTIME_METHODS=["UTF8ToString","HEAPU8"]',
-                          *(['-DSC_ENABLE_TESTING'] if c.get('testing') else []),*c['sources'],c['sodium'],'-o',str(out)]
-                    subprocess.run(argv,env=env,stdout=stream,stderr=subprocess.STDOUT,check=True)
+                    # Compile each language with its own driver; never reinterpret
+                    # the C protocol/provider sources as C++.
+                    objects = []
+                    cpp = any(source.endswith('.cpp') for source in c['sources'])
+                    for index, source in enumerate(c['sources']):
+                        is_cpp = source.endswith('.cpp')
+                        obj = root / f'{index}.o'
+                        argv = [str(em / ('em++' if is_cpp else 'emcc')),
+                                '-std=c++17' if is_cpp else '-std=c99',
+                                '-Oz', '-Wall', '-Wextra', '-Werror', '-I.',
+                                '-Ithird_party/nanopb', '-Ithird_party/libsodium/src/libsodium/include',
+                                *(['-DSC_ENABLE_TESTING'] if c.get('testing') else []),
+                                '-c', source, '-o', str(obj)]
+                        subprocess.run(argv, env=env, stdout=stream, stderr=subprocess.STDOUT, check=True)
+                        objects.append(str(obj))
+                    persistent = c.get('persistent', False)
+                    argv = [str(em / ('em++' if cpp else 'emcc')), '-Oz',
+                            '-sMODULARIZE=1', '-sEXPORT_ES6=1', '-sENVIRONMENT=web,worker,node',
+                            '-sWASM_BIGINT=1', '-sFILESYSTEM=0', '-sALLOW_MEMORY_GROWTH=0',
+                            '-sINITIAL_MEMORY=' + ('16777216' if persistent else '4194304'),
+                            '-sSTACK_SIZE=131072',
+                            '-sEXPORTED_RUNTIME_METHODS=' + json.dumps(
+                                ['UTF8ToString', 'HEAPU8'] + (['ccall'] if persistent else [])),
+                            *(['-sASYNCIFY=1', '-sASYNCIFY_STACK_SIZE=65536'] if persistent else []),
+                            *objects, c['sodium'], '-o', str(out)]
+                    subprocess.run(argv, env=env, stdout=stream, stderr=subprocess.STDOUT, check=True)
         except subprocess.CalledProcessError:
             print(log.read_text()[-20000:],file=sys.stderr);raise
 

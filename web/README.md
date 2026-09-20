@@ -5,6 +5,11 @@ WebAssembly module with checksum-pinned Emscripten 4.0.10. Vanilla ES modules
 render the guided chapters and shared message log. No server application, CDN, analytics, or runtime
 package downloads are used. Only static assets are requested.
 
+The site also links to the [fleet application example](../examples/fleet_manager/README.md)
+at `examples/fleet_manager/`. That example has persistent browser-local storage,
+C++ WebAssembly consoles, and a native Python console counterpart. The temporary
+storage behavior below describes the original guided demo only.
+
 ```sh
 python3 tools/bootstrap.py
 bazel build //web:site

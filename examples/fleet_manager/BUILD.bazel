@@ -1,0 +1,42 @@
+load("//web:defs.bzl", "wasm_build")
+load("//build:defs.bzl", "py_binary", "py_test")
+load(":defs.bzl", "fleet_site")
+package(default_visibility = ["//visibility:public"])
+
+wasm_build(
+    name = "module",
+    kind = "module",
+    output = "server.mjs",
+    persistent = True,
+    sources = [
+        "//examples/common:endpoint.c", "//core:sc.c", "//providers/sodium:sc_sodium.c",
+        "//schema:sc.pb.c", "//third_party/nanopb:pb_common.c",
+        "//third_party/nanopb:pb_encode.c", "//third_party/nanopb:pb_decode.c",
+    ],
+    inputs = [
+        "//examples/common:endpoint.h", "//core:sources", "//providers/sodium:sources",
+        "//schema:sources", "//third_party/nanopb:sources", "//third_party/libsodium:headers",
+    ],
+    sodium = "//web:sodium",
+)
+
+fleet_site(
+    name = "site",
+    assets = ["index.html", "style.css", "app.mjs", "worker.mjs",
+              "//examples/common:endpoint.mjs", "//examples/common:storage.mjs"],
+)
+
+py_binary(name = "preview", main = "preview.py", data = [":site"])
+py_test(
+    name = "protocol_test",
+    main = "run_protocol_test.py",
+    data = ["protocol_test.mjs", "//examples/common:endpoint.mjs", ":module",
+            "//examples/device_console:module", "//examples/python_device:console"],
+)
+exports_files(["site.py"])
+py_test(
+    name = "browser_test",
+    main = "run_browser_test.py",
+    data = ["browser_test.mjs", ":site", "//web:browser_packages"],
+    tags = ["manual", "local"],
+)

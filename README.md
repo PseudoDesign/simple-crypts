@@ -13,6 +13,10 @@ library and NaCl box run locally through WebAssembly. View the
 [test evidence](https://pseudodesign.github.io/simple-crypts/report/) separately.
 See [web build and browser tests](web/README.md) to run the demo locally.
 
+For setup, required checks, and pull request guidance, see
+[CONTRIBUTING.md](CONTRIBUTING.md). Project code uses the [MIT License](LICENSE);
+external dependencies retain their own licenses and notices.
+
 The implementation uses a bounded C99 protocol core, nanopb, and NaCl box
 (X25519/XSalsa20-Poly1305), with Ed25519 identities converted inside the provider. Python uses CFFI, Rust wraps the C ABI, and Go uses
 cgo. Each SDK supports both roles. A server context represents one serial

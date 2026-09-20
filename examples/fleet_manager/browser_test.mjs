@@ -95,6 +95,8 @@ try {
       await control(page, 'approve');
       assert.equal((await state(page)).registered, true);
       assert.match(await device(page, 'status'), /Registration: registered/);
+      assert.match(await device(page, 'consume 25'), /Insufficient credits: requested 25, available 0/);
+      assert.match(await page.locator('#notice').textContent(), /No credits consumed/);
       await control(page, 'debug');
       assert.equal(await page.locator('.console [data-action="debug"]').getAttribute('aria-pressed'), 'true');
       await click(page, '.device-row[data-serial="mcu-0001"] [data-action="issue"] button');
@@ -113,7 +115,7 @@ try {
       assert.equal((await state(page)).credits_consumed, '0');
       await control(page, 'request');
       assert.equal((await state(page)).credits_consumed, '25');
-      assert.match(await device(page, 'consume 100'), /error:/);
+      assert.match(await device(page, 'consume 100'), /Insufficient credits: requested 100, available 75/);
       await device(page, 'status');
       const commandInput = page.locator('.console input').first();
       assert.equal(await commandInput.evaluate(node => node === document.activeElement), true);

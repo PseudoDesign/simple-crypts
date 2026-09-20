@@ -223,6 +223,16 @@ API int ex_approve(void) { return failed ? SC_ERR_STORAGE : sc_enrollment_approv
 API int ex_cancel(void) { return failed ? SC_ERR_STORAGE : sc_enrollment_cancel(&context); }
 API int ex_issue(void) { return failed ? SC_ERR_STORAGE : sc_set_credits_issued(&context, get64(input + 2048)); }
 int ex_consume(uint64_t value) { return failed ? SC_ERR_STORAGE : sc_consume_credits(&context, value); }
+/* Read public balances for console diagnostics, without parsing display text
+ * or duplicating the core's validation/commit decision. */
+int ex_device_credits(uint64_t *issued, uint64_t *consumed) {
+    sc_state state;
+    int result = sc_inspect(&context, &state);
+    if (result != SC_OK) return result;
+    *issued = state.data.groups[0].values[0].u64;
+    *consumed = state.data.groups[0].values[1].u64;
+    return SC_OK;
+}
 API int ex_request(void) { return failed ? SC_ERR_STORAGE : sc_request_credit_status(&context); }
 API int ex_receive(size_t length) {
     if (failed) return SC_ERR_STORAGE;

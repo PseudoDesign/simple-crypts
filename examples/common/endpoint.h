@@ -19,6 +19,7 @@ int ex_cancel(void);
 int ex_issue(void);
 int ex_request(void);
 int ex_consume(uint64_t amount);
+int ex_device_credits(uint64_t *issued, uint64_t *consumed);
 int ex_receive(size_t length);
 int ex_outbound(void);
 const uint8_t *ex_frame(void);

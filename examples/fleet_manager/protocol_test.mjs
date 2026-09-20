@@ -34,6 +34,14 @@ const identity = device.state().public_key;
 assert.match((await device.console('help', now)).output, /sync/);
 for (const command of ['tx', 'rx aabb', 'consume -1', 'consume 18446744073709551616', 'status extra'])
   assert.equal((await device.console(command, now)).error, true);
+for (const command of ['consume 0', 'consume -1', 'consume 1.5', 'consume 18446744073709551616']) {
+  const result = await device.console(command, now);
+  assert.equal(result.error, true);
+  assert.match(result.output, /positive whole number from 1 to 18446744073709551615/);
+}
+assert.match((await device.console('consume', now)).output, /Usage: consume <amount>/);
+assert.match((await device.console('consume 1', now)).output, /enrollment is not confirmed/);
+assert.equal(device.state().credits_consumed, '0');
 assert.equal((await device.console('sync', now)).sync, true);
 assert.equal(await device.outbound(), null);
 await server.server('begin', {}, now);
@@ -49,6 +57,11 @@ await approve(server);
 server = await open('server', 'wasm-01', zero, false);
 await exchange(server, device, now);
 assert.equal(device.state().registered, true);
+const emptyBalance = await device.console('consume 25', now);
+assert.equal(emptyBalance.error, true);
+assert.match(emptyBalance.output, /Insufficient credits: requested 25, available 0/);
+assert.match(emptyBalance.output, /No credits consumed.*fleet table/);
+assert.equal(device.state().credits_consumed, '0');
 
 await server.server('issue', {total: '100'}, now);
 const grant = await server.outbound();
@@ -65,7 +78,9 @@ assert.equal(server.state().credits_consumed, '0');
 await server.server('request', {}, now);
 await exchange(server, device, now);
 assert.equal(server.state().credits_consumed, '25');
-assert.equal((await device.console('consume 76', now)).error, true);
+const overspend = await device.console('consume 76', now);
+assert.equal(overspend.error, true);
+assert.match(overspend.output, /Insufficient credits: requested 76, available 75/);
 assert.match((await device.console('status', now)).output, /Credits remaining: 75/);
 assert.equal((await device.console('reboot', now)).sync, true);
 device = await open('device', 'wasm-01', server.state().public_key, false);
@@ -95,6 +110,11 @@ await second.server('begin', {}, now);
 await exchange(second, other, now);
 await approve(second);
 await exchange(second, other, now);
+await second.server('issue', {total: '18446744073709551614'}, now);
+await exchange(second, other, now);
+assert.match((await other.console('consume 18446744073709551615', now)).output,
+  /requested 18446744073709551615, available 18446744073709551614/);
+assert.equal(other.state().credits_consumed, '0');
 await second.server('issue', {total: '18446744073709551615'}, now);
 await exchange(second, other, now);
 assert.equal(other.state().credits_issued, '18446744073709551615');
@@ -102,11 +122,18 @@ await other.console('consume 18446744073709551615', now);
 await second.server('request', {}, now);
 await exchange(second, other, now);
 assert.equal(second.state().credits_consumed, '18446744073709551615');
+const exhausted = await other.console('consume 1', now);
+assert.equal(exhausted.error, true);
+assert.match(exhausted.output, /lifetime consumption is 18446744073709551615.*would exceed/);
 
 // A failed debit is neither reported successful nor recovered as successful.
 const before = stores.get('device:wasm-01').slice();
 failWrite = key => key === 'device:wasm-01';
-assert.equal((await device.console('consume 1', now)).error, true);
+const storageFailure = await device.console('consume 1', now);
+assert.equal(storageFailure.error, true);
+assert.match(storageFailure.output, /Could not safely read or save device state/);
+assert.doesNotMatch(storageFailure.output, /Insufficient credits/);
+assert.match((await device.console('reboot', now)).output, /Cannot complete reboot.*reload/);
 assert.deepEqual(stores.get('device:wasm-01'), before);
 await assert.rejects(device.outbound());
 failWrite = null;

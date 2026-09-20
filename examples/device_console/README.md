@@ -10,8 +10,8 @@ bazel run //examples/fleet_manager:preview
 ```
 
 Choose **Create device**, type a command, and press Enter. Use the up/down arrow
-keys to recall commands. The console shows both application output and messages
-exchanged with the server; no frame copying or terminal setup is required.
+keys to recall commands. The console shows application output; enable **Debug**
+in its title bar to see messages exchanged with the server; no frame copying or terminal setup is required.
 
 | Command | Operation |
 | --- | --- |
@@ -21,6 +21,12 @@ exchanged with the server; no frame copying or terminal setup is required.
 | `sync` | Exchange pending messages with the server |
 | `reboot` | Restore saved identity and credits, then synchronize |
 | `quit` | Stop the device, retaining its saved state |
+
+Rejected commands explain the cause and the next step. For example, `consume 25`
+with no available balance reports `Insufficient credits: requested 25, available 0`,
+confirms no debit occurred, and points to the fleet's credit control. Invalid or
+zero amounts, unconfirmed enrollment, exhausted counters, and storage failures
+have distinct messages. Balances in these diagnostics retain full uint64 precision.
 
 The server's **Authorize enrollment** action sends a signed challenge and
 receives the device response. **Approve device** explicitly approves the exact

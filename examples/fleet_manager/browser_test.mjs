@@ -24,15 +24,38 @@ await mkdir(artifacts, {recursive: true});
 async function wait(page) {
   await page.waitForFunction(() => !document.querySelector('#create-form button').disabled);
 }
-async function click(page, id) { await page.locator(id).click(); await wait(page); }
+const row = (page, serial = 'mcu-0001') => page.locator(`.device-row[data-serial="${serial}"]`);
+async function hideConsoles(page) {
+  while (await page.locator('.console:visible').count()) {
+    const panel = page.locator('.console:visible').first();
+    // Bring an overlapping window forward using its visible title when needed.
+    await panel.locator('.drag-handle').focus();
+    await panel.getByRole('button', {name: 'Hide', exact: true}).click();
+  }
+}
+async function click(page, selector) {
+  await hideConsoles(page);
+  await page.locator(selector).click();
+  await wait(page);
+}
+async function control(page, name, serial = 'mcu-0001') {
+  await hideConsoles(page);
+  await row(page, serial).locator(`[data-action="${name}"]`).click();
+  await wait(page);
+}
 async function device(page, line, serial = 'mcu-0001') {
   const panel = page.locator(`.console[data-serial="${serial}"]`);
+  if (!await panel.isVisible()) await control(page, 'open', serial);
   await panel.locator('input').fill(line);
   await panel.locator('input').press('Enter');
   await wait(page);
   return panel.locator('pre').textContent();
 }
-async function state(page) { return JSON.parse(await page.locator('#server-state').textContent()); }
+async function state(page, serial = 'mcu-0001') {
+  const field = name => row(page, serial).locator(`[data-field="${name}"]`).textContent();
+  return {public_key: await field('server-key'), candidate_key: await field('candidate'),
+    registered: await field('enrollment') === 'Registered', credits_consumed: await field('consumed')};
+}
 
 try {
   for (const [name, engine] of [['chromium', chromium], ['firefox', firefox]]) {
@@ -51,7 +74,7 @@ try {
       await click(page, '#create-form button');
       const firstKey = (await state(page)).public_key;
       assert.match(await device(page, 'help'), /sync/);
-      await click(page, '#begin');
+      await control(page, 'begin');
       assert.equal((await state(page)).registered, false);
       const deviceKey = (await state(page)).candidate_key;
       assert.notEqual(deviceKey, '00'.repeat(32));
@@ -61,16 +84,16 @@ try {
       await wait(page);
       assert.equal((await state(page)).public_key, firstKey);
       assert.equal((await state(page)).registered, false);
-      await click(page, '#approve');
+      await control(page, 'approve');
       assert.equal((await state(page)).registered, true);
       assert.match(await device(page, 'status'), /Registration: registered/);
-      await click(page, '#issue-form button');
+      await click(page, '.device-row[data-serial="mcu-0001"] [data-action="issue"] button');
       assert.match(await device(page, 'status'), /Credits issued: 100/);
       assert.match(await device(page, 'consume 25'), /Consumed 25/);
       assert.equal((await state(page)).credits_consumed, '0');
       await device(page, 'sync');
       assert.equal((await state(page)).credits_consumed, '0');
-      await click(page, '#request');
+      await control(page, 'request');
       assert.equal((await state(page)).credits_consumed, '25');
       assert.match(await device(page, 'consume 100'), /error:/);
       await device(page, 'status');
@@ -83,13 +106,13 @@ try {
       await commandInput.press('ArrowDown');
       assert.equal(await commandInput.inputValue(), 'status');
       await commandInput.fill('');
-      await click(page, '#stop');
-      await page.locator('#total').fill('200');
-      await click(page, '#issue-form button');
+      await control(page, 'power');
+      await row(page).locator('input[name="total"]').fill('200');
+      await click(page, '.device-row[data-serial="mcu-0001"] [data-action="issue"] button');
       await page.reload();
       await wait(page);
       assert.equal(await page.locator('.console input').first().isDisabled(), true);
-      await click(page, '#start');
+      await control(page, 'power');
       const restored = await device(page, 'status');
       assert.match(restored, /Credits issued: 200/);
       assert.match(restored, /Credits consumed: 25/);
@@ -98,30 +121,87 @@ try {
       assert.match(await device(page, 'status'), /Credits remaining: 175/);
       await device(page, 'quit');
       assert.equal(await commandInput.isDisabled(), true);
-      await click(page, '#start');
-      await page.locator('.console button', {hasText: 'Hide'}).first().click();
+      await control(page, 'power');
+      await hideConsoles(page);
       assert.equal(await page.locator('.console').first().isVisible(), false);
-      await click(page, '#show-console');
+      await control(page, 'open');
       assert.equal(await page.locator('.console').first().isVisible(), true);
+      // Disconnection is independent of power. Consume locally and queue server
+      // work without delivery, even through sync/reboot/reload, then reconnect.
+      await control(page, 'connection');
+      assert.match(await device(page, 'consume 5'), /Consumed 5/);
+      await hideConsoles(page);
+      await row(page).locator('input[name="total"]').fill('300');
+      await click(page, '.device-row[data-serial="mcu-0001"] [data-action="issue"] button');
+      await control(page, 'request');
+      await device(page, 'sync');
+      await device(page, 'reboot');
+      assert.match(await device(page, 'status'), /Credits issued: 200/);
+      assert.equal((await state(page)).credits_consumed, '25');
+      await page.reload();
+      await wait(page);
+      assert.match(await device(page, 'status'), /Credits issued: 200/);
+      assert.match(await row(page).locator('[data-field="connection"]').textContent(), /Disconnected/);
+      await control(page, 'connection');
+      assert.match(await device(page, 'status'), /Credits issued: 300/);
+      assert.equal((await state(page)).credits_consumed, '30');
+
+      const window = page.locator('.console').first();
+      const handle = window.locator('.drag-handle');
+      const before = await window.boundingBox();
+      const grip = await handle.boundingBox();
+      await page.mouse.move(grip.x + 30, grip.y + 12);
+      await page.mouse.down();
+      await page.mouse.move(grip.x - 90, grip.y - 68, {steps: 8});
+      await page.mouse.up();
+      const after = await window.boundingBox();
+      assert.ok(after.x < before.x - 100 && after.y < before.y - 60);
+      await handle.focus();
+      await handle.press('ArrowRight');
+      assert.equal(Math.round((await window.boundingBox()).x - after.x), 20);
+      await handle.press('ArrowDown');
+      const moved = await window.boundingBox();
+      await hideConsoles(page);
+      await control(page, 'open');
+      assert.equal((await window.boundingBox()).x, moved.x);
+      assert.equal((await window.boundingBox()).y, moved.y);
+      assert.equal(await page.locator('#details').count(), 0);
+      assert.equal(await page.locator('.chapter-banner a').count(), 4);
+      assert.match(await page.locator('.chapter-banner a').nth(1).getAttribute('href'), /demo.html#establish-trust/);
+      await hideConsoles(page);
       await page.locator('#serial').fill('mcu-0002');
       await click(page, '#create-form button');
       assert.equal(await page.locator('.console').count(), 2);
-      assert.equal((await state(page)).credits_consumed, '0');
-      assert.notEqual((await state(page)).public_key, firstKey);
+      assert.equal((await state(page, 'mcu-0002')).credits_consumed, '0');
+      assert.notEqual((await state(page, 'mcu-0002')).public_key, firstKey);
+      await control(page, 'connection', 'mcu-0002');
+      assert.match(await row(page, 'mcu-0002').locator('[data-field="connection"]').textContent(), /Disconnected/);
+      assert.match(await row(page).locator('[data-field="connection"]').textContent(), /Connection enabled/);
+      await control(page, 'begin', 'mcu-0002');
+      assert.equal((await state(page, 'mcu-0002')).candidate_key, '00'.repeat(32));
+      await control(page, 'connection', 'mcu-0002');
+      assert.notEqual((await state(page, 'mcu-0002')).candidate_key, '00'.repeat(32));
+      await control(page, 'open');
+      await page.screenshot({path: join(artifacts, `${name}-desktop.png`)});
 
       const secondTab = await context.newPage();
       await secondTab.goto(url);
       await secondTab.waitForFunction(() => document.querySelector('#notice').textContent.includes('another tab'));
       assert.equal(await secondTab.locator('#create-form button').first().isDisabled(), true);
+      assert.equal(await secondTab.locator('#reset').isDisabled(), true);
       await secondTab.close();
 
       await page.reload();
       await wait(page);
-      await page.getByRole('button', {name: 'mcu-0001', exact: true}).click();
+      await hideConsoles(page);
       assert.equal((await state(page)).public_key, firstKey);
-      assert.equal((await state(page)).credits_consumed, '25');
+      assert.equal((await state(page)).credits_consumed, '30');
       assert.equal(await page.locator('#fleet-rows tr').count(), 2);
       await page.setViewportSize({width: 390, height: 844});
+      await control(page, 'open');
+      const mobileWindow = await page.locator('.console').first().boundingBox();
+      assert.ok(mobileWindow.x >= 0 && mobileWindow.x + mobileWindow.width <= 390);
+      assert.ok(mobileWindow.y >= 40 && mobileWindow.y + mobileWindow.height <= 844);
       await page.screenshot({path: join(artifacts, `${name}-fleet.png`), fullPage: true});
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 
@@ -144,13 +224,41 @@ try {
       });
       await page.reload();
       await wait(page);
-      await page.getByRole('button', {name: 'mcu-0001', exact: true}).click();
-      assert.match(await page.locator('#entry-error').textContent(), /storage/);
-      assert.equal(await page.locator('#begin').isDisabled(), true);
+      await hideConsoles(page);
+      assert.match(await row(page).locator('[data-field="error"]').textContent(), /storage/);
+      assert.equal(await row(page).locator('[data-action="begin"]').isDisabled(), true);
       assert.equal(await page.locator('#fleet-rows tr').count(), 2);
       assert.equal(await page.getByRole('button', {name: 'old-external'}).count(), 0);
+      // Reset is available even when one saved device is corrupt. Canceling
+      // preserves identities; committing clears both stores, including legacy rows.
+      await click(page, '#reset');
+      await page.getByRole('button', {name: 'Cancel', exact: true}).click();
+      assert.equal(await page.locator('.device-row').count(), 2);
+      await click(page, '#reset');
+      await page.locator('#confirm-reset').click();
+      await page.waitForFunction(() => document.querySelector('#fleet-rows').children.length === 0);
+      await wait(page);
+      assert.equal(await page.locator('.console').count(), 0);
+      const counts = await page.evaluate(async () => {
+        const db = await new Promise(resolve => {
+          const request = indexedDB.open('simple-crypts-fleet-v1', 1);
+          request.onsuccess = () => resolve(request.result);
+        });
+        const counts = await Promise.all(['fleet', 'endpoints'].map(store => new Promise(resolve => {
+          const request = db.transaction(store).objectStore(store).count();
+          request.onsuccess = () => resolve(request.result);
+        })));
+        db.close();
+        return counts;
+      });
+      assert.deepEqual(counts, [0, 0]);
+      await page.reload();
+      await wait(page);
+      assert.equal(await page.locator('.device-row').count(), 0);
+      await click(page, '#create-form button');
+      assert.notEqual((await state(page)).public_key, firstKey);
       assert.deepEqual(errors, []);
-      console.log(`${name}: interactive C++ consoles, transport, history, restart, isolation, lock and migration passed.`);
+      console.log(`${name}: fleet table controls, draggable consoles, persistent connection toggles, reset, isolation and storage recovery passed.`);
     } finally {
       await context.tracing.stop({path: join(artifacts, `${name}-trace.zip`)});
       await browser.close();

@@ -8,11 +8,20 @@
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
+  <nav class="chapter-banner" aria-label="Demo chapters">
+    <a href="../../">Home</a>
+    <a href="../../demo.html#establish-trust">1 · Establish trust</a>
+    <a href="../../demo.html#credits">2 · Credits</a>
+    <a href="./" aria-current="page">3 · Fleet</a>
+  </nav>
   <header>
-    <p class="eyebrow">SIMPLE CRYPTS / INTERACTIVE CONSOLE DEMO</p>
+    <div class="section-title">
+      <p class="eyebrow">SIMPLE CRYPTS / INTERACTIVE CONSOLE DEMO</p>
+      <button id="reset" class="secondary">Reset browser data</button>
+    </div>
     <h1>Your fleet, at the console.</h1>
-    <p>Create a device, type commands, and watch it talk to the server.</p>
-    <p class="muted">Saved in this browser. Each console runs a C++ device; the fleet server runs locally too.</p>
+    <p>Create devices, manage their connections, and type commands in their consoles.</p>
+    <p class="muted">Saved in this browser. Drag a console by its title bar to move it.</p>
   </header>
   <main>
     <p id="notice" role="status" aria-live="polite">Opening saved fleet…</p>
@@ -23,67 +32,56 @@
         <button>Create device</button>
       </form>
       <div class="table-scroll"><table>
-        <thead><tr><th>Serial</th><th>Device</th><th>Registration</th><th>Issued</th><th>Last reported consumed</th></tr></thead>
+        <thead><tr><th>Serial / console</th><th>Device / connection</th><th>Enrollment</th><th>Cumulative credits issued</th><th>Last reported consumed</th></tr></thead>
         <tbody id="fleet-rows"></tbody>
       </table></div>
       <p id="empty" class="muted">Create your first device to open its console.</p>
-    </section>
-    <section id="details" hidden aria-labelledby="selected-title">
-      <h2 id="selected-title"></h2>
-      <p id="entry-error" role="alert"></p>
-      <div class="columns">
-        <div>
-          <h3>Enrollment</h3>
-          <p id="enrollment-status"></p>
-          <div class="actions">
-            <button id="begin">Authorize enrollment</button>
-            <button id="approve">Approve device</button>
-            <button id="cancel" class="secondary">Cancel session</button>
-          </div>
-          <p id="expires" class="muted"></p>
-          <details>
-            <summary>Enrollment identity</summary>
-            <p>Compare the candidate with the public key shown by device <code>status</code> before approving.</p>
-            <label>Candidate public key <code id="candidate" class="wrap"></code></label>
-            <label>Session challenge <code id="challenge" class="wrap"></code></label>
-            <label>Pinned server public key <code id="server-key" class="wrap"></code></label>
-          </details>
-        </div>
-        <div>
-          <h3>Credits</h3>
-          <form id="issue-form">
-            <label>Cumulative credits issued <input id="total" value="100" inputmode="numeric" pattern="[0-9]+" required></label>
-            <button>Set issued total</button>
-          </form>
-          <button id="request" class="secondary">Request consumption report</button>
-          <p id="totals"></p>
-          <p class="muted">Consumption happens on the device. Request a report to update the server’s view.</p>
-        </div>
-      </div>
-      <div class="actions">
-        <button id="show-console">Open console</button>
-        <button id="start" class="secondary">Start saved device</button>
-        <button id="stop" class="secondary">Stop device</button>
-      </div>
-      <details><summary>Public server state</summary><pre id="server-state"></pre></details>
-    </section>
-    <section aria-labelledby="consoles-title">
-      <h2 id="consoles-title">Device consoles</h2>
-      <p class="muted">Type a command and press Enter. Use ↑ / ↓ for command history.</p>
-      <div id="consoles"></div>
+      <p class="muted">Disconnect to pause delivery while a device keeps running. Reconnect to exchange pending messages.</p>
     </section>
     <section>
       <h2>Try it</h2>
       <ol>
-        <li><strong>Create device</strong>, then <strong>Authorize enrollment</strong>. Watch the challenge and response in its console.</li>
-        <li>Run <code>status</code> to inspect its identity, then <strong>Approve device</strong>.</li>
+        <li><strong>Create device</strong>, then <strong>Authorize enrollment</strong> in its fleet row.</li>
+        <li>Run <code>status</code> in its console to compare its key with <strong>Enrollment identity</strong>, then <strong>Approve device</strong>.</li>
         <li>Set issued total to <strong>100</strong>. The device receives its credits and replies.</li>
-        <li>Type <code>consume 25</code>, then <code>status</code> to see the remaining balance.</li>
-        <li><strong>Request consumption report</strong> to update the server. Try <code>reboot</code> or stop/start to resume saved state.</li>
+        <li>Type <code>consume 25</code>, then <code>status</code> to see its remaining balance.</li>
+        <li><strong>Request report</strong> in the table to update the last reported consumption.</li>
       </ol>
-      <p class="muted">Messages travel over the demo’s simulated link. Use <code>sync</code> to retry pending work. Enrollment approval is always your choice.</p>
+      <p class="muted">Type <code>help</code> for commands. Use ↑ / ↓ for command history. Hide a console and reopen it from the fleet; its device keeps running.</p>
     </section>
   </main>
+  <div id="consoles" aria-label="Device console windows"></div>
+  <dialog id="reset-dialog" aria-labelledby="reset-title">
+    <h2 id="reset-title">Reset all saved demo data?</h2>
+    <p>This deletes every saved fleet device, identity, credit balance, and connection setting in this browser, including retired external-device records. This cannot be undone.</p>
+    <form method="dialog" class="actions">
+      <button value="cancel" class="secondary" autofocus>Cancel</button>
+      <button id="confirm-reset" value="reset">Delete saved demo data</button>
+    </form>
+  </dialog>
+  <template id="row-template">
+    <tr class="device-row">
+      <td><strong data-field="serial"></strong><p data-field="error" class="error" role="alert"></p><button data-action="open" class="secondary">Open console</button></td>
+      <td><p data-field="running"></p><button data-action="power" class="secondary"></button><p data-field="connection"></p><button data-action="connection" class="secondary"></button></td>
+      <td>
+        <p data-field="enrollment"></p>
+        <div class="row-actions">
+          <button data-action="begin">Authorize enrollment</button>
+          <button data-action="approve">Approve device</button>
+          <button data-action="cancel" class="secondary">Cancel session</button>
+        </div>
+        <details><summary>Enrollment identity</summary>
+          <p class="muted">Compare the candidate with device <code>status</code> before approving.</p>
+          <label>Candidate public key <code data-field="candidate" class="wrap"></code></label>
+          <label>Session challenge <code data-field="challenge" class="wrap"></code></label>
+          <label>Pinned server public key <code data-field="server-key" class="wrap"></code></label>
+          <p data-field="expires" class="muted"></p>
+        </details>
+      </td>
+      <td><p data-field="issued"></p><form data-action="issue"><label>New total <input name="total" value="100" inputmode="numeric" pattern="[0-9]+" required></label><button>Set issued total</button></form></td>
+      <td><p data-field="consumed"></p><button data-action="request" class="secondary">Request report</button><p class="muted">Updated only by a requested report.</p></td>
+    </tr>
+  </template>
   <footer>Real encrypted messages · C++ device consoles · Browser-local storage</footer>
   <script type="module" src="./app.mjs"></script>
 </body>

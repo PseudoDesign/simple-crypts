@@ -43,3 +43,15 @@ export function endpointStorage(db, serial, role, fresh) {
     },
   };
 }
+
+// Clear both stores in one transaction while the worker still owns the fleet
+// lock. Do not discard live endpoints until the deletion commits successfully.
+export function clearFleet(db) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(['fleet', 'endpoints'], 'readwrite', {durability: 'strict'});
+    tx.objectStore('fleet').clear();
+    tx.objectStore('endpoints').clear();
+    tx.oncomplete = resolve;
+    tx.onabort = tx.onerror = () => reject(tx.error ?? new Error('Reset transaction aborted'));
+  });
+}

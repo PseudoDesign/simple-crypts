@@ -23,14 +23,32 @@ under `examples/fleet_manager/`.
    encrypted response. The console reports that it is awaiting approval.
 3. Compare the candidate key in **Enrollment identity** with device `status`,
    then **Approve device**. Confirmation is delivered to the device.
-4. Set **Cumulative credits issued** to `100`. The request, device response, and
+4. In the fleet table, set **Cumulative credits issued** to `100`. The request, device response, and
    receipt are exchanged over the simulated link.
 5. Type `consume 25`. `status` shows 75 remaining; server **last reported
-   consumed** remains zero until you **Request consumption report**.
+   consumed** remains zero until you **Request report**.
 6. Try `reboot`, `quit`, or stop/start. Identities and credits survive. Pending
    server changes made while a device is stopped arrive when it starts.
 
-`sync` retries pending protocol work. There are no raw-frame fields, clipboard
+The top banner links back to Home and the guided demos. All enrollment, credit,
+report, power, and connection controls live in each device's fleet row. Consoles
+are small floating windows: drag their title bar, or focus it and use arrow keys.
+Escape cancels a drag. Hide/Open preserves the window position within the page;
+viewport resizing keeps windows reachable. Positions and command history are
+only UI state, not device checkpoints.
+
+**Disconnect** disables the simulated link without stopping the device. Local
+commands still work, while issuance, reports, and enrollment messages wait.
+**Connect** resumes pending exchanges. The setting survives reload/reboot and
+stop/start; previously saved devices default to connected.
+
+**Reset browser data** at the top asks for confirmation, then atomically clears
+all saved fleet entries and endpoint checkpoints, including retired external
+entries. It also closes consoles. Cancel leaves everything intact. The owning
+worker retains its exclusive lock throughout, so another tab cannot race reset.
+Reset affects this demo's saved data on the current browser origin.
+
+`sync` retries pending protocol work when connected. There are no raw-frame fields, clipboard
 controls, or external-device launch commands. The existing guided demo is still
 available for experimenting with individual packet delivery.
 
@@ -72,8 +90,7 @@ through the transport. No approval is inferred from device creation or restart.
 Browser devices saved by the earlier manual demo remain compatible. Retired
 external-device entries are omitted from the runtime/UI, but their stored data
 and serial reservations are not deleted or reassigned. There is no destructive
-migration or reset button. Deliberately clear this origin's site data in browser
-settings if you want to discard the whole demo fleet.
+migration. Use **Reset browser data** to deliberately discard the entire fleet.
 
 Changing the preview port changes the origin. Console activity is temporary;
 identity and protocol state survive refresh. Keys use local software storage,
@@ -87,7 +104,8 @@ bazel test //examples/fleet_manager:browser_test --test_output=errors
 ```
 
 Tests cover explicit approval, automatic frame exchange, command parsing,
-keyboard history, exact uint64 credits, stopped-device queues, reload/reboot,
+keyboard history, mouse/keyboard window movement, reset cancellation/deletion,
+persistent connection toggles, exact uint64 credits, stopped-device queues, reload/reboot,
 replay, expiry, isolated devices, finite exchange bounds, transaction failures,
 nonce reservations, and compatibility with old saved entries. Browser checks
 run in Chromium and Firefox, with artifacts under `/tmp/simple-crypts-fleet-browser`.

@@ -1,12 +1,12 @@
-/* UI only: the worker owns endpoints, persistence, and the simulated link.
- * Console commands run in C++; exchange events return as readable activity.
+/* The worker owns devices, storage, and links. This file owns only table forms
+ * and movable console windows; dragging/hiding never changes device lifetime.
  */
 const $ = id => document.getElementById(id);
 const worker = new Worker(new URL('./worker.mjs', import.meta.url), {type: 'module'});
 const waiting = new Map();
 const consoles = new Map();
-let nextId = 0, fleet = [], selected, busy = true, available = false;
-let displayedApproval;
+const rows = new Map();
+let nextId = 0, fleet = [], busy = true, available = false, topWindow = 50;
 
 worker.onmessage = ({data}) => {
   if (data.result?.fleet || data.fleet) fleet = data.result?.fleet ?? data.fleet;
@@ -45,65 +45,115 @@ async function action(operation) {
   finally { busy = false; render(); }
 }
 
+function raise(panel) {
+  // Keep windows below navigation. DOM order is also the keyboard tab order.
+  if (++topWindow >= 9999) {
+    topWindow = 50;
+    for (const item of consoles.values()) item.root.style.zIndex = '50';
+  }
+  panel.root.style.zIndex = String(topWindow);
+}
+
+function place(panel, x, y) {
+  // Bound the entire window, including its title bar, after drag or resize.
+  panel.x = Math.max(8, Math.min(x, innerWidth - panel.root.offsetWidth - 8));
+  panel.y = Math.max(48, Math.min(y, innerHeight - panel.root.offsetHeight - 8));
+  panel.root.style.left = `${panel.x}px`;
+  panel.root.style.top = `${panel.y}px`;
+}
+
+function openConsole(serial) {
+  const panel = consoles.get(serial);
+  panel.root.hidden = false;
+  place(panel, panel.x, panel.y);
+  raise(panel);
+  (panel.input.disabled ? panel.handle : panel.input).focus();
+}
+
+function makeRow(entry) {
+  const root = $('row-template').content.firstElementChild.cloneNode(true);
+  root.dataset.serial = entry.serial;
+  const row = {root, entry};
+  rows.set(entry.serial, row);
+  $('fleet-rows').append(root);
+  const button = name => root.querySelector(`[data-action="${name}"]`);
+  const server = (command, args = {}) => action(async () => {
+    await send('server', entry.serial, {command, ...args});
+    notice(`Updated ${entry.serial}. See its console for the exchange.`);
+  });
+  button('open').onclick = () => openConsole(entry.serial);
+  button('begin').onclick = () => server('begin');
+  button('cancel').onclick = () => server('cancel');
+  button('request').onclick = () => server('request');
+  button('approve').onclick = () => {
+    // Capture exactly the displayed binding before starting asynchronous work.
+    const {challenge, candidate_key: key} = row.entry.server;
+    server('approve', {challenge, key});
+  };
+  button('issue').onsubmit = event => {
+    event.preventDefault();
+    server('issue', {total: button('issue').elements.total.value});
+  };
+  button('power').onclick = () => action(async () => {
+    const command = row.entry.running ? 'stop' : 'start';
+    await send(command, entry.serial);
+    notice(`${entry.serial} ${command === 'stop' ? 'stopped' : 'started'}. Saved state retained.`);
+  });
+  button('connection').onclick = () => action(async () => {
+    const enabled = !row.entry.connected;
+    await send('connection', entry.serial, {enabled});
+    notice(`${entry.serial}: connection ${enabled ? 'enabled' : 'disabled'}.`);
+  });
+  return row;
+}
+
+function updateRow(entry) {
+  const row = rows.get(entry.serial) ?? makeRow(entry);
+  row.entry = entry;
+  const field = (name, text) => { row.root.querySelector(`[data-field="${name}"]`).textContent = text; };
+  const control = name => row.root.querySelector(`[data-action="${name}"]`);
+  const state = entry.server;
+  const candidate = state?.candidate_key && !/^0+$/.test(state.candidate_key);
+  field('serial', entry.serial);
+  field('error', entry.error ?? '');
+  field('running', entry.running ? 'Running' : 'Stopped');
+  field('connection', entry.connected ? 'Connection enabled' : 'Disconnected');
+  field('enrollment', state?.registered ? 'Registered' : candidate ? 'Awaiting approval' : 'Unregistered');
+  field('candidate', state?.candidate_key ?? '—');
+  field('challenge', state?.challenge ?? '—');
+  field('server-key', state?.public_key ?? 'Unavailable');
+  field('expires', state?.enrollment_expires && state.enrollment_expires !== '0' ?
+    `Session expires: ${new Date(Number(state.enrollment_expires) * 1000).toLocaleString()}` : '');
+  field('issued', state?.credits_issued ?? '—');
+  field('consumed', state?.credits_consumed ?? '—');
+  control('connection').textContent = entry.connected ? 'Disconnect' : 'Connect';
+  control('connection').setAttribute('aria-pressed', String(entry.connected));
+  control('power').textContent = entry.running ? 'Stop device' : 'Start device';
+  const unusable = busy || !available || Boolean(entry.error) || state?.storage_failed;
+  for (const button of row.root.querySelectorAll('button')) button.disabled = Boolean(unusable);
+  control('open').disabled = busy || !available;
+  control('begin').disabled ||= state?.registered;
+  control('cancel').disabled ||= state?.registered || !state?.enrollment_expires || state.enrollment_expires === '0';
+  control('approve').disabled ||= state?.registered || !candidate;
+  control('request').disabled ||= !state?.registered;
+  control('issue').querySelector('button').disabled ||= !state?.registered;
+}
+
 function render() {
-  if (!fleet.some(entry => entry.serial === selected)) selected = fleet[0]?.serial;
   $('empty').hidden = fleet.length > 0;
-  $('fleet-rows').replaceChildren();
+  for (const [serial, row] of rows) {
+    if (fleet.some(entry => entry.serial === serial)) continue;
+    row.root.remove();
+    rows.delete(serial);
+    consoles.get(serial).root.remove();
+    consoles.delete(serial);
+  }
   for (const entry of fleet) {
-    const row = document.createElement('tr');
-    row.classList.toggle('selected', entry.serial === selected);
-    const cell = document.createElement('td');
-    const button = document.createElement('button');
-    button.className = 'secondary';
-    button.textContent = entry.serial;
-    button.onclick = () => { selected = entry.serial; render(); };
-    cell.append(button);
-    row.append(cell);
-    for (const text of [entry.running ? 'Running' : 'Stopped',
-      entry.error ? 'Storage error' : entry.server?.registered ? 'Registered' : 'Unregistered',
-      entry.server?.credits_issued ?? '—', entry.server?.credits_consumed ?? '—']) {
-      const cell = document.createElement('td');
-      cell.textContent = text;
-      row.append(cell);
-    }
-    $('fleet-rows').append(row);
+    updateRow(entry);
     updateConsole(entry);
   }
-  const entry = fleet.find(item => item.serial === selected);
-  $('details').hidden = !entry;
-  if (entry) {
-    const state = entry.server;
-    $('selected-title').textContent = `Server · ${entry.serial}`;
-    $('entry-error').textContent = entry.error ?? '';
-    $('server-key').textContent = state?.public_key ?? 'Unavailable';
-    $('candidate').textContent = state?.candidate_key ?? '—';
-    $('challenge').textContent = state?.challenge ?? '—';
-    displayedApproval = {challenge: state?.challenge, key: state?.candidate_key};
-    const candidate = state?.candidate_key && !/^0+$/.test(state.candidate_key);
-    $('enrollment-status').textContent = state?.registered ? 'Registered. Device identity approved.' : candidate ?
-      'Device responded. Review its identity and approve enrollment.' : 'Authorize enrollment to connect this device.';
-    $('expires').textContent = state?.enrollment_expires !== '0' && state?.enrollment_expires ?
-      `Session expires: ${new Date(Number(state.enrollment_expires) * 1000).toLocaleString()}` : '';
-    $('totals').textContent = state ? `Issued: ${state.credits_issued} · Last reported consumed: ${state.credits_consumed}` : '';
-    $('server-state').textContent = JSON.stringify(state, null, 2);
-  }
-  for (const button of document.querySelectorAll('button')) button.disabled = busy || !available;
-  if (entry) {
-    const unusable = busy || !available || entry.error || entry.server?.storage_failed;
-    for (const button of $('details').querySelectorAll('button')) button.disabled = Boolean(unusable);
-    $('approve').disabled ||= entry.server?.registered || !entry.server?.candidate_key || /^0+$/.test(entry.server.candidate_key);
-    $('begin').disabled ||= entry.server?.registered;
-    $('cancel').disabled ||= entry.server?.registered;
-    $('request').disabled ||= !entry.server?.registered;
-    $('issue-form').querySelector('button').disabled ||= !entry.server?.registered;
-    $('start').disabled ||= entry.running;
-    $('stop').disabled ||= !entry.running;
-  }
-  for (const item of fleet) {
-    const panel = consoles.get(item.serial);
-    panel.input.disabled = busy || !available || !item.running || Boolean(item.error) || item.device?.storage_failed;
-    panel.submit.disabled = panel.input.disabled;
-  }
+  $('create-form').querySelector('button').disabled = busy || !available;
+  $('reset').disabled = busy || !available;
 }
 
 function updateConsole(entry) {
@@ -112,13 +162,19 @@ function updateConsole(entry) {
     const root = document.createElement('article');
     root.className = 'console';
     root.dataset.serial = entry.serial;
+    root.setAttribute('aria-label', `Device console ${entry.serial}`);
     const top = document.createElement('div');
-    top.className = 'section-title';
-    const title = document.createElement('h3');
+    top.className = 'console-titlebar';
+    const handle = document.createElement('button');
+    handle.className = 'drag-handle';
+    handle.title = 'Drag to move. Focus and use arrow keys to move; Escape cancels a drag.';
     const hide = document.createElement('button');
     hide.textContent = 'Hide';
-    hide.onclick = () => { root.hidden = true; };
-    top.append(title, hide);
+    hide.onclick = () => {
+      root.hidden = true;
+      rows.get(entry.serial).root.querySelector('[data-action="open"]').focus();
+    };
+    top.append(handle, hide);
     const log = document.createElement('pre');
     log.setAttribute('aria-label', `Console output ${entry.serial}`);
     log.setAttribute('aria-live', 'polite');
@@ -129,15 +185,54 @@ function updateConsole(entry) {
     input.autocomplete = 'off';
     input.spellcheck = false;
     input.maxLength = 4096;
-    input.placeholder = 'Type help, status, consume 25, or sync';
+    input.placeholder = 'help, status, consume 25, sync';
     label.append(input);
     const submit = document.createElement('button');
-    submit.textContent = 'Run command';
+    submit.textContent = 'Run';
     form.append(label, submit);
     root.append(top, log, form);
     $('consoles').append(root);
-    panel = {root, title, log, input, submit, history: [], cursor: 0, draft: ''};
+    panel = {root, handle, log, input, submit, history: [], cursor: 0, draft: ''};
     consoles.set(entry.serial, panel);
+    place(panel, innerWidth - 464 - (consoles.size - 1) % 5 * 28,
+      innerHeight - 374 - (consoles.size - 1) % 5 * 28);
+    raise(panel);
+    root.addEventListener('pointerdown', () => raise(panel));
+    root.addEventListener('focusin', () => raise(panel));
+
+    // Pointer capture keeps dragging reliable outside the handle and supports
+    // mouse, pen, and touch. Only the title handle initiates a move.
+    let drag;
+    handle.onpointerdown = event => {
+      if (event.button !== 0) return;
+      drag = {id: event.pointerId, x: event.clientX, y: event.clientY, left: panel.x, top: panel.y};
+      handle.setPointerCapture(event.pointerId);
+      root.classList.add('dragging');
+      handle.focus();
+    };
+    handle.onpointermove = event => {
+      if (drag?.id !== event.pointerId) return;
+      place(panel, drag.left + event.clientX - drag.x, drag.top + event.clientY - drag.y);
+    };
+    const endDrag = () => {
+      if (drag && handle.hasPointerCapture(drag.id)) handle.releasePointerCapture(drag.id);
+      drag = undefined;
+      root.classList.remove('dragging');
+    };
+    handle.onpointerup = endDrag;
+    handle.onpointercancel = () => {
+      if (drag) place(panel, drag.left, drag.top);
+      endDrag();
+    };
+    handle.onlostpointercapture = endDrag;
+    handle.onkeydown = event => {
+      if (event.key === 'Escape' && drag) {
+        place(panel, drag.left, drag.top);
+        endDrag();
+      }
+      const delta = {ArrowLeft: [-20, 0], ArrowRight: [20, 0], ArrowUp: [0, -20], ArrowDown: [0, 20]}[event.key];
+      if (delta) { event.preventDefault(); place(panel, panel.x + delta[0], panel.y + delta[1]); }
+    };
     input.onkeydown = event => {
       if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return;
       event.preventDefault();
@@ -162,7 +257,9 @@ function updateConsole(entry) {
       if (!input.disabled) input.focus();
     };
   }
-  panel.title.textContent = `${entry.serial} · ${entry.running ? 'connected' : 'stopped'}`;
+  panel.handle.textContent = `${entry.serial} · ${!entry.running ? 'stopped' : entry.connected ? 'connected' : 'disconnected'}`;
+  panel.input.disabled = busy || !available || !entry.running || Boolean(entry.error) || entry.device?.storage_failed;
+  panel.submit.disabled = panel.input.disabled;
   const text = entry.activity.join('\n');
   if (panel.log.textContent !== text) {
     panel.log.textContent = text;
@@ -170,44 +267,30 @@ function updateConsole(entry) {
   }
 }
 
-async function server(command, args = {}) {
-  await send('server', selected, {command, ...args});
-  notice('Server action completed. See the device console for the exchange.');
-}
-
+window.addEventListener('resize', () => {
+  for (const panel of consoles.values()) if (!panel.root.hidden) place(panel, panel.x, panel.y);
+});
 $('create-form').onsubmit = async event => {
   event.preventDefault();
   const serial = $('serial').value;
   await action(async () => {
     await send('create', serial);
-    selected = serial;
     let number = 1;
     while (fleet.some(item => item.serial === `mcu-${String(number).padStart(4, '0')}`)) number++;
     $('serial').value = `mcu-${String(number).padStart(4, '0')}`;
-    notice('Device created. Authorize enrollment, then approve its identity.');
+    notice('Device created. Authorize enrollment and approve its identity in the fleet table.');
   });
-  consoles.get(serial)?.input.focus();
+  if (consoles.has(serial)) openConsole(serial);
 };
-$('begin').onclick = () => action(() => server('begin'));
-$('cancel').onclick = () => action(() => server('cancel'));
-$('approve').onclick = () => {
-  const approval = {...displayedApproval};
-  action(() => server('approve', approval));
-};
-$('request').onclick = () => action(() => server('request'));
-$('issue-form').onsubmit = event => {
-  event.preventDefault();
-  const total = $('total').value;
-  action(() => server('issue', {total}));
-};
-$('show-console').onclick = () => {
-  const panel = consoles.get(selected);
-  panel.root.hidden = false;
-  panel.root.scrollIntoView({block: 'nearest'});
-  panel.input.focus();
-};
-$('start').onclick = () => action(async () => { await send('start', selected); notice('Device resumed and synchronized.'); });
-$('stop').onclick = () => action(async () => { await send('stop', selected); notice('Device stopped. Saved state retained.'); });
+$('reset').onclick = () => $('reset-dialog').showModal();
+$('reset-dialog').addEventListener('close', () => {
+  if ($('reset-dialog').returnValue !== 'reset') return;
+  action(async () => {
+    await send('reset');
+    $('serial').value = 'mcu-0001';
+    notice('All saved fleet data deleted. Create a device to start fresh.');
+  });
+});
 
 render();
 try {

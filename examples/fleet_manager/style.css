@@ -1,47 +1,57 @@
 :root { font: 16px/1.5 system-ui, sans-serif; color: #17312f; background: #f2f5f1; }
 * { box-sizing: border-box; }
-body { margin: 0; }
-header, main, footer { max-width: 1180px; margin: auto; padding: 24px; }
-header { padding-top: 48px; }
+body { margin: 0; padding-top: 40px; }
+a { color: inherit; }
+header, main, footer { max-width: 1320px; margin: auto; padding: 24px; }
+header { padding-top: 32px; padding-bottom: 0; }
+.chapter-banner { position: fixed; inset: 0 0 auto; z-index: 10000; height: 40px; display: flex; justify-content: center; align-items: center; gap: 20px; border-bottom: 1px solid #dce0d7; background: #f5f5ef; font-size: 12px; }
+.chapter-banner a { text-decoration: none; padding: 5px 8px; border-radius: 5px; color: #66736c; }
+.chapter-banner a[aria-current] { background: #e5f0e6; color: #22684e; font-weight: 700; }
 h1 { font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.05em; margin: 8px 0; }
 h2 { margin-top: 0; font-size: 1.4rem; }
-h3 { font-size: 1.05rem; }
 .eyebrow { font-size: .75rem; letter-spacing: .15em; font-weight: 700; }
 .muted, footer { color: #526860; }
 section { background: white; border: 1px solid #d8e2da; padding: 24px; border-radius: 12px; margin-bottom: 20px; }
-button, input, textarea { font: inherit; border-radius: 6px; }
+button, input { font: inherit; border-radius: 6px; }
 button { background: #176455; color: white; border: 1px solid transparent; padding: 9px 14px; cursor: pointer; }
 button.secondary { background: #edf3ef; color: #234d40; border-color: #ccdad1; }
 button:disabled { opacity: .45; cursor: default; }
 button:hover:not(:disabled) { filter: brightness(.92); }
 :focus-visible { outline: 3px solid #c88222; outline-offset: 3px; }
-input, textarea { border: 1px solid #a7bdb1; padding: 9px; background: #fff; color: #17312f; }
-input { max-width: 100%; }
-textarea { display: block; width: 100%; resize: vertical; font: 12px/1.6 ui-monospace, monospace; overflow-wrap: anywhere; }
-label { display: block; margin: 10px 0; font-size: .9rem; }
+input { border: 1px solid #a7bdb1; padding: 9px; background: #fff; color: #17312f; max-width: 100%; min-width: 0; }
+label { display: block; margin: 10px 0; font-size: .85rem; }
 label input { display: block; }
 form, .actions { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
-#receive-form { display: block; }
 .table-scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-th, td { padding: 12px; border-bottom: 1px solid #e5ece7; text-align: left; }
+table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+th, td { padding: 12px; border-bottom: 1px solid #e5ece7; text-align: left; vertical-align: top; }
 th { font-size: .8rem; color: #526860; }
-tr.selected { background: #edf5ed; }
-.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
-.section-title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.badge { font-size: .8rem; border-radius: 20px; background: #edf5ed; padding: 4px 12px; }
+td { min-width: 160px; }
+td:nth-child(3) { min-width: 225px; max-width: 290px; }
+td:first-child { overflow-wrap: anywhere; }
+td p { margin: 0 0 10px; }
+td button { font-size: .8rem; padding: 7px 10px; }
+td input { width: 150px; }
+td form { margin: 0; }
+td label { margin-top: 0; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+summary { cursor: pointer; }
+.section-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 code, pre { font: 12px/1.6 ui-monospace, monospace; }
 pre, .wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
-.wrap { display: block; padding: 10px; background: #f2f5f1; margin: 6px 0; }
+.wrap { display: block; padding: 8px; background: #f2f5f1; margin: 6px 0; }
 #notice { padding: 12px 16px; background: #dfeee3; border-radius: 6px; }
-#notice.error, #entry-error:not(:empty) { background: #ffede4; color: #872b14; }
-#consoles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr)); gap: 16px; }
-.console { background: #142b28; color: #cfedda; padding: 16px; border-radius: 8px; min-width: 0; }
-.console h3 { margin: 0; }
-.console pre { height: 300px; overflow-y: auto; user-select: text; }
-.console form { display: block; }
-.console label { font-family: ui-monospace, monospace; }
-.console input { width: 100%; background: #213e38; color: white; border-color: #668478; font-family: ui-monospace, monospace; }
-.console button { padding: 5px 10px; font-size: .8rem; }
+.error:not(:empty), #notice.error { background: #ffede4; color: #872b14; }
+.console { position: fixed; width: min(440px, calc(100vw - 16px)); height: min(350px, calc(100dvh - 56px)); display: flex; flex-direction: column; background: #142b28; color: #cfedda; border: 1px solid #668478; border-radius: 10px; box-shadow: 0 14px 40px #102b2840; overflow: hidden; }
+.console-titlebar { display: flex; align-items: center; background: #213e38; border-bottom: 1px solid #48665a; padding: 6px; gap: 6px; }
+.console .drag-handle { flex: 1; text-align: left; background: transparent; font-weight: 600; cursor: grab; touch-action: none; user-select: none; }
+.console.dragging .drag-handle { cursor: grabbing; }
+.console pre { flex: 1; min-height: 0; overflow-y: auto; user-select: text; padding: 12px; margin: 0; }
+.console form { display: flex; flex-wrap: nowrap; align-items: end; padding: 10px; margin: 0; border-top: 1px solid #48665a; }
+.console label { flex: 1; min-width: 0; margin: 0; font: 12px/1.6 ui-monospace, monospace; }
+.console input { width: 100%; background: #213e38; color: white; border-color: #668478; font: 12px/1.6 ui-monospace, monospace; }
+.console button { padding: 6px 10px; font-size: .8rem; }
+dialog { max-width: min(500px, calc(100vw - 32px)); border: 1px solid #a7bdb1; border-radius: 12px; padding: 24px; color: #17312f; }
+dialog::backdrop { background: #142b2870; }
 [hidden] { display: none !important; }
-@media (max-width: 760px) { .columns { grid-template-columns: 1fr; } header, main, footer { padding: 16px; } section { padding: 16px; } }
+@media (max-width: 760px) { header, main, footer { padding: 16px; } section { padding: 16px; } .section-title { flex-wrap: wrap; } .chapter-banner { gap: 4px; font-size: 10px; } .chapter-banner a { padding: 5px; } }

@@ -171,7 +171,10 @@ function render(){
       const outbox=$(role+'-outbox');
       outbox.replaceChildren();
       const pending=lab.queue.filter(packet=>packet.from===role);
-      outbox.parentElement.hidden=pending.length===0;
+      if(!pending.length){
+        const empty=document.createElement('p');empty.className='outbox-empty';
+        empty.textContent='No pending message';outbox.append(empty);
+      }
       for(const packet of pending)outbox.append(card(packet));
     }
     if(!lab.archive.length){

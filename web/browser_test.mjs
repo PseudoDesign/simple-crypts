@@ -89,6 +89,7 @@ async function next(page){await page.locator('#next').click();await ready(page);
 const pending=page=>page.locator('.outbox .packet[data-pending="true"]').first();
 const saved=page=>page.locator('#message-log .packet[data-pending="false"]').first();
 async function dragPacket(page,packet,target,touch=false){
+ const trayHeights=await page.locator('.outbox .message-tray').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height));
  const packetId=await packet.getAttribute('data-packet');
  if(Number(packetId)>0){
   const sender=await packet.getAttribute('data-from');
@@ -111,16 +112,20 @@ async function dragPacket(page,packet,target,touch=false){
  }
  await page.waitForFunction(old=>document.querySelector('#message-log .packet[data-pending="false"]')?.dataset.packet!==old,before);
  await ready(page);assert.equal(await page.locator('.touch-packet,.drag-over').count(),0);
+ assert.deepEqual(await page.locator('.outbox .message-tray').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height)),trayHeights);
  if(Number(packetId)>0){
   assert.equal(await page.locator(`.outbox .packet[data-packet="${packetId}"]`).count(),0);
   assert.equal(await page.locator(`#message-log .packet[data-packet="-${packetId}"]`).count(),1);
  }
 }
 async function generate(page){
+ const emptyHeights=await page.locator('.endpoint').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height));
+ assert.equal(await page.locator('.outbox-empty').count(),2);
  assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
  assert.equal(await page.locator('#device-unique-id').textContent(),'mcu-0001');
  assert.equal(await page.locator('#pinned-server-key').textContent(),await page.locator('#server-public-key').textContent());
  await next(page);assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
+ assert.deepEqual(await page.locator('.endpoint').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height)),emptyHeights);
  assert.equal(await pending(page).count(),1);
  assert.equal(await page.locator('#server-outbox .packet').count(),1);
  assert.equal(await page.locator('#device-outbox .packet,#message-log .packet').count(),0);

@@ -60,7 +60,9 @@ localStorage or IndexedDB. Wasm memory sizing is a browser build setting, not an
 MCU resource estimate.
 
 In both guided chapters, a new message first appears inside the endpoint that
-generated it. Drag it onto either endpoint to attempt delivery. Delivered,
+generated it. Both endpoints reserve a fixed-height packet tray even when empty;
+long or multiple messages scroll within that space. Drag a message onto either
+endpoint to attempt delivery. Delivered,
 rejected, and deliberately dropped messages move to the shared message log;
 drag a saved attempt again to replay it. The corruption button
 flips/restores a wire byte. The page shows actual status codes and explains

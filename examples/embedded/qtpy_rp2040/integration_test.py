@@ -87,6 +87,28 @@ class DemoTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 link.command(CONSUME, (1).to_bytes(8, "big"))
 
+    def test_ring_consumption_survives_reboot(self):
+        """Exercise multiple ring wraps through the real credit commit path."""
+        with self.boot() as link:
+            self.action(link, "setup")
+            self.action(link, "approve")
+            self.action(link, "issue", 100)
+            before = link.inspect()
+            for _ in range(70):
+                link.command(CONSUME, (1).to_bytes(8, "big"))
+            after = link.inspect()
+            self.assertEqual(after["consumed"], "70")
+            self.assertEqual(
+                after["snapshot_erase_attempts"] - before["snapshot_erase_attempts"], 70
+            )
+            self.assertEqual(after["reset_erase_attempts"], 0)
+            link.command(REBOOT)
+        with self.boot() as link:
+            result = self.action(link, "status")
+            self.assertEqual(result["device"]["consumed"], "70")
+            link.command(RESET)
+        self.assertEqual(self.flash.read_bytes(), bytes([255]) * (33 * 4096))
+
     def test_reject_bad_setup_without_persistence(self):
         """Pin/signature/serial failures cannot create an identity or write flash."""
         from simplecrypts import Endpoint

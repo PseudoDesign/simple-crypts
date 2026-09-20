@@ -71,7 +71,7 @@ class Link:
         self.sequence += 1
         message = struct.pack("!2sBBI", b"QT", 1, command, self.sequence) + payload
         frame = encode(message + struct.pack("!I", zlib.crc32(message)))
-        deadline = time.monotonic() + 10
+        deadline = time.monotonic() + 30  # Includes a 33-sector reset/recovery.
         sent = 0
         while sent < len(frame):
             remaining = deadline - time.monotonic()

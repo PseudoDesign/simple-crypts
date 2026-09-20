@@ -63,7 +63,7 @@ static int erase(qt_store *s, unsigned sector) {
 }
 static void encode(uint8_t *p, const qt_snapshot *v, uint64_t sequence) {
     memset(p, 0, QT_BODY);
-    memcpy(p, "QTS1", 4);
+    memcpy(p, "QTS2", 4);
     put64(p + 8, sequence);
     memcpy(p + 32, v->secret, 64);
     memcpy(p + 96, v->public_key, 32);
@@ -79,7 +79,7 @@ static void encode(uint8_t *p, const qt_snapshot *v, uint64_t sequence) {
 }
 static void marker(uint8_t *p, uint64_t sequence, uint64_t crc) {
     memset(p, 0, QT_PAGE);
-    memcpy(p, "QTC1", 4);
+    memcpy(p, "QTC2", 4);
     put64(p + 8, sequence);
     put64(p + 16, crc);
 }
@@ -96,7 +96,7 @@ static int decode(qt_store *s, unsigned sector, qt_snapshot *v, uint64_t *sequen
     uint64_t crc = get64(p + 16);
     *sequence = get64(p + 8);
     marker(expected, *sequence, crc);
-    if (memcmp(p, "QTS1", 4) || !*sequence || memcmp(expected, p + QT_BODY, QT_PAGE)) {
+    if (memcmp(p, "QTS2", 4) || !*sequence || memcmp(expected, p + QT_BODY, QT_PAGE)) {
         return fail(s);
     }
     memset(p + 16, 0, 8);
@@ -124,18 +124,21 @@ int qt_store_reset(qt_store *s) {
     uint8_t intent[QT_PAGE];
     memset(intent, 0, sizeof intent);
     /* Reuse an existing marker after power loss. Do not reprogram its page. */
-    if (read_at(s, 2 * QT_SECTOR, s->scratch, QT_SECTOR)) {
+    if (read_at(s, QT_RESET_SECTOR * QT_SECTOR, s->scratch, QT_SECTOR)) {
         return -1;
     }
     if (blank(s->scratch, QT_SECTOR)) {
         s->programmed_bytes += QT_PAGE;
-        if (s->flash.program(s->flash.user, 2 * QT_SECTOR, intent, QT_PAGE) ||
-            read_at(s, 2 * QT_SECTOR, s->scratch, QT_PAGE) || memcmp(s->scratch, intent, QT_PAGE)) {
+        if (s->flash.program(s->flash.user, QT_RESET_SECTOR * QT_SECTOR, intent, QT_PAGE) ||
+            read_at(s, QT_RESET_SECTOR * QT_SECTOR, s->scratch, QT_PAGE) ||
+            memcmp(s->scratch, intent, QT_PAGE)) {
             return fail(s);
         }
     }
-    if (erase(s, 0) || erase(s, 1) || erase(s, 2)) {
-        return -1;
+    for (unsigned i = 0; i < QT_NVM_SECTORS; ++i) {
+        if (erase(s, i)) {
+            return -1;
+        }
     }
     wipe(&s->state, sizeof s->state);
     wipe(s->scratch, sizeof s->scratch);
@@ -149,22 +152,28 @@ int qt_store_open(qt_store *s, const qt_flash *flash) {
     memset(s, 0, sizeof *s);
     s->flash = *flash;
     s->active = -1;
-    if (read_at(s, 2 * QT_SECTOR, s->scratch, QT_SECTOR)) {
+    if (read_at(s, QT_RESET_SECTOR * QT_SECTOR, s->scratch, QT_SECTOR)) {
         return -1;
     }
     if (!blank(s->scratch, QT_SECTOR)) {
         return qt_store_reset(s);
     }
-    for (unsigned i = 0; i < 2; ++i) {
+    uint64_t sequences[QT_SNAPSHOT_SECTORS] = {0};
+    for (unsigned i = 0; i < QT_SNAPSHOT_SECTORS; ++i) {
         uint64_t seq = 0;
         int rc = decode(s, i, &candidate, &seq);
         if (rc < 0) {
             wipe(&candidate, sizeof candidate);
             return -1;
         }
-        if (rc && seq == s->sequence) {
-            wipe(&candidate, sizeof candidate);
-            return fail(s);
+        if (rc) {
+            for (unsigned j = 0; j < i; ++j) {
+                if (seq == sequences[j]) {
+                    wipe(&candidate, sizeof candidate);
+                    return fail(s);
+                }
+            }
+            sequences[i] = seq;
         }
         if (rc && seq > s->sequence) {
             s->sequence = seq;
@@ -182,7 +191,7 @@ int qt_store_save(qt_store *s, const qt_snapshot *next) {
         s->sequence == UINT64_MAX) {
         return fail(s);
     }
-    unsigned dest = s->active == 0 ? 1u : 0u;
+    unsigned dest = s->active < 0 ? 0u : ((unsigned)s->active + 1u) % QT_SNAPSHOT_SECTORS;
     if (erase(s, dest)) {
         return -1;
     }

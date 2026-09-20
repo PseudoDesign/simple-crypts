@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-static uint8_t memory[3 * QT_SECTOR];
+static uint8_t memory[QT_NVM_BYTES];
 static FILE *disk;
 static qt_app app;
 static unsigned operations;

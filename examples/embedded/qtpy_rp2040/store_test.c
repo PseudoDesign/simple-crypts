@@ -5,7 +5,7 @@
 #include <string.h>
 
 typedef struct {
-    uint8_t bytes[3 * QT_SECTOR];
+    uint8_t bytes[QT_NVM_BYTES];
     unsigned operation, cut, mode;
 } flash_model;
 static int read_flash(void *u, uint32_t at, void *out, size_t n) {
@@ -63,6 +63,27 @@ int main(void) {
     assert(qt_store_open(&s, &f) == 0);
     assert(qt_store_reserve(&s, 7, 32, &first) == SC_OK && first == 32);
     assert(s.state.generation == 2);
+    /* Fill and wrap the ring repeatedly; all sectors must share the wear equally. */
+    assert(qt_store_reset(&s) == 0);
+    assert(qt_store_open(&s, &f) == 0);
+    qt_snapshot current = identity;
+    current.generation = 2;
+    current.record_len = sizeof record;
+    memcpy(current.record, record, sizeof record);
+    current.nonce_domain = 7;
+    current.nonce_end = 64;
+    for (unsigned i = 0; i < 3 * QT_SNAPSHOT_SECTORS; ++i) {
+        assert(qt_store_save(&s, &current) == 0);
+        assert(s.active == (int)(i % QT_SNAPSHOT_SECTORS));
+    }
+    for (unsigned i = 0; i < QT_SNAPSHOT_SECTORS; ++i) {
+        assert(s.erase_attempts[i] == 3);
+    }
+    assert(s.erase_attempts[QT_RESET_SECTOR] == 0);
+    assert(qt_store_open(&s, &f) == 0);
+    assert(s.sequence == 3 * QT_SNAPSHOT_SECTORS);
+    assert(s.active == (int)QT_SNAPSHOT_SECTORS - 1);
+    /* Fault injection below overwrites an old committed sector at ring wrap. */
     base.operation = 0;
     for (unsigned mode = 0; mode < 3; ++mode) {
         for (unsigned cut = 1; cut <= 17; ++cut) {
@@ -86,7 +107,7 @@ int main(void) {
                 assert(s.fault);
             }
         }
-        for (unsigned cut = 1; cut <= 4; ++cut) {
+        for (unsigned cut = 1; cut <= QT_NVM_SECTORS + 1; ++cut) {
             flash_model m = base;
             qt_flash target = backend(&m);
             assert(qt_store_open(&s, &target) == 0);
@@ -100,15 +121,43 @@ int main(void) {
                 assert(s.state.provisioned);
             } else {
                 assert(!s.state.provisioned);
+                for (size_t i = 0; i < sizeof m.bytes; ++i) {
+                    assert(m.bytes[i] == 255);
+                }
             }
         }
     }
+    /* Reject duplicate sequences even when neither is the newest snapshot. */
+    flash_model duplicate = base;
+    memcpy(duplicate.bytes + QT_SECTOR, duplicate.bytes, QT_SECTOR);
+    qt_flash duplicate_backend = backend(&duplicate);
+    assert(qt_store_open(&s, &duplicate_backend) != 0 && s.fault);
+    /* A legacy two-sector image at its original physical offsets requires reset. */
+    flash_model legacy = {0};
+    memset(legacy.bytes, 255, sizeof legacy.bytes);
+    uint8_t *old = legacy.bytes + (QT_SNAPSHOT_SECTORS - 2) * QT_SECTOR;
+    memcpy(old, base.bytes, QT_SECTOR);
+    memcpy(old, "QTS1", 4);
+    memcpy(old + QT_BODY, "QTC1", 4);
+    memset(old + 16, 0, 8);
+    uint64_t legacy_crc = qt_crc(old, QT_BODY);
+    for (unsigned i = 0; i < 8; ++i) {
+        old[16 + i] = (uint8_t)(legacy_crc >> (8 * i));
+        old[QT_BODY + 16 + i] = old[16 + i];
+    }
+    qt_flash legacy_backend = backend(&legacy);
+    assert(qt_store_open(&s, &legacy_backend) != 0 && s.fault);
+    /* The unchanged physical reset-marker address also recovers old interrupted resets. */
+    legacy.bytes[QT_RESET_SECTOR * QT_SECTOR] = 0;
+    assert(qt_store_open(&s, &legacy_backend) == 0 && !s.state.provisioned);
+    assert(qt_store_reset(&s) == 0);
+    assert(qt_store_open(&s, &legacy_backend) == 0 && !s.state.provisioned);
     /* A valid commit marker plus corrupt contents cannot roll back nonce state. */
     assert(qt_store_open(&s, &f) == 0);
     base.bytes[s.active * QT_SECTOR + 32] ^= 1;
     assert(qt_store_open(&s, &f) != 0 && s.fault);
     assert(qt_store_reset(&s) == 0);
     assert(qt_store_open(&s, &f) == 0 && !s.state.provisioned);
-    puts("snapshot, reservation, reset, and 63 power-cut cases passed");
+    puts("ring wear, wrap recovery, legacy rejection, and 153 power-cut cases passed");
     return 0;
 }

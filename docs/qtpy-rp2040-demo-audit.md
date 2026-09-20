@@ -269,6 +269,13 @@ state along with the identity and require a new secret provisioning seed.
 
 ## 4. NVM layout, write rate and endurance
 
+Implementation update: the demo now uses a **32-sector snapshot ring plus one
+reset-marker sector (132 KiB)**, with an ideal 3.2 million snapshot-update budget
+at 100,000 erases per sector. The two-sector layout and budgets below record the
+original audit baseline, not the current firmware. See the
+[current storage layout and upgrade/reset instructions](../examples/embedded/qtpy_rp2040/README.md#nvm-recovery-and-endurance).
+
+
 Use ordinary external-flash array sectors. For either documented candidate,
 the relevant geometry is **4 KiB erase sectors and 256-byte program pages**.
 Both candidates publish a 100,000-cycle endurance rating, subject to the exact

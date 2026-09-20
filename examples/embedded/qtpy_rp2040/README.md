@@ -56,7 +56,7 @@ The helper verifies the RP2040 family, block counts/order, addresses, boot code,
 and the mount's `INFO_UF2.TXT` before opening its output. It cannot distinguish
 one physical RP2040 board from another: selecting the mount is the operator's
 responsibility. It writes only this application's flash range. Firmware reflashes
-preserve the demo's final three sectors. Do not use a chip-erase/flash-nuke image
+preserve the demo's final 33 sectors. Do not use a chip-erase/flash-nuke image
 when preserving identity or counters matters. Initial installation replaces any
 existing CircuitPython/application image; it does not preserve that application's
 filesystem or provide a CircuitPython backup.
@@ -99,7 +99,7 @@ unapproved enrollment with a fresh signed challenge; `approve` is a separate
 explicit operator action. If the host store is lost or belongs to another board,
 the CLI fails rather than silently changing the board's trusted server.
 
-Commands time out after 10 seconds. A timeout/disconnect can mean an operation
+Commands time out after 30 seconds. A timeout/disconnect can mean an operation
 committed but its response was lost. Mutating commands are never automatically
 retried. Reconnect, inspect/obtain fresh status, and reconcile the cumulative
 counters before deciding on another consume or reset. CDC is binary, has no log
@@ -180,13 +180,14 @@ for the board and flash references.
 
 | Region | Flash offset | XIP address | Size |
 | --- | --- | --- | --- |
-| Application | `0x000000` | `0x10000000` | At most `0x7fd000` |
-| Snapshot A | `0x7fd000` | `0x107fd000` | 4096 bytes |
-| Snapshot B | `0x7fe000` | `0x107fe000` | 4096 bytes |
+| Application | `0x000000` | `0x10000000` | At most `0x7df000` |
+| Snapshot ring (32 sectors) | `0x7df000`–`0x7fe000` | `0x107df000`–`0x107fe000` | 131,072 bytes |
 | Reset intent | `0x7ff000` | `0x107ff000` | 4096 bytes |
 
-Snapshots alternate sectors. Each update erases one sector, programs/verifies
-15 body pages, then programs/verifies one dedicated commit page. Bodies contain
+Snapshots rotate through all 32 sectors in order, wrapping after the last sector.
+The partition is 132 KiB including the reset marker. Boot scans the ring for the
+highest valid sequence and rejects duplicate sequences or ambiguous records.
+Each update erases one sector, programs/verifies 15 body pages, then programs/verifies one dedicated commit page. Bodies contain
 identity, trusted peer, serialized core state/generation, and nonce reservation
 high-water mark. Snapshot sequence and core generation are separate. State
 commits retain reservations; reservations retain state. Reboot burns unused
@@ -209,19 +210,35 @@ Observed device writes in the simulator with one settled exchange per command:
 Retries, enrollment restarts, and rebooting with unused reservations change these
 counts. The counters in `inspect` are per boot, not a guaranteed lifetime wear
 meter. Conditional on the fitted part's **100,000 erase-cycle** rating and its
-specified operating conditions, two evenly alternating sectors budget about
-**200,000 snapshot writes**. A repeated issue/consume/status cycle costs 7 writes
+specified operating conditions, 32 evenly rotated sectors budget about
+**3,200,000 snapshot writes**. A repeated issue/consume/status cycle costs 7 writes
 plus reservations (typically 2 outgoing frames/32), giving approximately
-`200000 / (7 + 2/32) = 28,300` cycles before setup, resets, retries, retention, and
+`3200000 / (7 + 2/32) = 453,000` cycles before setup, resets, retries, retention, and
 qualification margins. This is an engineering budget, not a lifetime guarantee.
 There is no persistent entropy/DRBG state and no per-boot entropy write.
 
+The ring uses the private `QTS2`/`QTC2` storage format. Upgrading from the old
+12 KiB, two-sector demo requires flashing this firmware, factory-resetting, then
+starting a fresh host session and re-enrolling. Legacy committed records are
+rejected until reset; there is no automatic migration. The reset marker remains
+at its original physical address, so interrupted legacy resets still finish.
+Do not downgrade with live state: older firmware cannot safely interpret the
+ring. Reset with the newer firmware before flashing an older demo and provision
+a fresh identity afterwards.
+
+Per-boot `inspect` reports aggregate `snapshot_erase_attempts` and
+`reset_erase_attempts`; these replace the old three-entry diagnostics array.
+There is no background status polling, and button consumption remains durable
+before green feedback; no RAM batching is introduced.
+
 To factory-reset the **demo**, run the operator's `reset` action, or hold the
 runtime BOOT button (GPIO21) for five seconds. Reset first writes and verifies an
-intent marker, erases/verifies both identity/state sectors, then erases/verifies
+intent marker, erases/verifies all 32 identity/state sectors, then erases/verifies
 the marker, wipes RAM, and reboots. Any nonblank intent sector on boot resumes
 that erasure before processing protocol work. A reset normally uses one page
-program and one erase per sector. Afterwards, `setup` creates new device and
+program and 33 sector erases. Reset latency grows with the sector count; the host
+allows 30 seconds per command, including reset and boot recovery. Factory reset
+does not restore endurance. Afterwards, `setup` creates new device and
 server identities in a fresh host session; old host sessions remain available
 for inspection. A power cut before any marker byte is written may leave the old
 identity intact, so verify reset completion before provisioning again.
@@ -243,19 +260,23 @@ bazel test //examples/embedded/qtpy_rp2040:controls_test \
 python3 examples/embedded/qtpy_rp2040/qualify.py --bazel bazel --output /tmp/qtpy-fresh-check
 ```
 
-The locally verified Linux x86-64 firmware uses **183,756 bytes of flash**,
-**29,520 bytes of static main SRAM**, and a separately reserved **32,768-byte
+The locally verified Linux x86-64 firmware uses **183,820 bytes of flash**,
+**29,760 bytes of static main SRAM**, and a separately reserved **32,768-byte
 stack**. Its UF2 SHA-256 is
-`ecc7684cb79a53ae2e6362bc69cd133fdec90381c4baa7d84336abb6423ad608`.
+`e0a3b310f3552dc97826e1f24450afd8bfe12063efd41943b56582c3faa1eedc`.
 Two clean output bases produced identical ELF, BIN, UF2, and reports. These are
 build results, not evidence that a physical board has been exercised.
 
 The controls test covers bounce, once-per-release consumption, long-hold reset,
 late releases, startup-held buttons, and green/red flash timing.
 The storage test injects cuts before, during, and after each erase/program in
-snapshot and reset transactions. The process-based simulator exercises the exact
+snapshot and reset transactions (153 injected cuts), including recycling an old
+committed sector at ring wrap. It also checks equal wear, duplicate-sequence
+rejection, legacy-format rejection, and legacy reset-marker recovery.
+The process-based simulator exercises the exact
 application, finite RNG, flash store, COBS/RPC codec, production Python server,
-explicit approval, credit exchange, reboot, recovery from a process killed
+explicit approval, credit exchange, 70 consecutive durable consumptions across
+ring wraps, reboot, recovery from a process killed
 immediately after identity persistence but before core initialization, enrollment
 resume, and identity
 rotation on reset. It is not a Pico SDK or electrical simulator.

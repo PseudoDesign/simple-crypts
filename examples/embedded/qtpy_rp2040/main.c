@@ -38,7 +38,7 @@ static void __not_in_flash_func(flash_run)(void *arg) {
 }
 static int read_flash(void *u, uint32_t at, void *out, size_t n) {
     (void)u;
-    if (!supported || at > 3 * QT_SECTOR || n > 3 * QT_SECTOR - at) {
+    if (!supported || at > QT_NVM_BYTES || n > QT_NVM_BYTES - at) {
         return -1;
     }
     const volatile uint8_t *source = (const volatile uint8_t *)(XIP_BASE + QT_NVM_OFFSET + at);
@@ -50,7 +50,7 @@ static int read_flash(void *u, uint32_t at, void *out, size_t n) {
 }
 static int erase_flash(void *u, uint32_t at) {
     (void)u;
-    if (!supported || at % QT_SECTOR || at >= 3 * QT_SECTOR) {
+    if (!supported || at % QT_SECTOR || at >= QT_NVM_BYTES) {
         return -1;
     }
     flash_job job = {.offset = at, .op = 0};
@@ -58,7 +58,7 @@ static int erase_flash(void *u, uint32_t at) {
 }
 static int program_flash(void *u, uint32_t at, const void *bytes, size_t n) {
     (void)u;
-    if (!supported || at % QT_PAGE || n != QT_PAGE || at > 3 * QT_SECTOR - n) {
+    if (!supported || at % QT_PAGE || n != QT_PAGE || at > QT_NVM_BYTES - n) {
         return -1;
     }
     flash_job job = {.offset = at, .bytes = bytes, .op = 1};

@@ -107,6 +107,10 @@ static int status(qt_app *a, uint8_t *out, size_t cap, size_t *length) {
     }
     hex(a->store.state.public_key, pk);
     hex(a->store.state.server_key, server);
+    uint64_t snapshot_erases = 0;
+    for (unsigned i = 0; i < QT_SNAPSHOT_SECTORS; ++i) {
+        snapshot_erases += a->store.erase_attempts[i];
+    }
     int n = snprintf(
         (char *)out, cap,
         "{\"version\":1,\"flash_jedec\":\"%06" PRIx32 "\",\"stack_high_water\":%" PRIu32
@@ -114,13 +118,13 @@ static int status(qt_app *a, uint8_t *out, size_t cap, size_t *length) {
         "\"ready\":%d,\"fault\":%d,\"registered\":%d,\"public_key\":\"%s\",\"server_key\":\"%s\","
         "\"issued\":\"%" PRIu64 "\",\"consumed\":\"%" PRIu64 "\",\"sequence\":\"%" PRIu64 "\","
         "\"nonce_end\":\"%" PRIu64 "\",\"commits\":%" PRIu64 ",\"reservations\":%" PRIu64 ","
-        "\"programmed_bytes\":%" PRIu64 ",\"erase_attempts\":[%" PRIu64 ",%" PRIu64 ",%" PRIu64
-        "]}",
+        "\"programmed_bytes\":%" PRIu64 ",\"snapshot_erase_attempts\":%" PRIu64
+        ",\"reset_erase_attempts\":%" PRIu64 "}",
         a->flash_jedec, a->stack_high_water, a->serial, a->crypto_ready, a->store.state.provisioned,
         a->ready, a->store.fault, state.registered, pk, server, state.data.groups[0].values[0].u64,
         state.data.groups[0].values[1].u64, a->store.sequence, a->store.state.nonce_end,
-        a->store.commits, a->store.reservations, a->store.programmed_bytes,
-        a->store.erase_attempts[0], a->store.erase_attempts[1], a->store.erase_attempts[2]);
+        a->store.commits, a->store.reservations, a->store.programmed_bytes, snapshot_erases,
+        a->store.erase_attempts[QT_RESET_SECTOR]);
     if (n < 0 || (size_t)n >= cap) {
         return SC_ERR_BOUNDS;
     }

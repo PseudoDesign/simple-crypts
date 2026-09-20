@@ -40,7 +40,7 @@ XIP_RAM_LENGTH = DEFINED(XIP_RAM_LENGTH) ? XIP_RAM_LENGTH : XIP_RAM_LENGTH_DEFAU
 /* Include memory regions used */
 MEMORY
 {
-    FLASH(rx) : ORIGIN = 0x10000000, LENGTH = 0x7fd000
+    FLASH(rx) : ORIGIN = 0x10000000, LENGTH = 0x7df000
 
 }
 
@@ -84,7 +84,7 @@ MEMORY
 
    MEMORY
 {
-    FLASH(rx) : ORIGIN = 0x10000000, LENGTH = 0x7fd000
+    FLASH(rx) : ORIGIN = 0x10000000, LENGTH = 0x7df000
 
 }
 
@@ -660,5 +660,5 @@ SECTIONS
 
 
 ASSERT(SIZEOF(.boot2) == 256, "boot2 must be 256 bytes")
-ASSERT(__flash_binary_end <= 0x107fd000, "firmware overlaps demo NVM")
+ASSERT(__flash_binary_end <= 0x107df000, "firmware overlaps demo NVM")
 ASSERT(__StackBottom >= 0x20038000, "stack overflow")

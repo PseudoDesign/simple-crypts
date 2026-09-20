@@ -10,9 +10,13 @@
 #define QT_SECTOR 4096u
 #define QT_PAGE 256u
 #define QT_BODY (QT_SECTOR - QT_PAGE)
-#define QT_NVM_OFFSET 0x7fd000u
+#define QT_SNAPSHOT_SECTORS 32u
+#define QT_RESET_SECTOR QT_SNAPSHOT_SECTORS
+#define QT_NVM_SECTORS (QT_SNAPSHOT_SECTORS + 1u)
+#define QT_NVM_BYTES (QT_NVM_SECTORS * QT_SECTOR)
+#define QT_NVM_OFFSET (0x800000u - QT_NVM_BYTES)
 
-/* Backend addresses are relative to the three-sector partition, never chip addresses. */
+/* Backend addresses are relative to the reserved partition, never chip addresses. */
 typedef struct {
     void *user;
     int (*read)(void *, uint32_t, void *, size_t);
@@ -32,7 +36,7 @@ typedef struct {
 typedef struct {
     qt_flash flash;
     qt_snapshot state;
-    uint64_t sequence, commits, reservations, erase_attempts[3], programmed_bytes;
+    uint64_t sequence, commits, reservations, erase_attempts[QT_NVM_SECTORS], programmed_bytes;
     int active, fault;
     uint8_t scratch[QT_SECTOR];
 } qt_store;

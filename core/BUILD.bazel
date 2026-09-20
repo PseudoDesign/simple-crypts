@@ -17,6 +17,7 @@ c_library(
 
 c_library(
     name = "sc_testing",
+    testonly = True,
     srcs = ["sc.c"],
     hdrs = [
         "data.h",
@@ -27,6 +28,10 @@ c_library(
         "//schema:resources.h",
     ],
     copts = ["-DSC_ENABLE_TESTING"],
+    visibility = [
+        "//providers/host:__pkg__",
+        "//tests:__pkg__",
+    ],
     deps = ["//schema:proto"],
 )
 

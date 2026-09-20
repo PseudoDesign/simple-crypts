@@ -4,8 +4,15 @@ package(default_visibility = ["//visibility:public"])
 
 c_binary(
     name = "adapter",
+    testonly = True,
     srcs = ["main.c"],
     copts = ["-DSC_ENABLE_TESTING"],
+    visibility = [
+        "//examples:__pkg__",
+        "//tests:__pkg__",
+        "//tools:__pkg__",
+        "//web:__pkg__",
+    ],
     deps = ["//providers/host:host_testing"],
 )
 

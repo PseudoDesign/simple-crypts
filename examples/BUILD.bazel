@@ -4,6 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 py_binary(
     name = "device_server_demo",
+    testonly = True,
     data = [
         "//adapters/c:adapter",
         "//adapters/python:adapter",
@@ -15,6 +16,9 @@ py_binary(
         "adapters/c/adapter",
         "--server",
         "adapters/python/adapter",
+    ],
+    visibility = [
+        "//visibility:private",
     ],
 )
 

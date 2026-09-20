@@ -1,7 +1,8 @@
 /** @module web/lab */
-/** Maximum pending packet count and retained event count, respectively. */
-export const MAX_QUEUE = 64,
-  MAX_EVENTS = 200;
+/** Maximum number of pending packets retained by a lab. */
+export const MAX_QUEUE = 64;
+/** Maximum number of diagnostic events retained by a lab. */
+export const MAX_EVENTS = 200;
 /** Fixed demo serial used before key generation or enrollment. */
 export const DEVICE_SERIAL = 'mcu-0001';
 /**

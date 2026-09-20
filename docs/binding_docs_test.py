@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from binding_docs import build_bindings, python_entries
+from binding_docs import build_bindings, javascript_entries, python_entries
 from repository_quality import sdk
 
 
@@ -46,6 +46,22 @@ class BindingDocumentationTest(unittest.TestCase):
             result = subprocess.run([str(validator), str(source)], capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Undocumented Go API: Undocumented", result.stderr)
+
+    def test_javascript_export_forms(self):
+        entries = {entry["name"]: entry for entry in javascript_entries()}
+        for name in (
+            "module:web/endpoint.hex",
+            "module:examples/common/storage.rows",
+            "module:examples/common/storage.saveRow",
+            "module:web/lab.MAX_QUEUE",
+            "module:web/lab.MAX_EVENTS",
+            "module:web/lab.DEVICE_SERIAL",
+        ):
+            self.assertIn(name, entries)
+        self.assertTrue(entries["module:web/endpoint.hex"]["signature"].endswith("(bytes)"))
+        self.assertEqual(
+            entries["module:web/lab.MAX_EVENTS"]["signature"], "module:web/lab.MAX_EVENTS"
+        )
 
     def test_reproducible_bindings(self):
         inventories = []

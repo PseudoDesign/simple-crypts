@@ -93,6 +93,10 @@ def javascript_entries():
         "examples/common/storage.mjs",
         "examples/fleet_manager/transport.mjs",
     ]
+    subprocess.run(
+        ["web/node_modules/.bin/eslint", "--config", "web/eslint.config.mjs", *paths],
+        check=True,
+    )
     records = json.loads(
         subprocess.check_output(
             ["web/node_modules/.bin/jsdoc", "-c", "docs/jsdoc.json", "-X", *paths], text=True
@@ -102,14 +106,14 @@ def javascript_entries():
     for record in records:
         if record.get("undocumented") or record.get("access") == "private":
             continue
-        if record.get("kind") not in ("class", "function", "module"):
+        if record.get("kind") not in ("class", "function", "module", "constant", "member"):
             continue
         description = record.get("description") or record.get("classdesc")
         if not description:
             continue
         params = record.get("params", [])
         signature = record["longname"]
-        if record["kind"] != "module":
+        if record["kind"] in ("class", "function") or params or record.get("returns"):
             signature += "(" + ", ".join(p["name"] for p in params) + ")"
         for param in params:
             description += "\n" + param["name"] + ": " + param.get("description", "")

@@ -16,6 +16,7 @@ const server=createServer(async(req,res)=>{try{
  res.setHeader('Content-Type',mime[extname(file)]||'text/plain');res.end(await readFile(file));
 }catch{res.writeHead(404);res.end('Not found');}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}/simple-crypts/`;
+const demoURL=base+'demo.html';
 const artifacts=resolve(process.env.TEST_UNDECLARED_OUTPUTS_DIR||process.env.BROWSER_ARTIFACTS_DIR||'/tmp/simple-crypts-browser-artifacts');
 await mkdir(artifacts,{recursive:true});
 const contexts=new Map();let contextNumber=0;
@@ -49,6 +50,26 @@ async function captureFailure(error){
   await context.tracing.stop({path:resolve(artifacts,record.name+'-failure.zip')}).catch(()=>{});
  }
 }
+async function landing(page){
+ const requests=[];const record=request=>requests.push(request.url());page.on('request',record);
+ await page.goto(base);await page.locator('#credits-demo').waitFor();
+ assert.equal(await page.title(),'Simple Crypts · Small APIs. Real cryptography.');
+ assert.deepEqual(await page.locator('.language-grid dt').allTextContents(),['C','Python','Rust','Go']);
+ assert(await page.locator('#start-demo').isVisible());
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ assert(!requests.some(url=>/\.wasm|worker\.mjs|app\.mjs/.test(url)),'Landing must not initialize the demo runtime');
+ page.off('request',record);
+ await page.locator('#credits-demo').click();await ready(page);
+ assert.equal(await page.locator('body').getAttribute('data-chapter'),'credits');
+ assert.equal((await state(page,'device')).registered,'true');
+ assert.equal(await page.locator('#message-log .packet').count(),0);
+ await page.reload();await ready(page);assert.equal(await page.locator('body').getAttribute('data-chapter'),'credits');
+ await page.getByRole('link',{name:'Simple Crypts home',exact:true}).click();
+ await page.locator('#start-demo').click();await ready(page);
+ assert.equal(await page.locator('body').getAttribute('data-chapter'),'trust');
+ console.log('PASS landing: lightweight overview, direct credits, reload, home and enrollment navigation');
+}
+
 async function ready(page){
  await page.waitForFunction(()=>document.body.dataset.ready==='true'&&document.body.dataset.busy==='false');
  assert(await page.locator('#error').isHidden(),await page.locator('#error').textContent());
@@ -189,7 +210,7 @@ async function cancelledDrag(page,touch=false){
  await pending(page).locator('[data-select]').click();await ready(page);assert.equal(await pending(page).count(),1);
 }
 async function lifecycle(page,touch=false){
- assert.deepEqual(await page.locator('.chapter-banner a').allTextContents(),['1 · Establish trust','2 · Credits']);
+ assert.deepEqual(await page.locator('.chapter-banner a[id]').allTextContents(),['1 · Establish trust','2 · Credits']);
  assert(await page.locator('#add-credit').isHidden());assert(await page.locator('#consume-credit').isHidden());
  await generate(page);await cancelledDrag(page,touch);
  // The message details are visible on the actual draggable box.
@@ -217,7 +238,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
  const browser=await type.launch({headless:true});
  try{
   const context=await monitoredContext(browser,{viewport:{width:1366,height:768},reducedMotion:'reduce'}),page=await context.newPage(),errors=[];
-  page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await ready(page);await lifecycle(page);
+  page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));await landing(page);await lifecycle(page);
   for(const chapter of ['trust']){
    assert(await page.locator('#message-log').isVisible());assert.equal(await page.locator('#drop-target').count(),0);assert.equal(await page.locator('.inbox,#deliver,.show-tip').count(),0);
    await page.locator('#hide-tip').click();await page.locator('#chapter-'+chapter).click();assert(await page.locator('#guide-popup').isVisible());
@@ -287,7 +308,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
   assert.equal((await page.request.get(base+'report/')).status(),200);assert.deepEqual(errors,[]);
   await closeContext(context);
   if(name==='chromium'){
-   const touch=await monitoredContext(browser,{viewport:{width:390,height:844},hasTouch:true}),t=await touch.newPage();await t.goto(base);await ready(t);await lifecycle(t,true);await generate(t);
+   const touch=await monitoredContext(browser,{viewport:{width:390,height:844},hasTouch:true}),t=await touch.newPage();await landing(t);await lifecycle(t,true);await generate(t);
    await corrupt(pending(t));await dragPacket(t,pending(t),'#device-panel',true);assert.match(await t.locator('#device-result').textContent(),/\(-3\)/);
    await corrupt(saved(t));await dragPacket(t,saved(t),'#device-panel',true);await next(t);await dragPacket(t,pending(t),'#server-panel',true);await next(t);await next(t);await dragPacket(t,pending(t),'#device-panel',true);
    assert.equal(await t.locator('#device-status').textContent(),'Confirmed');assert(await t.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
@@ -297,11 +318,11 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    await creditFlow(t,true);await errorFlow(t,true);
    await t.screenshot({path:'/tmp/simple-crypts-touch-log.png',fullPage:true});await closeContext(touch);
   }
-  const unavailable=await monitoredContext(browser,{},true);await unavailable.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const p=await unavailable.newPage();await p.goto(base);await p.locator('#error').waitFor({state:'visible'});assert.match(await p.locator('#error').textContent(),/randomness/);await closeContext(unavailable);
+  const unavailable=await monitoredContext(browser,{},true);await unavailable.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const p=await unavailable.newPage();await p.goto(demoURL);await p.locator('#error').waitFor({state:'visible'});assert.match(await p.locator('#error').textContent(),/randomness/);await closeContext(unavailable);
   const loading=await monitoredContext(browser);let releaseLoad;
   const loadGate=new Promise(resolve=>{releaseLoad=resolve;});
   await loading.route('**/endpoint.wasm.wasm*',async route=>{await loadGate;await route.continue();});
-  const loadingPage=await loading.newPage();await loadingPage.goto(base);
+  const loadingPage=await loading.newPage();await loadingPage.goto(demoURL);
   await loadingPage.waitForFunction(()=>document.body.dataset.busy==='true');
   assert(await loadingPage.locator('#next').isDisabled());
   assert.equal(await loadingPage.locator('#chapter-credits').getAttribute('aria-disabled'),'true');
@@ -309,7 +330,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
   releaseLoad();await ready(loadingPage);await generate(loadingPage);await closeContext(loading);
   // Fail on the HTTP server too: Firefox may recover routed fetch failures via sync XHR.
   const broken=await monitoredContext(browser,{},true);
-  const brokenPage=await broken.newPage();await brokenPage.goto(base+'missing-wasm/');await brokenPage.locator('#error').waitFor({state:'visible'});
+  const brokenPage=await broken.newPage();await brokenPage.goto(base+'missing-wasm/demo.html');await brokenPage.locator('#error').waitFor({state:'visible'});
   assert.match(await brokenPage.locator('#error').textContent(),/runtime failed|load|fetch|wasm|WebAssembly|Aborted/i);assert(await brokenPage.locator('#next').isDisabled());await closeContext(broken);
   console.log(`PASS ${name}: common log, reversible corruption, direct replay, real result codes, challenge before keygen, rejection recovery, expiry, bounded history`);
  }catch(error){await captureFailure(error);throw error;}finally{await browser.close();}

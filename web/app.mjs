@@ -102,6 +102,7 @@ function card(p){
 }
 function chapterEnd(){return chapter==='credits'?tour.length-1:2;}
 async function prepareChapter(){
+  history.replaceState(null,'',chapter==='credits'?'#credits':'#establish-trust');
   if(chapter==='credits'){
     // A direct chapter jump starts from an actually enrolled, empty-credit pair.
     if(!lab.states.device?.registered||!lab.states.server?.registered||(chapter==='credits'&&lab.states.server.credits_issued!=='0')){
@@ -410,4 +411,5 @@ for(const event of ['pointercancel','lostpointercapture'])document.addEventListe
 document.addEventListener('contextmenu',e=>{if(e.target.closest('[data-select]'))e.preventDefault();});
 window.addEventListener('blur',cancelTouch);
 window.addEventListener('pagehide',()=>{cancelTouch();lab.stop();});
-intro();run(()=>lab.reset({deferDevice:true}));
+chapter=location.hash==='#credits'?'credits':'trust';
+intro();run(prepareChapter);

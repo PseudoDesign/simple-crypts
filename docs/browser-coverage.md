@@ -15,6 +15,7 @@ and a deployment gate.
 
 | Area | Acceptance checks |
 | --- | --- |
+| Landing page | Project overview and four APIs; no demo runtime requests before entry; enrollment and direct credits links; credits survives reload; return home; desktop and touch layout |
 | Clean enrollment | Both roles and serial shown before key generation; server key pinned; signature verified before device key creation; explicit approval precedes confirmation |
 | Enrollment faults | Reversible corruption, rejected packets preserve state, repeated claims and confirmations, reflection, expiration before approval, successful recovery, time changes after enrollment |
 | Credit exchange | Entry from enrollment and directly from the chapter link; issuing +100, consuming +25, stage-specific control availability, exact status-report/receipt labels, server's last report stays stale until delivery |

@@ -1,7 +1,7 @@
 # Publishing the demo and test report
 
-The [GitHub Pages homepage](https://pseudodesign.github.io/simple-crypts/) runs the
-live C/WebAssembly demo. The [test report](https://pseudodesign.github.io/simple-crypts/report/)
+The [GitHub Pages homepage](https://pseudodesign.github.io/simple-crypts/) presents a
+project overview, with links to the live C/WebAssembly demos at `demo.html` and `demo.html#credits`. The [test report](https://pseudodesign.github.io/simple-crypts/report/)
 is a separately attributed snapshot of tested source. Existing resource and log
 URLs remain available. Hardware measurements are maintained separately from demo publication.
 

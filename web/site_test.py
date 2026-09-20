@@ -24,7 +24,7 @@ class SiteTest(unittest.TestCase):
     def test_asset_graph_is_versioned(self):
         root=Path('web/site')
         versions=[]
-        for file,asset in [('index.html','style.css'),('index.html','app.mjs'),('app.mjs','lab.mjs'),('lab.mjs','worker.mjs'),('worker.mjs','endpoint.wasm.mjs'),('endpoint.wasm.mjs','endpoint.wasm.wasm')]:
+        for file,asset in [('index.html','landing.css'),('index.html','demo.html'),('demo.html','style.css'),('demo.html','app.mjs'),('app.mjs','lab.mjs'),('lab.mjs','worker.mjs'),('worker.mjs','endpoint.wasm.mjs'),('endpoint.wasm.mjs','endpoint.wasm.wasm')]:
             match=re.search(re.escape(asset)+r'\?v=([0-9a-f]{20})', (root/file).read_text())
             self.assertIsNotNone(match,(file,asset))
             versions.append(match[1])

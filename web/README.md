@@ -12,7 +12,7 @@ bazel test //web:protocol_test //web:lab_test
 bazel run //web:preview -- --port 8000
 ```
 
-Open `http://127.0.0.1:8000/`. The compiler and Node.js need Linux x86-64;
+Open `http://127.0.0.1:8000/` for the project landing page. It introduces the libraries and links to `demo.html` (enrollment) and `demo.html#credits` (an enrolled pair ready for credits). The landing page loads no JavaScript or WebAssembly. The demo chapter bar links back home. The compiler and Node.js need Linux x86-64;
 Node.js 18+ is a system prerequisite, like the existing host C compiler.
 The Emscripten archive and sysroot are declared Bazel action inputs. The build
 uses the archive's frozen system-library cache, with no network access.

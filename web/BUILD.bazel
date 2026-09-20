@@ -9,7 +9,7 @@ wasm_build(name="test_module",kind="module",output="endpoint.test.mjs",sources=S
 load("//build:defs.bzl", "py_test", "py_binary")
 py_test(name="protocol_test",main="run_protocol_test.py",data=["protocol_test.mjs","endpoint.mjs",":module",":test_module","//adapters/c:adapter"])
 load(":defs.bzl", "demo_site")
-demo_site(name="site",inputs=["THIRD_PARTY_NOTICES.txt","index.html","style.css","app.mjs","lab.mjs","endpoint.mjs","worker.mjs","resources.mjs","//site:report_snapshot","//tools:test_report.py"])
+demo_site(name="site",inputs=["THIRD_PARTY_NOTICES.txt","index.html","landing.css","demo.html","style.css","app.mjs","lab.mjs","endpoint.mjs","worker.mjs","resources.mjs","//site:report_snapshot","//tools:test_report.py"])
 py_binary(name="preview",main="preview.py",data=[":site"])
 py_test(name="lab_test",main="run_lab_test.py",data=["lab_test.mjs","lab.mjs","endpoint.mjs"])
 py_test(name="site_test",main="site_test.py",data=["site.py",":site","//tools:test_report.py"])

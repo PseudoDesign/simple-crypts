@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['provider_20callbacks_20and_20libsodium_0',['Provider callbacks and libsodium',['../group__providers.html',1,'']]],
-  ['public_20state_1',['Initialization and public state',['../group__initialization.html',1,'']]]
+  ['libsodium_0',['Provider callbacks and libsodium',['../group__providers.html',1,'']]],
+  ['linux_20host_20api_1',['Durable Linux host API',['../group__host.html',1,'']]]
 ];

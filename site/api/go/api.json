@@ -1,0 +1,197 @@
+[
+  {
+    "description": "Close closes the native handle and release its exclusive store lock. Repeated closes are\nharmless; do not use the endpoint afterward.\n",
+    "name": "*Endpoint.Close",
+    "signature": "func()"
+  },
+  {
+    "description": "ConsumeCredits consumes a positive uint64 amount on an enrolled device. Insufficient credits\nfail with conflict; overflow fails with exhausted. The server learns consumption through a\nlater requested report.\n",
+    "name": "*Endpoint.ConsumeCredits",
+    "signature": "func(amount uint64) error"
+  },
+  {
+    "description": "EnrollmentApprove approves the exact 32-byte challenge and candidate Ed25519 key at trusted\nserver time now. The application must authorize the serial/session/key binding. Stale or\nexpired approvals fail.\n",
+    "name": "*Endpoint.EnrollmentApprove",
+    "signature": "func(challenge, key []byte, now uint64) error"
+  },
+  {
+    "description": "EnrollmentBegin authorizes a new server enrollment session. now and expires use the same\ntrusted server clock and application-defined units; expires must be greater than now. A fresh\nchallenge replaces any prior candidate.\n",
+    "name": "*Endpoint.EnrollmentBegin",
+    "signature": "func(now, expires uint64) error"
+  },
+  {
+    "description": "EnrollmentCancel cancels an unregistered server session durably. This does not revoke an\nenrolled peer.\n",
+    "name": "*Endpoint.EnrollmentCancel",
+    "signature": "func() error"
+  },
+  {
+    "description": "EnrollmentEnable persistently enables signed enrollment before registration. This mode cannot\nbe disabled.\n",
+    "name": "*Endpoint.EnrollmentEnable",
+    "signature": "func() error"
+  },
+  {
+    "description": "Fail injects fixture-only failures into the next count storage, random or crypto operations.\nZero clears the selected counter. This is not an application recovery API.\n",
+    "name": "*Endpoint.Fail",
+    "signature": "func(operation string, count uint32) error"
+  },
+  {
+    "description": "FixtureRevision provides fixture-only revision seeding for uint64 boundary tests. Requires an\nexplicitly testing-enabled native library; production builds reject it.\n",
+    "name": "*Endpoint.FixtureRevision",
+    "signature": "func(revision uint64) error"
+  },
+  {
+    "description": "Inspect returns copied public-state diagnostics with uint64 counters as decimal strings. No\nprivate keys are exported, and this snapshot is not a restorable native context.\n",
+    "name": "*Endpoint.Inspect",
+    "signature": "func() (map[string]any, error)"
+  },
+  {
+    "description": "InspectGroup returns a copied diagnostic snapshot of one group. Field values retain exact\ninteger values; revision counters are decimal strings. Device-owned values on the server are\nlast reported values.\n",
+    "name": "*Endpoint.InspectGroup",
+    "signature": "func(id uint16) (map[string]any, error)"
+  },
+  {
+    "description": "Outbound generates at most one frame within budget and capacity byte limits. An idle endpoint\nreturns no frame. Bounds failures retain pending work. Generating a frame never delivers it.\n",
+    "name": "*Endpoint.Outbound",
+    "signature": "func(budget, capacity int) ([]byte, error)"
+  },
+  {
+    "description": "Receive authenticates one complete protocol frame without a trusted clock. Unapproved signed\nserver enrollment fails closed; use ReceiveAt during enrollment.\n",
+    "name": "*Endpoint.Receive",
+    "signature": "func(frame []byte) error"
+  },
+  {
+    "description": "ReceiveAt authenticates one complete frame using trusted server time now for enrollment\nexpiry. Accepted changes are persisted; responses remain pending for outbound transport.\n",
+    "name": "*Endpoint.ReceiveAt",
+    "signature": "func(frame []byte, now uint64) error"
+  },
+  {
+    "description": "RequestCreditStatus persists a new credit report request on an enrolled server. Exchange the\nresulting request, response and receipt through application-owned transport.\n",
+    "name": "*Endpoint.RequestCreditStatus",
+    "signature": "func() error"
+  },
+  {
+    "description": "RequestGroup queues and persists a resource-group snapshot request on an enrolled server.\nUnknown group IDs fail; no bytes are transferred automatically.\n",
+    "name": "*Endpoint.RequestGroup",
+    "signature": "func(id uint16) error"
+  },
+  {
+    "description": "SetCreditsIssued sets the cumulative issued total on an enrolled server. The uint64 total must\nnot decrease. Success commits locally and queues work; it does not deliver a frame.\n",
+    "name": "*Endpoint.SetCreditsIssued",
+    "signature": "func(total uint64) error"
+  },
+  {
+    "description": "UpdateGroup atomically replaces fields owned by this endpoint in id. Values must match the\nconfigured schema; invalid, duplicate, decreasing monotonic or wrong-owner updates fail\nwithout partial changes.\n",
+    "name": "*Endpoint.UpdateGroup",
+    "signature": "func(id uint16, updates []ResourceValue) error"
+  },
+  {
+    "description": "Error returns the stable native status token.\n",
+    "name": "*Error.Error",
+    "signature": "func() string"
+  },
+  {
+    "description": "Config represents initialization inputs copied by the native provider.\n",
+    "name": "Config",
+    "signature": "Config struct {\n\t// Role is \"device\" or \"server\".\n\tRole string\n\t// Storage is a private durable store directory.\n\tStorage string\n\t// Serial is 1 through 32 printable ASCII bytes.\n\tSerial string\n\t// Secret is a required 32-byte enrollment secret.\n\tSecret []byte\n\t// ProvisionedSeed optionally supplies a trusted 32-byte identity seed.\n\tProvisionedSeed []byte\n\t// ServerPublicKey is the required 32-byte Ed25519 server pin for a device.\n\tServerPublicKey []byte\n\t// RandomUnavailable injects entropy failure in fixtures; applications use false.\n\tRandomUnavailable bool\n}"
+  },
+  {
+    "description": "ProvisionedSeed optionally supplies a trusted 32-byte identity seed.\n",
+    "name": "Config.ProvisionedSeed",
+    "signature": "[]byte"
+  },
+  {
+    "description": "RandomUnavailable injects entropy failure in fixtures; applications use false.\n",
+    "name": "Config.RandomUnavailable",
+    "signature": "bool"
+  },
+  {
+    "description": "Role is \"device\" or \"server\".\n",
+    "name": "Config.Role",
+    "signature": "string"
+  },
+  {
+    "description": "Secret is a required 32-byte enrollment secret.\n",
+    "name": "Config.Secret",
+    "signature": "[]byte"
+  },
+  {
+    "description": "Serial is 1 through 32 printable ASCII bytes.\n",
+    "name": "Config.Serial",
+    "signature": "string"
+  },
+  {
+    "description": "ServerPublicKey is the required 32-byte Ed25519 server pin for a device.\n",
+    "name": "Config.ServerPublicKey",
+    "signature": "[]byte"
+  },
+  {
+    "description": "Storage is a private durable store directory.\n",
+    "name": "Config.Storage",
+    "signature": "string"
+  },
+  {
+    "description": "Endpoint represents an owned native handle; close it and externally synchronize concurrent calls.\n",
+    "name": "Endpoint",
+    "signature": "Endpoint struct{ handle *C.sc_host }"
+  },
+  {
+    "description": "Error represents native host failure with a stable status token.\n",
+    "name": "Error",
+    "signature": "Error struct {\n\t// Status is the stable native failure token.\n\tStatus string\n}"
+  },
+  {
+    "description": "Status is the stable native failure token.\n",
+    "name": "Error.Status",
+    "signature": "string"
+  },
+  {
+    "description": "FixturePublicKey derives a public key from a 32-byte fixture seed. Use independently generated\nprovisioning secrets for real deployments.\n",
+    "name": "FixturePublicKey",
+    "signature": "func(seed []byte) ([]byte, error)"
+  },
+  {
+    "description": "Initialize opens or create a durable endpoint with an exclusive store lock. Configuration\nbytes are copied by the native provider. Existing incompatible or corrupt stores fail instead\nof replacing identities.\n",
+    "name": "Initialize",
+    "signature": "func(config Config) (*Endpoint, error)"
+  },
+  {
+    "description": "ResourceValue represents a schema-typed field update. Type values: 1=uint64,\n2=int64, 3=Boolean, 4=UTF-8, 5=bytes. Only the corresponding member is used.\n",
+    "name": "ResourceValue",
+    "signature": "ResourceValue struct {\n\t// FieldID identifies the field in its configured resource group.\n\tFieldID uint16\n\t// Type is the schema type tag: 1=uint64, 2=int64, 3=Boolean, 4=text, 5=bytes.\n\tType uint8\n\t// Uint64 holds an unsigned value for type 1.\n\tUint64 uint64\n\t// Int64 holds a signed value for type 2.\n\tInt64 int64\n\t// Boolean holds a Boolean value for type 3.\n\tBoolean bool\n\t// Text holds UTF-8 without embedded NUL for type 4.\n\tText string\n\t// Bytes holds bounded arbitrary bytes for type 5.\n\tBytes []byte\n}"
+  },
+  {
+    "description": "Boolean holds a Boolean value for type 3.\n",
+    "name": "ResourceValue.Boolean",
+    "signature": "bool"
+  },
+  {
+    "description": "Bytes holds bounded arbitrary bytes for type 5.\n",
+    "name": "ResourceValue.Bytes",
+    "signature": "[]byte"
+  },
+  {
+    "description": "FieldID identifies the field in its configured resource group.\n",
+    "name": "ResourceValue.FieldID",
+    "signature": "uint16"
+  },
+  {
+    "description": "Int64 holds a signed value for type 2.\n",
+    "name": "ResourceValue.Int64",
+    "signature": "int64"
+  },
+  {
+    "description": "Text holds UTF-8 without embedded NUL for type 4.\n",
+    "name": "ResourceValue.Text",
+    "signature": "string"
+  },
+  {
+    "description": "Type is the schema type tag: 1=uint64, 2=int64, 3=Boolean, 4=text, 5=bytes.\n",
+    "name": "ResourceValue.Type",
+    "signature": "uint8"
+  },
+  {
+    "description": "Uint64 holds an unsigned value for type 1.\n",
+    "name": "ResourceValue.Uint64",
+    "signature": "uint64"
+  }
+]

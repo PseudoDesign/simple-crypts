@@ -1,6 +1,15 @@
+/** @module examples/fleet_manager/transport */
 /* Action-driven in-browser transport. It forwards real opaque frames between
  * isolated endpoints. No timers, protocol shortcuts, or synthesized replies.
  * Enrollment deliberately stops at the application approval boundary.
+ */
+/**
+ * Deliver pending opaque frames between connected simulated endpoints until idle or awaiting enrollment approval.
+ * @param {object} server Server endpoint.
+ * @param {object|null} device Running device endpoint, or null when stopped.
+ * @param {bigint} now Trusted server time for enrollment expiry.
+ * @param {Function} [log] Observer for completed transfer messages.
+ * @returns {Promise<void>} Completion; rejected frames or nonconvergence throw.
  */
 export async function exchange(server, device, now, log = () => {}) {
   if (!device) {
@@ -12,8 +21,9 @@ export async function exchange(server, device, now, log = () => {}) {
     const frame = await sender.outbound();
     if (!frame) return false;
     const before = receiver.state();
-    try { await receiver.receive(frame, now); }
-    catch (error) {
+    try {
+      await receiver.receive(frame, now);
+    } catch (error) {
       log(`${label}: rejected (${error.message}).`);
       throw error;
     }

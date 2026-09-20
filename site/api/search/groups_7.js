@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['initialization_20and_20public_20state_0',['Initialization and public state',['../group__initialization.html',1,'']]]
+  ['helpers_0',['Test and fixture helpers',['../group__fixtures.html',1,'']]],
+  ['host_20api_1',['Durable Linux host API',['../group__host.html',1,'']]]
 ];

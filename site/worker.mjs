@@ -1,13 +1,15 @@
-import createModule from './endpoint.wasm.mjs?v=39acb451fd0a98387170';
-import { Endpoint } from './endpoint.mjs?v=39acb451fd0a98387170';
-const ready = createModule().then(module => new Endpoint(module));
+import createModule from './endpoint.wasm.mjs?v=f7ac1ff01689f4d7a1b1';
+import { Endpoint } from './endpoint.mjs?v=f7ac1ff01689f4d7a1b1';
+const ready = createModule().then((module) => new Endpoint(module));
 let serial = Promise.resolve();
-self.onmessage = ({data}) => {
+self.onmessage = ({ data }) => {
   serial = serial.then(async () => {
     try {
       const endpoint = await ready;
       const result = await endpoint.command(data.command, data.args);
-      self.postMessage({id:data.id,result},result.frame ? [result.frame.buffer] : []);
-    } catch(error) { self.postMessage({id:data.id,error:error.message}); }
+      self.postMessage({ id: data.id, result }, result.frame ? [result.frame.buffer] : []);
+    } catch (error) {
+      self.postMessage({ id: data.id, error: error.message });
+    }
   });
 };

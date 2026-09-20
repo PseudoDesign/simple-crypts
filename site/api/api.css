@@ -1,2 +1,5 @@
 /* Keep API navigation visually consistent with the existing demos. */
-html { --primary-color: #176458; --primary-dark-color: #124c43; }
+html {
+  --primary-color: #176458;
+  --primary-dark-color: #124c43;
+}

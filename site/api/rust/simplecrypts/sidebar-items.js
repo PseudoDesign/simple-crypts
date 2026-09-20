@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ResourceValue","Role"],"fn":["fixture_public_key"],"mod":["resources"],"struct":["Config","Endpoint","Error"]};

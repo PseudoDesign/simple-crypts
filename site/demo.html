@@ -1,66 +1,361 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Run a real encrypted device/server exchange. Drop packets, change state, and watch the endpoints recover.">
-<meta name="color-scheme" content="light"><title>Simple Crypts · See the exchange</title>
-<link rel="stylesheet" href="./style.css?v=39acb451fd0a98387170"><script type="module" src="./app.mjs?v=39acb451fd0a98387170"></script>
-</head>
-<body data-mode="tour" data-phase="intro">
-<nav class="chapter-banner" aria-label="Demo chapters"><a class="home-link" href="./" aria-label="Simple Crypts home">Home</a><a id="chapter-trust" href="#establish-trust" aria-current="step">1 · Establish trust</a><a id="chapter-credits" href="#credits" title="Issue, consume, and report credits">2 · Credits</a><a id="chapter-fleet" href="./examples/fleet_manager/">3 · Fleet</a></nav>
-<a class="skip" href="#walkthrough">Skip to demo</a>
-<header class="top"><a class="brand" href="./"><span class="mark" aria-hidden="true">s:c</span> simple crypts</a><nav aria-label="Main"><a href="./report/">Test evidence ↗</a><a href="https://github.com/PseudoDesign/simple-crypts">Source ↗</a></nav></header>
-<main><aside id="guide-popup" class="guide-popup" role="region" aria-label="Step guidance"><p id="guide-role" class="guide-role">Device</p><button id="hide-tip" class="hide-tip" aria-label="Hide step guidance">×</button><section id="walkthrough" class="walkthrough" aria-labelledby="tour-title">
-<div class="tour-copy" aria-live="polite" aria-atomic="true"><p class="eyebrow" id="tour-progress">STEP 1 OF 5</p><h2 id="tour-title">Generate the device’s key pair.</h2><p id="tour-text">Create a public identity and a private key inside the device.</p></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Run a real encrypted device/server exchange. Drop packets, change state, and watch the endpoints recover."
+    />
+    <meta name="color-scheme" content="light" />
+    <title>Simple Crypts · See the exchange</title>
+    <link rel="stylesheet" href="./style.css?v=f7ac1ff01689f4d7a1b1" />
+    <script type="module" src="./app.mjs?v=f7ac1ff01689f4d7a1b1"></script>
+  </head>
+  <body data-mode="tour" data-phase="intro">
+    <nav class="chapter-banner" aria-label="Demo chapters">
+      <a class="home-link" href="./" aria-label="Simple Crypts home">Home</a
+      ><a id="chapter-trust" href="#establish-trust" aria-current="step">1 · Establish trust</a
+      ><a id="chapter-credits" href="#credits" title="Issue, consume, and report credits"
+        >2 · Credits</a
+      ><a id="chapter-fleet" href="./examples/fleet_manager/">3 · Fleet</a>
+    </nav>
+    <a class="skip" href="#walkthrough">Skip to demo</a>
+    <header class="top">
+      <a class="brand" href="./"><span class="mark" aria-hidden="true">s:c</span> simple crypts</a>
+      <nav aria-label="Main">
+        <a href="./report/">Test evidence ↗</a
+        ><a href="https://github.com/PseudoDesign/simple-crypts">Source ↗</a>
+      </nav>
+    </header>
+    <main>
+      <aside id="guide-popup" class="guide-popup" aria-label="Step guidance">
+        <p id="guide-role" class="guide-role">Device</p>
+        <button type="button" id="hide-tip" class="hide-tip" aria-label="Hide step guidance">
+          ×
+        </button>
+        <section id="walkthrough" class="walkthrough" aria-labelledby="tour-title">
+          <div class="tour-copy" aria-live="polite" aria-atomic="true">
+            <p class="eyebrow" id="tour-progress">STEP 1 OF 5</p>
+            <h2 id="tour-title">Generate the device’s key pair.</h2>
+            <p id="tour-text">Create a public identity and a private key inside the device.</p>
+          </div>
 
-<div class="progress" aria-hidden="true"><span id="progress-fill"></span></div>
-</section>
-<div class="session-bar"><p id="session-status" role="status">Loading the cryptographic library…</p><div><span class="session-label">Temporary session</span><button id="reset">Reset session ↺</button></div></div>
-<p id="error" class="error" role="alert" hidden></p>
-<div class="tour-actions"><button id="next" class="primary" disabled>Generate key pair →</button><button id="restart-enrollment" hidden>Restart enrollment ↺</button><button id="retry" hidden>Try this message again</button></div>
-<details id="packet-inspector"><summary>Packet details</summary><section id="enrollment-packet" class="enrollment-packet" aria-labelledby="packet-title" hidden>
-<p class="eyebrow" id="packet-label">PACKET DETAILS</p><h2 id="packet-title"></h2>
-<p class="packet-perspective">Sender’s view before encryption. The host forwards opaque bytes.</p>
-<dl id="packet-fields"></dl>
-<details><summary>Public keys &amp; wire bytes</summary><pre id="packet-wire"></pre></details>
-</section>
-
-</details><details id="experiment-tools"><summary>Recent packets · replay a saved copy</summary><article class="relay"><header><div><p class="eyebrow">02 / UNTRUSTED HOST</p><h2>Your message workbench</h2></div><span id="queue-count" class="count">0 / 64</span></header><p class="relay-copy">You choose the order and destination.<br>Dropping a message onto an endpoint calls the real receiver.</p>
-<label class="budget" for="budget">Budget per opportunity <span><input id="budget" type="number" min="0" max="512" step="1" value="512"> bytes</span></label>
-<button class="dropzone hold" data-destination="relay"><strong>Hold here</strong><span>Delay delivery for as long as you like</span></button>
-<div id="queue" class="queue message-tray"><p class="empty">No frames in transit.<br><span>Nothing is sent automatically.</span></p></div>
-<p class="relay-foot">Each endpoint accepts attempts—even reflected, old, or modified messages. The library decides the outcome.</p></article>
-<section class="result-panel" aria-live="polite"><p class="eyebrow">RESULT OF YOUR LAST DELIVERY</p><h2 id="result-title">No message has been delivered.</h2><p id="result-text">An endpoint receives only when you drop a message onto it.</p><ul id="result-changes"></ul></section>
-<section class="archive-panel"><div class="section-title"><h2>Messages you have tried</h2><span>Latest 16 · queue a copy to replay</span></div><div id="archive" class="archive"></div></section>
-</details></aside>
-<section class="hero"><div><p class="eyebrow">A small API. A real encrypted exchange.</p><h1>You move the messages.<br><em>The endpoints keep the truth.</em></h1><p class="lede">Every box is a real signed or encrypted message. Act as the intermediary: deliver it, hold it, discard it, or try it against a different endpoint state.</p></div><div class="live-note"><span class="dot"></span> Real cryptography, in your browser <small>C library · WebAssembly · NaCl box</small></div></section>
-<p id="move-hint" class="move-hint" role="status">Drag a message onto the recipient to deliver it. Escape cancels dragging.</p>
-<section class="lanes" aria-label="Device and server">
-<article class="endpoint" id="device-panel" data-destination="device" tabindex="0"><header><span class="node-icon" aria-hidden="true">◉</span><div><p class="eyebrow">01 / DEVICE</p><h2>Device</h2></div><span id="device-status" class="badge">Starting</span></header>
-<p class="guided-state" id="device-summary"></p><p class="packet-result" id="device-result" role="status" hidden></p><div class="identity-card" aria-label="Device identity and keys">
-<span class="key-label">Unique ID · serial number</span><code id="device-unique-id" class="device-unique-id">mcu-0001</code>
-<span class="key-label">Public key · Ed25519</span><code id="device-public-key" class="public-key">Not generated yet</code>
-<span class="key-label private-label">Private key</span><p id="device-private-key">Not generated yet</p>
-<div id="server-trust-details" hidden><span class="key-label">Pinned server public key</span><code id="pinned-server-key" class="public-key"></code></div></div><div class="readings" aria-live="polite"><div><span class="label">Credits consumed</span><div class="credit-value"><strong id="device-consumed">—</strong><button id="consume-credit" class="credit-plus" aria-label="Consume 25 credits" title="Consume 25 credits">+</button></div><small id="device-consumed-state">Local total</small></div><div><span class="label">Credits issued</span><strong id="device-issued" class="name">0</strong><small id="device-issued-state">Accepted cumulative total</small></div></div>
-<div class="outbox"><p class="eyebrow">GENERATED BY THE DEVICE</p><div id="device-outbox" class="message-tray"></div></div>
-<form id="consume-form"><label for="amount">Consume credits <span>local operation</span></label><div class="input-row"><input id="amount" type="number" value="25" step="1" min="1" required><button type="submit">Update</button></div></form>
-<div class="endpoint-actions"><button data-transmit="device" class="send">Create message →</button><button data-reboot="device" class="quiet">Reboot</button></div>
-<details><summary>Identity &amp; revisions</summary><pre id="device-details"></pre></details></article>
-<article class="endpoint" id="server-panel" data-destination="server" tabindex="0"><header><span class="node-icon" aria-hidden="true">▤</span><div><p class="eyebrow">03 / SERVER</p><h2>Device registry</h2></div><span id="server-status" class="badge">Starting</span></header>
-<p class="guided-state" id="server-summary"></p><p class="packet-result" id="server-result" role="status" hidden></p><div class="identity-card" aria-label="Server keys">
-<span class="key-label">Public key · Ed25519</span><code id="server-public-key" class="public-key">Not generated yet</code>
-<span class="key-label private-label">Private key</span><p id="server-private-key">Not generated yet</p>
-<div id="registered-key-details" hidden><span class="key-label" id="registered-key-label">Registered device public key</span><code id="registered-device-key" class="public-key"></code></div></div><div class="readings" aria-live="polite"><div><span class="label">Credits consumed · last reported</span><strong id="server-consumed">—</strong><small id="server-consumed-state">No accepted report</small></div><div><span class="label">Credits issued</span><div class="credit-value"><strong id="server-issued" class="name">0</strong><button id="add-credit" class="credit-plus" aria-label="Add 100 credits" title="Add 100 credits">+</button></div><small id="server-issued-state">Cumulative total</small></div></div>
-<div class="outbox"><p class="eyebrow">GENERATED BY THE SERVER</p><div id="server-outbox" class="message-tray"></div></div>
-<form id="issue-form"><label for="total">Issue cumulative credits <span>uint64 total</span></label><div class="input-row"><input id="total" value="100" required><button type="submit">Update</button></div></form>
-<div class="endpoint-actions"><button id="begin-enrollment">Authorize session</button><button id="approve-enrollment">Approve proposed key</button><button data-transmit="server" class="send">← Create message</button><button data-reboot="server" class="quiet">Reboot</button></div>
-<details><summary>Identity &amp; revisions</summary><pre id="server-details"></pre></details></article>
-</section>
-<section class="message-area" aria-label="Intermediary messages"><div class="message-log"><header><h2>Message log</h2><span>Drag any saved packet to send it again · latest 16 attempts</span></header><div id="message-log" aria-label="Draggable packet log"></div></div><aside class="clock-panel"><button id="advance-time">Server time +10 min</button><small id="clock-result">Expiration is checked when a response arrives.</small></aside></section>
-<section class="below"><article class="history"><div class="section-title"><h2>What happened</h2><span>Latest 200 events</span></div><ol id="events" aria-label="Exchange history"></ol></article><article class="code-panel"><p class="eyebrow">THE API BEHIND THE STEP</p><h2>A few calls do the work.</h2><pre><code id="step-code">sc_consume_credits(&amp;device, 25);
+          <div class="progress" aria-hidden="true"><span id="progress-fill"></span></div>
+        </section>
+        <div class="session-bar">
+          <p id="session-status" role="status">Loading the cryptographic library…</p>
+          <div>
+            <span class="session-label">Temporary session</span
+            ><button type="button" id="reset">Reset session ↺</button>
+          </div>
+        </div>
+        <p id="error" class="error" role="alert" hidden></p>
+        <div class="tour-actions">
+          <button type="button" id="next" class="primary" disabled>Generate key pair →</button
+          ><button type="button" id="restart-enrollment" hidden>Restart enrollment ↺</button
+          ><button type="button" id="retry" hidden>Try this message again</button>
+        </div>
+        <details id="packet-inspector">
+          <summary>Packet details</summary>
+          <section
+            id="enrollment-packet"
+            class="enrollment-packet"
+            aria-labelledby="packet-title"
+            hidden
+          >
+            <p class="eyebrow" id="packet-label">PACKET DETAILS</p>
+            <h2 id="packet-title">Packet details</h2>
+            <p class="packet-perspective">
+              Sender’s view before encryption. The host forwards opaque bytes.
+            </p>
+            <dl id="packet-fields"></dl>
+            <details>
+              <summary>Public keys &amp; wire bytes</summary>
+              <pre id="packet-wire"></pre>
+            </details>
+          </section>
+        </details>
+        <details id="experiment-tools">
+          <summary>Recent packets · replay a saved copy</summary>
+          <article class="relay">
+            <header>
+              <div>
+                <p class="eyebrow">02 / UNTRUSTED HOST</p>
+                <h2>Your message workbench</h2>
+              </div>
+              <span id="queue-count" class="count">0 / 64</span>
+            </header>
+            <p class="relay-copy">
+              You choose the order and destination.<br />Dropping a message onto an endpoint calls
+              the real receiver.
+            </p>
+            <label class="budget"
+              >Budget per opportunity
+              <span
+                ><input id="budget" type="number" min="0" max="512" step="1" value="512" />
+                bytes</span
+              ></label
+            >
+            <button type="button" class="dropzone hold" data-destination="relay">
+              <strong>Hold here</strong><span>Delay delivery for as long as you like</span>
+            </button>
+            <div id="queue" class="queue message-tray">
+              <p class="empty">
+                No frames in transit.<br /><span>Nothing is sent automatically.</span>
+              </p>
+            </div>
+            <p class="relay-foot">
+              Each endpoint accepts attempts—even reflected, old, or modified messages. The library
+              decides the outcome.
+            </p>
+          </article>
+          <section class="result-panel" aria-live="polite">
+            <p class="eyebrow">RESULT OF YOUR LAST DELIVERY</p>
+            <h2 id="result-title">No message has been delivered.</h2>
+            <p id="result-text">An endpoint receives only when you drop a message onto it.</p>
+            <ul id="result-changes"></ul>
+          </section>
+          <section class="archive-panel">
+            <div class="section-title">
+              <h2>Messages you have tried</h2>
+              <span>Latest 16 · queue a copy to replay</span>
+            </div>
+            <div id="archive" class="archive"></div>
+          </section>
+        </details>
+      </aside>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">A small API. A real encrypted exchange.</p>
+          <h1>You move the messages.<br /><em>The endpoints keep the truth.</em></h1>
+          <p class="lede">
+            Every box is a real signed or encrypted message. Act as the intermediary: deliver it,
+            hold it, discard it, or try it against a different endpoint state.
+          </p>
+        </div>
+        <div class="live-note">
+          <span class="dot"></span> Real cryptography, in your browser
+          <small>C library · WebAssembly · NaCl box</small>
+        </div>
+      </section>
+      <p id="move-hint" class="move-hint" role="status">
+        Drag a message onto the recipient to deliver it. Escape cancels dragging.
+      </p>
+      <section class="lanes" aria-label="Device and server">
+        <article class="endpoint" id="device-panel" data-destination="device" tabindex="0">
+          <header>
+            <span class="node-icon" aria-hidden="true">◉</span>
+            <div>
+              <p class="eyebrow">01 / DEVICE</p>
+              <h2>Device</h2>
+            </div>
+            <span id="device-status" class="badge">Starting</span>
+          </header>
+          <p class="guided-state" id="device-summary"></p>
+          <p class="packet-result" id="device-result" role="status" hidden></p>
+          <div class="identity-card" role="group" aria-label="Device identity and keys">
+            <span class="key-label">Unique ID · serial number</span
+            ><code id="device-unique-id" class="device-unique-id">mcu-0001</code>
+            <span class="key-label">Public key · Ed25519</span
+            ><code id="device-public-key" class="public-key">Not generated yet</code>
+            <span class="key-label private-label">Private key</span>
+            <p id="device-private-key">Not generated yet</p>
+            <div id="server-trust-details" hidden>
+              <span class="key-label">Pinned server public key</span
+              ><code id="pinned-server-key" class="public-key"></code>
+            </div>
+          </div>
+          <div class="readings" aria-live="polite">
+            <div>
+              <span class="label">Credits consumed</span>
+              <div class="credit-value">
+                <strong id="device-consumed">—</strong
+                ><button
+                  type="button"
+                  id="consume-credit"
+                  class="credit-plus"
+                  aria-label="Consume 25 credits"
+                  title="Consume 25 credits"
+                >
+                  +
+                </button>
+              </div>
+              <small id="device-consumed-state">Local total</small>
+            </div>
+            <div>
+              <span class="label">Credits issued</span
+              ><strong id="device-issued" class="name">0</strong
+              ><small id="device-issued-state">Accepted cumulative total</small>
+            </div>
+          </div>
+          <div class="outbox">
+            <p class="eyebrow">GENERATED BY THE DEVICE</p>
+            <div id="device-outbox" class="message-tray"></div>
+          </div>
+          <form id="consume-form">
+            <label for="amount">Consume credits <span>local operation</span></label>
+            <div class="input-row">
+              <input id="amount" type="number" value="25" step="1" min="1" required /><button
+                type="submit"
+              >
+                Update
+              </button>
+            </div>
+          </form>
+          <div class="endpoint-actions">
+            <button type="button" data-transmit="device" class="send">Create message →</button
+            ><button type="button" data-reboot="device" class="quiet">Reboot</button>
+          </div>
+          <details>
+            <summary>Identity &amp; revisions</summary>
+            <pre id="device-details"></pre>
+          </details>
+        </article>
+        <article class="endpoint" id="server-panel" data-destination="server" tabindex="0">
+          <header>
+            <span class="node-icon" aria-hidden="true">▤</span>
+            <div>
+              <p class="eyebrow">03 / SERVER</p>
+              <h2>Device registry</h2>
+            </div>
+            <span id="server-status" class="badge">Starting</span>
+          </header>
+          <p class="guided-state" id="server-summary"></p>
+          <p class="packet-result" id="server-result" role="status" hidden></p>
+          <div class="identity-card" role="group" aria-label="Server keys">
+            <span class="key-label">Public key · Ed25519</span
+            ><code id="server-public-key" class="public-key">Not generated yet</code>
+            <span class="key-label private-label">Private key</span>
+            <p id="server-private-key">Not generated yet</p>
+            <div id="registered-key-details" hidden>
+              <span class="key-label" id="registered-key-label">Registered device public key</span
+              ><code id="registered-device-key" class="public-key"></code>
+            </div>
+          </div>
+          <div class="readings" aria-live="polite">
+            <div>
+              <span class="label">Credits consumed · last reported</span
+              ><strong id="server-consumed">—</strong
+              ><small id="server-consumed-state">No accepted report</small>
+            </div>
+            <div>
+              <span class="label">Credits issued</span>
+              <div class="credit-value">
+                <strong id="server-issued" class="name">0</strong
+                ><button
+                  type="button"
+                  id="add-credit"
+                  class="credit-plus"
+                  aria-label="Add 100 credits"
+                  title="Add 100 credits"
+                >
+                  +
+                </button>
+              </div>
+              <small id="server-issued-state">Cumulative total</small>
+            </div>
+          </div>
+          <div class="outbox">
+            <p class="eyebrow">GENERATED BY THE SERVER</p>
+            <div id="server-outbox" class="message-tray"></div>
+          </div>
+          <form id="issue-form">
+            <label for="total">Issue cumulative credits <span>uint64 total</span></label>
+            <div class="input-row">
+              <input type="text" id="total" value="100" required /><button type="submit">
+                Update
+              </button>
+            </div>
+          </form>
+          <div class="endpoint-actions">
+            <button type="button" id="begin-enrollment">Authorize session</button
+            ><button type="button" id="approve-enrollment">Approve proposed key</button
+            ><button type="button" data-transmit="server" class="send">← Create message</button
+            ><button type="button" data-reboot="server" class="quiet">Reboot</button>
+          </div>
+          <details>
+            <summary>Identity &amp; revisions</summary>
+            <pre id="server-details"></pre>
+          </details>
+        </article>
+      </section>
+      <section class="message-area" aria-label="Intermediary messages">
+        <div class="message-log">
+          <header>
+            <h2>Message log</h2>
+            <span>Drag any saved packet to send it again · latest 16 attempts</span>
+          </header>
+          <div id="message-log" role="group" aria-label="Draggable packet log"></div>
+        </div>
+        <aside class="clock-panel" aria-label="Simulated server clock">
+          <button type="button" id="advance-time">Server time +10 min</button
+          ><small id="clock-result">Expiration is checked when a response arrives.</small>
+        </aside>
+      </section>
+      <section class="below">
+        <article class="history">
+          <div class="section-title">
+            <h2>What happened</h2>
+            <span>Latest 200 events</span>
+          </div>
+          <ol id="events"></ol>
+        </article>
+        <article class="code-panel">
+          <p class="eyebrow">THE API BEHIND THE STEP</p>
+          <h2>A few calls do the work.</h2>
+          <pre><code id="step-code">sc_consume_credits(&amp;device, 25);
 sc_set_credits_issued(&amp;server, 100);
-// Forward opaque frames when a link is available.</code></pre><p>The same C core powers the language bindings and this demo. Encryption, enrollment, revisions, and receipts run inside the library.</p><div class="code-links"><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/core/sc.h">C API ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/examples/python_api.py">Python example ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/bindings/rust/src/lib.rs">Rust ↗</a><a href="https://github.com/PseudoDesign/simple-crypts/blob/main/bindings/go/simplecrypts.go">Go ↗</a></div></article></section>
-<section class="notes"><h2>What this demonstrates</h2><div><p><strong>Private contents. Visible delivery.</strong> The host can read signed challenges and public routing information. Device responses and confirmations are encrypted. Endpoint panels show each endpoint’s own knowledge; they are not a host decryption view.</p><p><strong>Agreement needs delivery.</strong> Cryptography detects tampering; it cannot make the host forward a message. Updates stay pending until the required authenticated report or receipt arrives.</p><p><strong>A local simulation with real code.</strong> Both endpoints run in this tab, each in its own worker. Reboot preserves simulated storage; refresh or Reset starts fresh. This is not a hardware keystore or a production server.</p></div></section>
-</main><footer><span>Simple Crypts · show, don’t tell. <a href="./demo.json">Build details</a> · <a href="./THIRD_PARTY_NOTICES.txt?v=39acb451fd0a98387170">Notices</a></span><a href="./report/">Explore the cross-language test evidence →</a></footer>
-<noscript>This demo needs JavaScript and WebAssembly. The <a href="./report/">test evidence</a> is available separately.</noscript>
-</body></html>
+// Forward opaque frames when a link is available.</code></pre>
+          <p>
+            The same C core powers the language bindings and this demo. Encryption, enrollment,
+            revisions, and receipts run inside the library.
+          </p>
+          <div class="code-links">
+            <a href="https://github.com/PseudoDesign/simple-crypts/blob/main/core/sc.h">C API ↗</a
+            ><a
+              href="https://github.com/PseudoDesign/simple-crypts/blob/main/examples/python_api.py"
+              >Python example ↗</a
+            ><a
+              href="https://github.com/PseudoDesign/simple-crypts/blob/main/bindings/rust/src/lib.rs"
+              >Rust ↗</a
+            ><a
+              href="https://github.com/PseudoDesign/simple-crypts/blob/main/bindings/go/simplecrypts.go"
+              >Go ↗</a
+            >
+          </div>
+        </article>
+      </section>
+      <section class="notes">
+        <h2>What this demonstrates</h2>
+        <div>
+          <p>
+            <strong>Private contents. Visible delivery.</strong> The host can read signed challenges
+            and public routing information. Device responses and confirmations are encrypted.
+            Endpoint panels show each endpoint’s own knowledge; they are not a host decryption view.
+          </p>
+          <p>
+            <strong>Agreement needs delivery.</strong> Cryptography detects tampering; it cannot
+            make the host forward a message. Updates stay pending until the required authenticated
+            report or receipt arrives.
+          </p>
+          <p>
+            <strong>A local simulation with real code.</strong> Both endpoints run in this tab, each
+            in its own worker. Reboot preserves simulated storage; refresh or Reset starts fresh.
+            This is not a hardware keystore or a production server.
+          </p>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <span
+        >Simple Crypts · show, don’t tell. <a href="./demo.json">Build details</a> ·
+        <a href="./THIRD_PARTY_NOTICES.txt?v=f7ac1ff01689f4d7a1b1">Notices</a></span
+      ><a href="./report/">Explore the cross-language test evidence →</a>
+    </footer>
+    <noscript
+      >This demo needs JavaScript and WebAssembly. The <a href="./report/">test evidence</a> is
+      available separately.</noscript
+    >
+  </body>
+</html>

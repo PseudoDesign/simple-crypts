@@ -1,4 +1,6 @@
 var searchData=
 [
-  ['durable_20linux_20host_20api_0',['Durable Linux host API',['../group__host.html',1,'']]]
+  ['callbacks_20and_20libsodium_0',['Provider callbacks and libsodium',['../group__providers.html',1,'']]],
+  ['credits_1',['Cumulative credits',['../group__credits.html',1,'']]],
+  ['cumulative_20credits_2',['Cumulative credits',['../group__credits.html',1,'']]]
 ];

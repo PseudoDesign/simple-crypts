@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['helpers_0',['Test and fixture helpers',['../group__fixtures.html',1,'']]],
-  ['host_20api_1',['Durable Linux host API',['../group__host.html',1,'']]]
+  ['generation_20and_20reception_0',['Frame generation and reception',['../group__transport.html',1,'']]],
+  ['groups_1',['Typed resource groups',['../group__resources.html',1,'']]]
 ];

@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['reception_0',['Frame generation and reception',['../group__transport.html',1,'']]],
-  ['resource_20groups_1',['Typed resource groups',['../group__resources.html',1,'']]]
+  ['provider_20callbacks_20and_20libsodium_0',['Provider callbacks and libsodium',['../group__providers.html',1,'']]],
+  ['public_20state_1',['Initialization and public state',['../group__initialization.html',1,'']]]
 ];

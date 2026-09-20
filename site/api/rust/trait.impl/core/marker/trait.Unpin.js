@@ -1,0 +1,9 @@
+(function() {
+    var implementors = Object.fromEntries([["simplecrypts",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.85.1/core/marker/trait.Unpin.html\" title=\"trait core::marker::Unpin\">Unpin</a> for <a class=\"enum\" href=\"simplecrypts/enum.ResourceValue.html\" title=\"enum simplecrypts::ResourceValue\">ResourceValue</a>",1,["simplecrypts::ResourceValue"]],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.85.1/core/marker/trait.Unpin.html\" title=\"trait core::marker::Unpin\">Unpin</a> for <a class=\"enum\" href=\"simplecrypts/enum.Role.html\" title=\"enum simplecrypts::Role\">Role</a>",1,["simplecrypts::Role"]],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.85.1/core/marker/trait.Unpin.html\" title=\"trait core::marker::Unpin\">Unpin</a> for <a class=\"struct\" href=\"simplecrypts/struct.Endpoint.html\" title=\"struct simplecrypts::Endpoint\">Endpoint</a>",1,["simplecrypts::Endpoint"]],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.85.1/core/marker/trait.Unpin.html\" title=\"trait core::marker::Unpin\">Unpin</a> for <a class=\"struct\" href=\"simplecrypts/struct.Error.html\" title=\"struct simplecrypts::Error\">Error</a>",1,["simplecrypts::Error"]],["impl&lt;'a&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/1.85.1/core/marker/trait.Unpin.html\" title=\"trait core::marker::Unpin\">Unpin</a> for <a class=\"struct\" href=\"simplecrypts/struct.Config.html\" title=\"struct simplecrypts::Config\">Config</a>&lt;'a&gt;",1,["simplecrypts::Config"]]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":57,"fragment_lengths":[1480]}

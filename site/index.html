@@ -1,23 +1,143 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Simple Crypts is an open-source library for encrypted device/server messaging, with C, Python, Rust, and Go APIs. Try the interactive demos.">
-<meta name="color-scheme" content="light"><title>Simple Crypts · Small APIs. Real cryptography.</title>
-<link rel="stylesheet" href="./landing.css?v=39acb451fd0a98387170">
-</head>
-<body>
-<a class="skip" href="#main">Skip to content</a>
-<header class="top"><a class="brand" href="./"><span class="mark" aria-hidden="true">s:c</span> simple crypts</a><nav aria-label="Project"><a href="./api/">C API</a><a href="./report/">Test evidence</a><a href="https://github.com/PseudoDesign/simple-crypts">GitHub ↗</a></nav></header>
-<main id="main">
-<section class="hero" aria-labelledby="title"><p class="eyebrow">OPEN SOURCE · DEVICE / SERVER MESSAGING</p><h1 id="title">Small APIs.<br><em>Real cryptography.</em></h1><p class="lede">Connect devices and servers with signed enrollment, encrypted messages, and shared state that survives interrupted delivery.</p><p class="intro">Simple Crypts puts the protocol behind a common library. Your application decides what to share; the library handles authentication, encryption, and keeping track of what arrived.</p><a class="primary" id="start-demo" href="./demo.html?v=39acb451fd0a98387170">Try the enrollment demo <span aria-hidden="true">→</span></a><p class="hint">Runs locally in your browser. No account or setup.</p></section>
-<section class="demos" aria-labelledby="demo-title"><div class="section-heading"><p class="eyebrow">SEE IT WORK</p><h2 id="demo-title">Trust, shared state, and a working fleet.</h2><p>Explore signed device enrollment, credit accounting, and recovery from interrupted delivery. Each demo shows the real library at work, from individual protocol exchanges to a complete example application.</p></div><div class="demo-grid">
-<a class="demo-card" id="enrollment-demo" href="./demo.html?v=39acb451fd0a98387170"><span class="number">01 / START HERE</span><h3>Establish trust <span aria-hidden="true">↗</span></h3><p>See how a signed challenge and explicit approval bind a device’s serial number to its public key. Explore authenticated enrollment and the rejection of altered messages.</p><span class="card-action">Start enrollment →</span></a>
-<a class="demo-card" id="credits-demo" href="./demo.html#credits"><span class="number">02 / SHARE STATE</span><h3>Exchange credits <span aria-hidden="true">↗</span></h3><p>See how cumulative credits, local consumption, snapshots, and receipts keep track of shared state. Explore balance limits and recovery from lost or repeated messages.</p><span class="card-action">Try credits →</span><small>Starts with an enrolled pair.</small></a>
-<a class="demo-card" id="fleet-demo" href="./examples/fleet_manager/index.html?v=39acb451fd0a98387170"><span class="number">03 / BUILD AN APPLICATION</span><h3>Manage a fleet <span aria-hidden="true">↗</span></h3><p>A working application brings device enrollment, credit management, and persistent state together. Independent device identities and balances survive disconnections and restarts.</p><span class="card-action">Open the fleet example →</span><small>Saved locally in this browser.</small></a>
-</div><p class="runtime">In the guided demos, drag messages between endpoints to control delivery and try corruption or replay. In the fleet example, use device consoles and connection controls to explore the same protocol in an application.</p><p class="runtime">Real C code, compiled to WebAssembly with nanopb and libsodium. The guided demos use temporary endpoints; the fleet example saves state in this browser.</p></section>
-<section class="libraries" aria-labelledby="library-title"><div class="section-heading"><p class="eyebrow">BUILD WITH IT</p><h2 id="library-title">One core. Four language APIs.</h2><p>A bounded-memory C99 protocol engine with caller-owned buffers and no heap allocation in the engine. Python, Rust, and Go use the same core.</p></div><dl class="language-grid"><div><dt>C</dt><dd>Native core API</dd></div><div><dt>Python</dt><dd>CFFI bindings</dd></div><div><dt>Rust</dt><dd>Safe C ABI wrapper</dd></div><div><dt>Go</dt><dd>cgo bindings</dd></div></dl><div class="features"><p><strong>Choose your data.</strong> Share typed values, cumulative totals, and atomic groups. Request snapshots and track receipts.</p><p><strong>Choose your transport.</strong> Generate a frame when delivery is possible. No required pings or keepalives.</p><p><strong>Inspect the evidence.</strong> Bazel builds, cross-language conformance tests, and browser tests keep the implementations working together.</p></div><a class="text-link" href="https://github.com/PseudoDesign/simple-crypts#readme">Read the docs &amp; get the libraries →</a></section>
-</main>
-<footer><span>simple crypts · Open-source device/server messaging</span><a href="./report/">Recorded test report ↗</a></footer>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Simple Crypts is an open-source library for encrypted device/server messaging, with C, Python, Rust, and Go APIs. Try the interactive demos."
+    />
+    <meta name="color-scheme" content="light" />
+    <title>Simple Crypts · Small APIs. Real cryptography.</title>
+    <link rel="stylesheet" href="./landing.css?v=f7ac1ff01689f4d7a1b1" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="top">
+      <a class="brand" href="./"><span class="mark" aria-hidden="true">s:c</span> simple crypts</a>
+      <nav aria-label="Project">
+        <a href="./api/">C API</a><a href="./report/">Test evidence</a
+        ><a href="https://github.com/PseudoDesign/simple-crypts">GitHub ↗</a>
+      </nav>
+    </header>
+    <main id="main">
+      <section class="hero" aria-labelledby="title">
+        <p class="eyebrow">OPEN SOURCE · DEVICE / SERVER MESSAGING</p>
+        <h1 id="title">Small APIs.<br /><em>Real cryptography.</em></h1>
+        <p class="lede">
+          Connect devices and servers with signed enrollment, encrypted messages, and shared state
+          that survives interrupted delivery.
+        </p>
+        <p class="intro">
+          Simple Crypts puts the protocol behind a common library. Your application decides what to
+          share; the library handles authentication, encryption, and keeping track of what arrived.
+        </p>
+        <a class="primary" id="start-demo" href="./demo.html?v=f7ac1ff01689f4d7a1b1"
+          >Try the enrollment demo <span aria-hidden="true">→</span></a
+        >
+        <p class="hint">Runs locally in your browser. No account or setup.</p>
+      </section>
+      <section class="demos" aria-labelledby="demo-title">
+        <div class="section-heading">
+          <p class="eyebrow">SEE IT WORK</p>
+          <h2 id="demo-title">Trust, shared state, and a working fleet.</h2>
+          <p>
+            Explore signed device enrollment, credit accounting, and recovery from interrupted
+            delivery. Each demo shows the real library at work, from individual protocol exchanges
+            to a complete example application.
+          </p>
+        </div>
+        <div class="demo-grid">
+          <a class="demo-card" id="enrollment-demo" href="./demo.html?v=f7ac1ff01689f4d7a1b1"
+            ><span class="number">01 / START HERE</span>
+            <h3>Establish trust <span aria-hidden="true">↗</span></h3>
+            <p>
+              See how a signed challenge and explicit approval bind a device’s serial number to its
+              public key. Explore authenticated enrollment and the rejection of altered messages.
+            </p>
+            <span class="card-action">Start enrollment →</span></a
+          >
+          <a class="demo-card" id="credits-demo" href="./demo.html#credits"
+            ><span class="number">02 / SHARE STATE</span>
+            <h3>Exchange credits <span aria-hidden="true">↗</span></h3>
+            <p>
+              See how cumulative credits, local consumption, snapshots, and receipts keep track of
+              shared state. Explore balance limits and recovery from lost or repeated messages.
+            </p>
+            <span class="card-action">Try credits →</span
+            ><small>Starts with an enrolled pair.</small></a
+          >
+          <a class="demo-card" id="fleet-demo" href="./examples/fleet_manager/index.html?v=f7ac1ff01689f4d7a1b1"
+            ><span class="number">03 / BUILD AN APPLICATION</span>
+            <h3>Manage a fleet <span aria-hidden="true">↗</span></h3>
+            <p>
+              A working application brings device enrollment, credit management, and persistent
+              state together. Independent device identities and balances survive disconnections and
+              restarts.
+            </p>
+            <span class="card-action">Open the fleet example →</span
+            ><small>Saved locally in this browser.</small></a
+          >
+        </div>
+        <p class="runtime">
+          In the guided demos, drag messages between endpoints to control delivery and try
+          corruption or replay. In the fleet example, use device consoles and connection controls to
+          explore the same protocol in an application.
+        </p>
+        <p class="runtime">
+          Real C code, compiled to WebAssembly with nanopb and libsodium. The guided demos use
+          temporary endpoints; the fleet example saves state in this browser.
+        </p>
+      </section>
+      <section class="libraries" aria-labelledby="library-title">
+        <div class="section-heading">
+          <p class="eyebrow">BUILD WITH IT</p>
+          <h2 id="library-title">One core. Four language APIs.</h2>
+          <p>
+            A bounded-memory C99 protocol engine with caller-owned buffers and no heap allocation in
+            the engine. Python, Rust, and Go use the same core.
+          </p>
+        </div>
+        <dl class="language-grid">
+          <div>
+            <dt>C</dt>
+            <dd>Native core API</dd>
+          </div>
+          <div>
+            <dt>Python</dt>
+            <dd>CFFI bindings</dd>
+          </div>
+          <div>
+            <dt>Rust</dt>
+            <dd>Safe C ABI wrapper</dd>
+          </div>
+          <div>
+            <dt>Go</dt>
+            <dd>cgo bindings</dd>
+          </div>
+        </dl>
+        <div class="features">
+          <p>
+            <strong>Choose your data.</strong> Share typed values, cumulative totals, and atomic
+            groups. Request snapshots and track receipts.
+          </p>
+          <p>
+            <strong>Choose your transport.</strong> Generate a frame when delivery is possible. No
+            required pings or keepalives.
+          </p>
+          <p>
+            <strong>Inspect the evidence.</strong> Bazel builds, cross-language conformance tests,
+            and browser tests keep the implementations working together.
+          </p>
+        </div>
+        <a class="text-link" href="https://github.com/PseudoDesign/simple-crypts#readme"
+          >Read the docs &amp; get the libraries →</a
+        >
+      </section>
+    </main>
+    <footer>
+      <span>simple crypts · Open-source device/server messaging</span
+      ><a href="./report/">Recorded test report ↗</a>
+    </footer>
+  </body>
 </html>

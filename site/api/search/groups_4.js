@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['fixture_20helpers_0',['Test and fixture helpers',['../group__fixtures.html',1,'']]],
-  ['frame_20generation_20and_20reception_1',['Frame generation and reception',['../group__transport.html',1,'']]]
+  ['enrollment_20authorization_20and_20approval_0',['Enrollment authorization and approval',['../group__enrollment.html',1,'']]],
+  ['example_20interfaces_1',['Browser example interfaces',['../group__examples.html',1,'']]]
 ];

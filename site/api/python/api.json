@@ -1,0 +1,112 @@
+[
+  {
+    "description": "Single-owner synchronous native endpoint. Use a context manager or close explicitly.\nCalls may raise Error for native failures or ValueError for invalid Python arguments.\nSynchronize externally across threads.",
+    "name": "Endpoint",
+    "signature": "Endpoint"
+  },
+  {
+    "description": "Open or create one durable native endpoint under an exclusive store lock.\n\nArgs:\n    role: \"device\" or \"server\".\n    storage: Private persistent store directory, accepted by os.fsencode.\n    serial: Between 1 and 32 printable ASCII bytes.\n    secret: Required 32-byte enrollment secret, matching an existing store.\n    server_public_key: Required 32-byte pinned Ed25519 key on devices; None on servers.\n    provisioned_seed: Optional trusted 32-byte identity seed; None generates a new identity.\n    random_unavailable: Fixture-only entropy failure switch; use False in applications.\n\nInputs are copied. Missing prerequisites, corrupt or incompatible stores raise Error;\nexisting identities are never silently replaced. Invalid representations raise ValueError.",
+    "name": "Endpoint.__init__",
+    "signature": "Endpoint.__init__(self, role, storage, serial, secret, *, server_public_key=None, provisioned_seed=None, random_unavailable=False)"
+  },
+  {
+    "description": "Close the native handle and release its exclusive store lock. Repeated closes\nare harmless; do not use the endpoint afterward.",
+    "name": "Endpoint.close",
+    "signature": "Endpoint.close(self)"
+  },
+  {
+    "description": "Consume a positive uint64 amount on an enrolled device. Insufficient credits fail with\nconflict; overflow fails with exhausted. The server learns consumption through a later\nrequested report. Raises Error on native failure; invalid argument representations raise\nValueError.",
+    "name": "Endpoint.consume_credits",
+    "signature": "Endpoint.consume_credits(self, amount)"
+  },
+  {
+    "description": "Approve the exact 32-byte challenge and candidate Ed25519 key at trusted server time\nnow. The application must authorize the serial/session/key binding. Stale or expired\napprovals fail. Raises Error on native failure; invalid argument representations raise\nValueError.",
+    "name": "Endpoint.enrollment_approve",
+    "signature": "Endpoint.enrollment_approve(self, challenge, key, now)"
+  },
+  {
+    "description": "Authorize a new server enrollment session. now and expires use the same trusted server\nclock and application-defined units; expires must be greater than now. A fresh challenge\nreplaces any prior candidate. Raises Error on native failure; invalid argument\nrepresentations raise ValueError.",
+    "name": "Endpoint.enrollment_begin",
+    "signature": "Endpoint.enrollment_begin(self, now, expires)"
+  },
+  {
+    "description": "Cancel an unregistered server session durably. This does not revoke an enrolled peer.\nRaises Error on native failure; invalid argument representations raise ValueError.",
+    "name": "Endpoint.enrollment_cancel",
+    "signature": "Endpoint.enrollment_cancel(self)"
+  },
+  {
+    "description": "Persistently enable signed enrollment before registration. This mode cannot be disabled.\nRaises Error on native failure; invalid argument representations raise ValueError.",
+    "name": "Endpoint.enrollment_enable",
+    "signature": "Endpoint.enrollment_enable(self)"
+  },
+  {
+    "description": "Fixture-only injection: fail the next count calls of the selected operation\n(storage, random or crypto fault name). Zero\nclears the selected counter. This is not an application recovery API. Raises Error on\nnative failure; invalid argument representations raise ValueError.",
+    "name": "Endpoint.fail",
+    "signature": "Endpoint.fail(self, operation, count=1)"
+  },
+  {
+    "description": "Fixture-only revision seeding for uint64 boundary tests. Requires an explicitly testing-\nenabled native library; production builds reject it. Raises Error on native failure;\ninvalid argument representations raise ValueError.",
+    "name": "Endpoint.fixture_revision",
+    "signature": "Endpoint.fixture_revision(self, revision)"
+  },
+  {
+    "description": "Return copied public-state diagnostics with uint64 counters as decimal strings. No\nprivate keys are exported, and this snapshot is not a restorable native context. Raises\nError on native failure; invalid argument representations raise ValueError.",
+    "name": "Endpoint.inspect",
+    "signature": "Endpoint.inspect(self)"
+  },
+  {
+    "description": "Return a copied diagnostic snapshot of group_id. Field values retain exact integer\nvalues; revision counters are decimal strings. Device-owned values on the server are\nlast reported values. Raises Error on native failure; invalid argument representations\nraise ValueError.",
+    "name": "Endpoint.inspect_group",
+    "signature": "Endpoint.inspect_group(self, group_id)"
+  },
+  {
+    "description": "Generate at most one frame within budget and capacity byte limits. An idle endpoint\nreturns no frame. Bounds failures retain pending work. Generating a frame never delivers\nit. Raises Error on native failure; invalid argument representations raise ValueError.",
+    "name": "Endpoint.outbound",
+    "signature": "Endpoint.outbound(self, budget=512, capacity=512)"
+  },
+  {
+    "description": "Authenticate one complete protocol frame without a trusted clock. Unapproved signed\nserver enrollment fails closed; use receive_at during enrollment. Raises Error on native\nfailure; invalid argument representations raise ValueError.",
+    "name": "Endpoint.receive",
+    "signature": "Endpoint.receive(self, frame)"
+  },
+  {
+    "description": "Authenticate one complete frame using trusted server time now for enrollment expiry.\nAccepted changes are persisted; responses remain pending for outbound transport. Raises\nError on native failure; invalid argument representations raise ValueError.",
+    "name": "Endpoint.receive_at",
+    "signature": "Endpoint.receive_at(self, frame, now)"
+  },
+  {
+    "description": "Persist a new credit report request on an enrolled server. Exchange the resulting\nrequest, response and receipt through application-owned transport. Raises Error on\nnative failure; invalid argument representations raise ValueError.",
+    "name": "Endpoint.request_credit_status",
+    "signature": "Endpoint.request_credit_status(self)"
+  },
+  {
+    "description": "Queue and persist a group_id snapshot request on an enrolled server. Unknown group\nIDs fail; no bytes are transferred automatically. Raises Error on native failure;\ninvalid argument representations raise ValueError.",
+    "name": "Endpoint.request_group",
+    "signature": "Endpoint.request_group(self, group_id)"
+  },
+  {
+    "description": "Set the cumulative issued total on an enrolled server. The uint64 total must not\ndecrease. Success commits locally and queues work; it does not deliver a frame. Raises\nError on native failure; invalid argument representations raise ValueError.",
+    "name": "Endpoint.set_credits_issued",
+    "signature": "Endpoint.set_credits_issued(self, total)"
+  },
+  {
+    "description": "Atomically apply updates to group_id, validated by the configured schema.\n\nupdates is a sequence of (field_id, type, value) triples. Fields must be\nlocally owned, unique and correctly typed. Accepted updates persist;\nvalidation failures leave the group unchanged. Native failures raise Error.",
+    "name": "Endpoint.update_group",
+    "signature": "Endpoint.update_group(self, group_id, updates)"
+  },
+  {
+    "description": "Native failure with its numeric code and stable host status token.",
+    "name": "Error",
+    "signature": "Error"
+  },
+  {
+    "description": "Construct a native error from its numeric status code.",
+    "name": "Error.__init__",
+    "signature": "Error.__init__(self, code)"
+  },
+  {
+    "description": "Derive a 32-byte public key from a 32-byte fixture seed.\n\nThe seed must be bytes. Never derive a server secret on a real device.",
+    "name": "fixture_public_key",
+    "signature": "fixture_public_key(seed)"
+  }
+]

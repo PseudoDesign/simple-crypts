@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['state_0',['Initialization and public state',['../group__initialization.html',1,'']]]
+  ['reception_0',['Frame generation and reception',['../group__transport.html',1,'']]],
+  ['resource_20groups_1',['Typed resource groups',['../group__resources.html',1,'']]]
 ];

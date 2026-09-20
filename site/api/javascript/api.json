@@ -1,0 +1,217 @@
+[
+  {
+    "description": "Wrap a Wasm module already owned by the calling worker. Use open for initialization.\nmodule: Emscripten module instance.",
+    "name": "module:examples/common/endpoint.Endpoint",
+    "signature": "module:examples/common/endpoint.Endpoint(module)"
+  },
+  {
+    "description": "Await an exported mutation, including storage completion; native errors reject.\nname: Export name.\ntypes: Emscripten argument types.\nargs: Argument values.\nReturns: Nonnegative native status.",
+    "name": "module:examples/common/endpoint.Endpoint#call",
+    "signature": "module:examples/common/endpoint.Endpoint#call(name, types, args)"
+  },
+  {
+    "description": "Run the C++ command parser after copying a UTF-8 input line.\nline: At most 4096 UTF-8 bytes without NUL.\nnow: Trusted server time in seconds.\nReturns: Copied output and quit/error/sync flags; the worker handles transport.",
+    "name": "module:examples/common/endpoint.Endpoint#console",
+    "signature": "module:examples/common/endpoint.Endpoint#console(line, now)"
+  },
+  {
+    "description": "Generate and copy one pending frame, awaiting nonce reservation before success.\nReturns: Owned bytes, or null when idle. Never delivers the frame.",
+    "name": "module:examples/common/endpoint.Endpoint#outbound",
+    "signature": "module:examples/common/endpoint.Endpoint#outbound()"
+  },
+  {
+    "description": "Copy bytes into the shared 4096-byte bridge input; callers serialize access.\nbytes: Input bytes.\noffset: Byte offset.",
+    "name": "module:examples/common/endpoint.Endpoint#put",
+    "signature": "module:examples/common/endpoint.Endpoint#put(bytes, offset)"
+  },
+  {
+    "description": "Authenticate a complete frame and await durable state updates.\nframe: Between 1 and 512 bytes.\nnow: Trusted server time in seconds.\nReturns: Completion; failures reject.",
+    "name": "module:examples/common/endpoint.Endpoint#receive",
+    "signature": "module:examples/common/endpoint.Endpoint#receive(frame, now)"
+  },
+  {
+    "description": "Apply a fleet control to this server, persisting pending work without delivery.\ncommand: begin, cancel, approve, issue, or request.\nargs: Challenge/key for approval or decimal total for issuance.\nnow: Trusted server time in seconds; enrollment lasts 600 seconds.\nReturns: ok on success; errors reject.",
+    "name": "module:examples/common/endpoint.Endpoint#server",
+    "signature": "module:examples/common/endpoint.Endpoint#server(command, args, now)"
+  },
+  {
+    "description": "Copy public diagnostics; uint64 values remain decimal strings.\nReturns: Public state or null when unavailable.",
+    "name": "module:examples/common/endpoint.Endpoint#state",
+    "signature": "module:examples/common/endpoint.Endpoint#state()"
+  },
+  {
+    "description": "Write exact uint64 slots at input offset 2048; avoids Asyncify i64 argument rewind.\nvalues: At most two values in the uint64 range.",
+    "name": "module:examples/common/endpoint.Endpoint#values",
+    "signature": "module:examples/common/endpoint.Endpoint#values(values)"
+  },
+  {
+    "description": "Create an isolated instance and await initialization from durable storage. Missing or incompatible saved state rejects.\nfactory: Emscripten module factory.\nstorage: Awaitable load/save callbacks.\nrole: Device or server role.\nserial: Validated serial.\npin: Hexadecimal 32-byte server public key.\nfresh: Require a new identity.\nReturns: Initialized, exclusively owned endpoint.",
+    "name": "module:examples/common/endpoint.Endpoint.open",
+    "signature": "module:examples/common/endpoint.Endpoint.open(factory, storage, role, serial, pin, fresh)"
+  },
+  {
+    "description": "Parse an exact unsigned decimal uint64 without converting through Number.\ntext: Decimal digits only.\nReturns: The exact value; malformed or overflowing input throws.",
+    "name": "module:examples/common/endpoint.uint64",
+    "signature": "module:examples/common/endpoint.uint64(text)"
+  },
+  {
+    "description": "Validate a serial before creating storage or identity state.\nserial: Between 1 and 32 printable non-space ASCII bytes.\nReturns: The validated serial; invalid input throws.",
+    "name": "module:examples/common/endpoint.validSerial",
+    "signature": "module:examples/common/endpoint.validSerial(serial)"
+  },
+  {
+    "description": "Delete all fleet and endpoint records in one durable transaction.\ndb: Open database; caller must stop endpoint instances first.\nReturns: Completion; aborts reject without reporting success.",
+    "name": "module:examples/common/storage.clearFleet",
+    "signature": "module:examples/common/storage.clearFleet(db)"
+  },
+  {
+    "description": "Create callbacks for one endpoint namespace. Persist encoded records and nonce high-water marks, never raw native context memory.\ndb: Open database.\nserial: Validated device serial.\nrole: Device or server namespace.\nfresh: Whether initialization requires an absent endpoint record.\nReturns: Asynchronous read/write callbacks used by the Wasm provider.",
+    "name": "module:examples/common/storage.endpointStorage",
+    "signature": "module:examples/common/storage.endpointStorage(db, serial, role, fresh)"
+  },
+  {
+    "description": "Open the versioned browser database; incompatible or failed stores reject instead of replacing identities. The owning worker holds the fleet Web Lock.\nReturns: Open database connection.",
+    "name": "module:examples/common/storage.openDatabase",
+    "signature": "module:examples/common/storage.openDatabase()"
+  },
+  {
+    "description": "Run one object-store operation and resolve only after transaction completion.\ndb: Open database.\nstore: Object store name.\nmode: Access mode.\noperation: Callback returning an IDBRequest.\nReturns: Request result after durable completion; aborts reject.",
+    "name": "module:examples/common/storage.transaction",
+    "signature": "module:examples/common/storage.transaction(db, store, mode, operation)"
+  },
+  {
+    "description": "Deliver pending opaque frames between connected simulated endpoints until idle or awaiting enrollment approval.\nserver: Server endpoint.\ndevice: Running device endpoint, or null when stopped.\nnow: Trusted server time for enrollment expiry.\nlog: Observer for completed transfer messages.\nReturns: Completion; rejected frames or nonconvergence throw.",
+    "name": "module:examples/fleet_manager/transport.exchange",
+    "signature": "module:examples/fleet_manager/transport.exchange(server, device, now, log)"
+  },
+  {
+    "description": "Wrap one isolated guided-demo Wasm instance.\nmodule: Emscripten module with scw exports.",
+    "name": "module:web/endpoint.Endpoint",
+    "signature": "module:web/endpoint.Endpoint(module)"
+  },
+  {
+    "description": "Apply one guided-demo command. Generation, initialization, enrollment, credit, receive and transmit commands delegate to the C bridge. Producing a frame does not deliver it.\ncommand: Command name.\nargs: Command-specific inputs; uint64 values must be exact.\nReturns: Native status, copied state and optional frame; malformed inputs reject.",
+    "name": "module:web/endpoint.Endpoint#command",
+    "signature": "module:web/endpoint.Endpoint#command(command, args)"
+  },
+  {
+    "description": "Copy input bytes into the instance-owned bridge buffer.\nbytes: Input bytes.\noffset: Offset within the 4096-byte buffer.",
+    "name": "module:web/endpoint.Endpoint#put",
+    "signature": "module:web/endpoint.Endpoint#put(bytes, offset)"
+  },
+  {
+    "description": "Copy public diagnostics; this is not a restorable native context.\nReturns: Public state with exact decimal counters.",
+    "name": "module:web/endpoint.Endpoint#state",
+    "signature": "module:web/endpoint.Endpoint#state()"
+  },
+  {
+    "description": "Decode exactly one 32-byte public key from hexadecimal.\ntext: A 64-character hexadecimal key.\nReturns: Fresh key bytes; malformed input throws.",
+    "name": "module:web/endpoint.unhex",
+    "signature": "module:web/endpoint.unhex(text)"
+  },
+  {
+    "description": "Create a lab without starting workers; reset initializes them.\nonChange: Observer called after state changes.\nworkerFactory: Factory for isolated endpoint workers.",
+    "name": "module:web/lab.Lab",
+    "signature": "module:web/lab.Lab(onChange, workerFactory)"
+  },
+  {
+    "description": "Approve the displayed candidate binding at the current simulated time.\nReturns: Completion; stale or absent candidates fail.",
+    "name": "module:web/lab.Lab#approveEnrollment",
+    "signature": "module:web/lab.Lab#approveEnrollment()"
+  },
+  {
+    "description": "Authorize a ten-minute session using the simulated server clock.\nReturns: Completion; native failures reject.",
+    "name": "module:web/lab.Lab#beginEnrollment",
+    "signature": "module:web/lab.Lab#beginEnrollment()"
+  },
+  {
+    "description": "Execute a worker command and update visible state and events.\nrole: Endpoint role.\ncommand: Bridge command.\nargs: Command arguments.\nReturns: Worker result.",
+    "name": "module:web/lab.Lab#command",
+    "signature": "module:web/lab.Lab#command(role, command, args)"
+  },
+  {
+    "description": "Flip ciphertext bytes for authentication-failure testing.\nid: Packet identifier.",
+    "name": "module:web/lab.Lab#corrupt",
+    "signature": "module:web/lab.Lab#corrupt(id)"
+  },
+  {
+    "description": "Deliver a queued packet to one endpoint and record its acceptance or failure.\nid: Packet identifier.\ntarget: Destination role.\nReturns: Receive result.",
+    "name": "module:web/lab.Lab#deliver",
+    "signature": "module:web/lab.Lab#deliver(id, target)"
+  },
+  {
+    "description": "Discard a packet without reception and record the outcome.\nid: Packet identifier.",
+    "name": "module:web/lab.Lab#drop",
+    "signature": "module:web/lab.Lab#drop(id)"
+  },
+  {
+    "description": "Queue a second copy without mutating the original.\nid: Packet identifier.",
+    "name": "module:web/lab.Lab#duplicate",
+    "signature": "module:web/lab.Lab#duplicate(id)"
+  },
+  {
+    "description": "Append a bounded diagnostic event and notify observers.\nmessage: Display text.\nkind: Event category.",
+    "name": "module:web/lab.Lab#event",
+    "signature": "module:web/lab.Lab#event(message, kind)"
+  },
+  {
+    "description": "Generate a fresh device identity after optional challenge verification.\noptions: Set fromChallenge to verify the displayed invitation first.\nReturns: Completion; invalid session or verification failures reject.",
+    "name": "module:web/lab.Lab#generateDevice",
+    "signature": "module:web/lab.Lab#generateDevice(options)"
+  },
+  {
+    "description": "Move a visible packet between transport locations.\nid: Packet identifier.\nlocation: New location.",
+    "name": "module:web/lab.Lab#move",
+    "signature": "module:web/lab.Lab#move(id, location)"
+  },
+  {
+    "description": "Notify the UI with the current lab state.",
+    "name": "module:web/lab.Lab#notify",
+    "signature": "module:web/lab.Lab#notify()"
+  },
+  {
+    "description": "Find a queued packet or throw if it is no longer available.\nid: Packet identifier.\nReturns: Mutable queue record.",
+    "name": "module:web/lab.Lab#packet",
+    "signature": "module:web/lab.Lab#packet(id)"
+  },
+  {
+    "description": "Initialize the generated device with its serial and pinned server key.\nReturns: Completion; missing provisioning inputs reject.",
+    "name": "module:web/lab.Lab#provisionDevice",
+    "signature": "module:web/lab.Lab#provisionDevice()"
+  },
+  {
+    "description": "Send a command to one worker and correlate its response; no peer transfer occurs.\nrole: Endpoint role.\ncommand: Bridge command.\nargs: Command arguments.\nReturns: Worker response; runtime errors reject.",
+    "name": "module:web/lab.Lab#raw",
+    "signature": "module:web/lab.Lab#raw(role, command, args)"
+  },
+  {
+    "description": "Archive a packet with its final outcome, keeping bounded history.\npacket: Queue record.\noutcome: Final outcome.",
+    "name": "module:web/lab.Lab#remember",
+    "signature": "module:web/lab.Lab#remember(packet, outcome)"
+  },
+  {
+    "description": "Queue a copy of archived bytes for explicit replay testing.\npacket: Archived record.",
+    "name": "module:web/lab.Lab#replay",
+    "signature": "module:web/lab.Lab#replay(packet)"
+  },
+  {
+    "description": "Discard transient state and initialize fresh workers and server identity.\noptions: Set deferDevice to postpone device provisioning.\nReturns: Completion; initialization failures reject.",
+    "name": "module:web/lab.Lab#reset",
+    "signature": "module:web/lab.Lab#reset(options)"
+  },
+  {
+    "description": "Terminate workers and reject pending calls, invalidating the current session.",
+    "name": "module:web/lab.Lab#stop",
+    "signature": "module:web/lab.Lab#stop()"
+  },
+  {
+    "description": "Generate and stage a packet in its sender box; do not deliver it.\nrole: Sending endpoint.\nbudget: Maximum frame bytes.\nReturns: Queued packet ID, or null when idle.",
+    "name": "module:web/lab.Lab#transmit",
+    "signature": "module:web/lab.Lab#transmit(role, budget)"
+  },
+  {
+    "description": "Apply a state-changing command and report its result; frame generation is separate.\nrole: Endpoint role.\ncommand: Bridge command.\nargs: Command arguments.\nReturns: Command result; delivery remains explicit.",
+    "name": "module:web/lab.Lab#update",
+    "signature": "module:web/lab.Lab#update(role, command, args)"
+  }
+]

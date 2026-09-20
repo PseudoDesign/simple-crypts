@@ -1,0 +1,85 @@
+<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Simple Crypts python API</title>
+<style>body{max-width:70rem;margin:2rem auto;padding:0 1rem;font:1rem/1.6 system-ui}pre{white-space:pre-wrap;overflow-wrap:anywhere}article{border-top:1px solid #ccc;padding:1rem 0}input{font:inherit;padding:.5rem;width:90%}</style>
+<nav><a href="../index.html">C API and demos</a> · <a href="../bindings.html">All bindings</a></nav>
+<h1>Python API</h1>
+<p>Endpoints have one owner. Mutations persist through the host or browser provider; transport remains application-owned. Fixture helpers are for testing only.</p>
+<label>Filter declarations <input type="search" id="search"></label>
+<article id="entry-0"><h2>Endpoint</h2><pre>Endpoint</pre><p>Single-owner synchronous native endpoint. Use a context manager or close explicitly.
+Calls may raise Error for native failures or ValueError for invalid Python arguments.
+Synchronize externally across threads.</p></article>
+<article id="entry-1"><h2>Endpoint.__init__</h2><pre>Endpoint.__init__(self, role, storage, serial, secret, *, server_public_key=None, provisioned_seed=None, random_unavailable=False)</pre><p>Open or create one durable native endpoint under an exclusive store lock.
+
+Args:
+    role: &quot;device&quot; or &quot;server&quot;.
+    storage: Private persistent store directory, accepted by os.fsencode.
+    serial: Between 1 and 32 printable ASCII bytes.
+    secret: Required 32-byte enrollment secret, matching an existing store.
+    server_public_key: Required 32-byte pinned Ed25519 key on devices; None on servers.
+    provisioned_seed: Optional trusted 32-byte identity seed; None generates a new identity.
+    random_unavailable: Fixture-only entropy failure switch; use False in applications.
+
+Inputs are copied. Missing prerequisites, corrupt or incompatible stores raise Error;
+existing identities are never silently replaced. Invalid representations raise ValueError.</p></article>
+<article id="entry-2"><h2>Endpoint.close</h2><pre>Endpoint.close(self)</pre><p>Close the native handle and release its exclusive store lock. Repeated closes
+are harmless; do not use the endpoint afterward.</p></article>
+<article id="entry-3"><h2>Endpoint.consume_credits</h2><pre>Endpoint.consume_credits(self, amount)</pre><p>Consume a positive uint64 amount on an enrolled device. Insufficient credits fail with
+conflict; overflow fails with exhausted. The server learns consumption through a later
+requested report. Raises Error on native failure; invalid argument representations raise
+ValueError.</p></article>
+<article id="entry-4"><h2>Endpoint.enrollment_approve</h2><pre>Endpoint.enrollment_approve(self, challenge, key, now)</pre><p>Approve the exact 32-byte challenge and candidate Ed25519 key at trusted server time
+now. The application must authorize the serial/session/key binding. Stale or expired
+approvals fail. Raises Error on native failure; invalid argument representations raise
+ValueError.</p></article>
+<article id="entry-5"><h2>Endpoint.enrollment_begin</h2><pre>Endpoint.enrollment_begin(self, now, expires)</pre><p>Authorize a new server enrollment session. now and expires use the same trusted server
+clock and application-defined units; expires must be greater than now. A fresh challenge
+replaces any prior candidate. Raises Error on native failure; invalid argument
+representations raise ValueError.</p></article>
+<article id="entry-6"><h2>Endpoint.enrollment_cancel</h2><pre>Endpoint.enrollment_cancel(self)</pre><p>Cancel an unregistered server session durably. This does not revoke an enrolled peer.
+Raises Error on native failure; invalid argument representations raise ValueError.</p></article>
+<article id="entry-7"><h2>Endpoint.enrollment_enable</h2><pre>Endpoint.enrollment_enable(self)</pre><p>Persistently enable signed enrollment before registration. This mode cannot be disabled.
+Raises Error on native failure; invalid argument representations raise ValueError.</p></article>
+<article id="entry-8"><h2>Endpoint.fail</h2><pre>Endpoint.fail(self, operation, count=1)</pre><p>Fixture-only injection: fail the next count calls of the selected operation
+(storage, random or crypto fault name). Zero
+clears the selected counter. This is not an application recovery API. Raises Error on
+native failure; invalid argument representations raise ValueError.</p></article>
+<article id="entry-9"><h2>Endpoint.fixture_revision</h2><pre>Endpoint.fixture_revision(self, revision)</pre><p>Fixture-only revision seeding for uint64 boundary tests. Requires an explicitly testing-
+enabled native library; production builds reject it. Raises Error on native failure;
+invalid argument representations raise ValueError.</p></article>
+<article id="entry-10"><h2>Endpoint.inspect</h2><pre>Endpoint.inspect(self)</pre><p>Return copied public-state diagnostics with uint64 counters as decimal strings. No
+private keys are exported, and this snapshot is not a restorable native context. Raises
+Error on native failure; invalid argument representations raise ValueError.</p></article>
+<article id="entry-11"><h2>Endpoint.inspect_group</h2><pre>Endpoint.inspect_group(self, group_id)</pre><p>Return a copied diagnostic snapshot of group_id. Field values retain exact integer
+values; revision counters are decimal strings. Device-owned values on the server are
+last reported values. Raises Error on native failure; invalid argument representations
+raise ValueError.</p></article>
+<article id="entry-12"><h2>Endpoint.outbound</h2><pre>Endpoint.outbound(self, budget=512, capacity=512)</pre><p>Generate at most one frame within budget and capacity byte limits. An idle endpoint
+returns no frame. Bounds failures retain pending work. Generating a frame never delivers
+it. Raises Error on native failure; invalid argument representations raise ValueError.</p></article>
+<article id="entry-13"><h2>Endpoint.receive</h2><pre>Endpoint.receive(self, frame)</pre><p>Authenticate one complete protocol frame without a trusted clock. Unapproved signed
+server enrollment fails closed; use receive_at during enrollment. Raises Error on native
+failure; invalid argument representations raise ValueError.</p></article>
+<article id="entry-14"><h2>Endpoint.receive_at</h2><pre>Endpoint.receive_at(self, frame, now)</pre><p>Authenticate one complete frame using trusted server time now for enrollment expiry.
+Accepted changes are persisted; responses remain pending for outbound transport. Raises
+Error on native failure; invalid argument representations raise ValueError.</p></article>
+<article id="entry-15"><h2>Endpoint.request_credit_status</h2><pre>Endpoint.request_credit_status(self)</pre><p>Persist a new credit report request on an enrolled server. Exchange the resulting
+request, response and receipt through application-owned transport. Raises Error on
+native failure; invalid argument representations raise ValueError.</p></article>
+<article id="entry-16"><h2>Endpoint.request_group</h2><pre>Endpoint.request_group(self, group_id)</pre><p>Queue and persist a group_id snapshot request on an enrolled server. Unknown group
+IDs fail; no bytes are transferred automatically. Raises Error on native failure;
+invalid argument representations raise ValueError.</p></article>
+<article id="entry-17"><h2>Endpoint.set_credits_issued</h2><pre>Endpoint.set_credits_issued(self, total)</pre><p>Set the cumulative issued total on an enrolled server. The uint64 total must not
+decrease. Success commits locally and queues work; it does not deliver a frame. Raises
+Error on native failure; invalid argument representations raise ValueError.</p></article>
+<article id="entry-18"><h2>Endpoint.update_group</h2><pre>Endpoint.update_group(self, group_id, updates)</pre><p>Atomically apply updates to group_id, validated by the configured schema.
+
+updates is a sequence of (field_id, type, value) triples. Fields must be
+locally owned, unique and correctly typed. Accepted updates persist;
+validation failures leave the group unchanged. Native failures raise Error.</p></article>
+<article id="entry-19"><h2>Error</h2><pre>Error</pre><p>Native failure with its numeric code and stable host status token.</p></article>
+<article id="entry-20"><h2>Error.__init__</h2><pre>Error.__init__(self, code)</pre><p>Construct a native error from its numeric status code.</p></article>
+<article id="entry-21"><h2>fixture_public_key</h2><pre>fixture_public_key(seed)</pre><p>Derive a 32-byte public key from a 32-byte fixture seed.
+
+The seed must be bytes. Never derive a server secret on a real device.</p></article>
+<script>document.querySelector("#search").addEventListener("input",event=>{const query=event.target.value.toLowerCase();document.querySelectorAll("article").forEach(entry=>entry.hidden=!entry.textContent.toLowerCase().includes(query))});</script></html>

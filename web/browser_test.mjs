@@ -72,8 +72,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
  try{
   const context=await browser.newContext({viewport:{width:1366,height:768},reducedMotion:'reduce'}),page=await context.newPage(),errors=[];
   page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await ready(page);
-  for(const chapter of ['trust','attack']){
-   if(chapter==='attack'){await page.locator('#chapter-attack').click();await ready(page);}
+  for(const chapter of ['trust']){
    assert(await page.locator('#message-log').isVisible());assert.equal(await page.locator('#drop-target').count(),0);assert.equal(await page.locator('.inbox,#deliver,.show-tip').count(),0);
    await page.locator('#hide-tip').click();await page.locator('#chapter-'+chapter).click();assert(await page.locator('#guide-popup').isVisible());
    await generate(page);
@@ -97,6 +96,15 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    await next(page);
    await dragPacket(page,pending(page),'#device-panel');assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
    assert.match(await page.locator('#tour-title').textContent(),/Enrollment complete/);
+   assert.equal(await page.locator('#chapter-attack').count(),0);
+   assert.match(await page.locator('#tour-text').textContent(),/Corruption.*server time.*expiry/);
+   const enrolledState=await page.locator('#server-details').textContent();
+   await page.locator('#advance-time').click();await ready(page);
+   assert.equal(await page.locator('#server-details').textContent(),enrolledState);
+   assert.match(await page.locator('#clock-result').textContent(),/Completed enrollment stays valid/);
+   await corrupt(saved(page));await dragPacket(page,saved(page),'#device-panel');
+   assert.match(await page.locator('#device-result').textContent(),/authentication/);
+   await corrupt(saved(page));
    assert.equal(await page.locator('#next').textContent(),'Continue to credits →');
    await dragPacket(page,saved(page),'#device-panel');assert.match(await page.locator('#device-result').textContent(),/ok \(0\).*no newer state/i);
    // Reflect the saved server confirmation back to the server and surface its actual error.
@@ -110,7 +118,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
   await creditFlow(page);
   await next(page);assert.equal(await page.locator('#device-issued').textContent(),'0');
   assert.equal(await page.locator('#message-log .packet').count(),0);
-  await page.locator('#chapter-attack').click();await ready(page);
+  await page.locator('#chapter-trust').click();await ready(page);
   // Advancing simulated server time alone does not call receive. A later response fails expiry.
   await page.locator('#reset').click();await ready(page);await generate(page);await dragPacket(page,pending(page),'#device-panel');await next(page);
   const identity=await page.locator('#device-public-key').textContent();const beforeClock=await page.locator('#server-details').textContent();

@@ -28,7 +28,7 @@ bazel test //web:browser_test --test_output=errors
 The explicit `//web:browser_test` target is marked manual because browser
 engines are separate development prerequisites; `bazel test //...` runs the
 protocol, relay, and site-verification checks without them. Browser tests launch a loopback-only HTTP server and need permission to bind a
-local socket. They test all three chapters in Chromium and Firefox, corruption toggles,
+local socket. They test both chapters in Chromium and Firefox, corruption toggles,
 replays and reflections, delayed responses, rejection recovery, bounded history,
 and simulated touch dragging. Screenshots are written to
 `/tmp/simple-crypts-{browser}-{chapter}-log.png` and `/tmp/simple-crypts-touch-log.png`.
@@ -109,4 +109,4 @@ labels from the build-time resource definition. JavaScript passes uint64 values
 as exact strings/BigInt, never floating-point numbers. The recorded `/report/`
 evidence remains a separately attributed historical snapshot.
 
-The two enrollment chapters stop at confirmation. The Credits chapter reuses a freshly enrolled pair when reached from enrollment, or completes a real local enrollment as setup when opened directly. Only credit packets appear in its message log.
+Establish Trust ends at confirmation with suggestions to corrupt and replay saved packets or advance server time. Completed enrollment stays valid after time advances; reset the session and delay its response to explore expiration. The Credits chapter reuses a freshly enrolled pair when reached from enrollment, or completes a real local enrollment as setup when opened directly. Only credit packets appear in its message log.

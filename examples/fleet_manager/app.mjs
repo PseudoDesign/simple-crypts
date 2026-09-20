@@ -99,11 +99,6 @@ function makeRow(entry) {
     await send(command, entry.serial);
     notice(`${entry.serial} ${command === 'stop' ? 'stopped' : 'started'}. Saved state retained.`);
   });
-  button('connection').onclick = () => action(async () => {
-    const enabled = !row.entry.connected;
-    await send('connection', entry.serial, {enabled});
-    notice(`${entry.serial}: connection ${enabled ? 'enabled' : 'disabled'}.`);
-  });
   return row;
 }
 
@@ -126,8 +121,6 @@ function updateRow(entry) {
     `Session expires: ${new Date(Number(state.enrollment_expires) * 1000).toLocaleString()}` : '');
   field('issued', state?.credits_issued ?? '—');
   field('consumed', state?.credits_consumed ?? '—');
-  control('connection').textContent = entry.connected ? 'Disconnect' : 'Connect';
-  control('connection').setAttribute('aria-pressed', String(entry.connected));
   control('power').textContent = entry.running ? 'Stop device' : 'Start device';
   const unusable = busy || !available || Boolean(entry.error) || state?.storage_failed;
   for (const button of row.root.querySelectorAll('button')) button.disabled = Boolean(unusable);
@@ -168,19 +161,40 @@ function updateConsole(entry) {
     const handle = document.createElement('button');
     handle.className = 'drag-handle';
     handle.title = 'Drag to move. Focus and use arrow keys to move; Escape cancels a drag.';
+    const title = document.createElement('span');
+    title.className = 'console-name';
+    title.textContent = entry.serial;
+    const status = document.createElement('span');
+    status.className = 'console-status';
+    handle.append(title, status);
+    const connection = document.createElement('button');
+    connection.dataset.action = 'connection';
+    connection.onclick = () => action(async () => {
+      const enabled = !panel.entry.connected;
+      await send('connection', entry.serial, {enabled});
+      notice(`${entry.serial}: connection ${enabled ? 'enabled' : 'disabled'}.`);
+    });
+    const debug = document.createElement('button');
+    debug.dataset.action = 'debug';
+    debug.onclick = () => action(async () => {
+      await send('debug', entry.serial, {enabled: !panel.entry.debug});
+    });
     const hide = document.createElement('button');
     hide.textContent = 'Hide';
     hide.onclick = () => {
       root.hidden = true;
       rows.get(entry.serial).root.querySelector('[data-action="open"]').focus();
     };
-    top.append(handle, hide);
+    top.append(handle, connection, debug, hide);
     const log = document.createElement('pre');
     log.setAttribute('aria-label', `Console output ${entry.serial}`);
     log.setAttribute('aria-live', 'polite');
     const form = document.createElement('form');
     const label = document.createElement('label');
-    label.textContent = `${entry.serial} >`;
+    const prompt = document.createElement('span');
+    prompt.className = 'console-prompt';
+    prompt.textContent = `${entry.serial} >`;
+    label.append(prompt);
     const input = document.createElement('input');
     input.autocomplete = 'off';
     input.spellcheck = false;
@@ -192,7 +206,7 @@ function updateConsole(entry) {
     form.append(label, submit);
     root.append(top, log, form);
     $('consoles').append(root);
-    panel = {root, handle, log, input, submit, history: [], cursor: 0, draft: ''};
+    panel = {root, handle, status, connection, debug, log, input, submit, history: [], cursor: 0, draft: ''};
     consoles.set(entry.serial, panel);
     place(panel, innerWidth - 464 - (consoles.size - 1) % 5 * 28,
       innerHeight - 374 - (consoles.size - 1) % 5 * 28);
@@ -257,10 +271,20 @@ function updateConsole(entry) {
       if (!input.disabled) input.focus();
     };
   }
-  panel.handle.textContent = `${entry.serial} · ${!entry.running ? 'stopped' : entry.connected ? 'connected' : 'disconnected'}`;
+  panel.entry = entry;
+  panel.status.textContent = !entry.running ? 'stopped' : entry.connected ? 'connected' : 'disconnected';
+  panel.connection.textContent = entry.connected ? 'Disconnect' : 'Connect';
+  panel.connection.setAttribute('aria-pressed', String(entry.connected));
+  panel.connection.disabled = busy || !available || Boolean(entry.error) || entry.server?.storage_failed;
+  panel.debug.textContent = entry.debug ? 'Debug: on' : 'Debug: off';
+  panel.debug.setAttribute('aria-pressed', String(entry.debug));
+  panel.debug.title = entry.debug ? 'Disable debug logging' : 'Enable debug logging';
+  panel.debug.disabled = busy || !available;
   panel.input.disabled = busy || !available || !entry.running || Boolean(entry.error) || entry.device?.storage_failed;
   panel.submit.disabled = panel.input.disabled;
-  const text = entry.activity.join('\n');
+  const text = entry.activity
+    .filter(line => entry.debug || line.level !== 'debug')
+    .map(line => line.text).join('\n');
   if (panel.log.textContent !== text) {
     panel.log.textContent = text;
     panel.log.scrollTop = panel.log.scrollHeight;

@@ -43,15 +43,24 @@ pre, .wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
 #notice { padding: 12px 16px; background: #dfeee3; border-radius: 6px; }
 .error:not(:empty), #notice.error { background: #ffede4; color: #872b14; }
 .console { position: fixed; width: min(440px, calc(100vw - 16px)); height: min(350px, calc(100dvh - 56px)); display: flex; flex-direction: column; background: #142b28; color: #cfedda; border: 1px solid #668478; border-radius: 10px; box-shadow: 0 14px 40px #102b2840; overflow: hidden; }
-.console-titlebar { display: flex; align-items: center; background: #213e38; border-bottom: 1px solid #48665a; padding: 6px; gap: 6px; }
-.console .drag-handle { flex: 1; text-align: left; background: transparent; font-weight: 600; cursor: grab; touch-action: none; user-select: none; }
+.console-titlebar { flex-shrink: 0; display: flex; align-items: center; background: #213e38; border-bottom: 1px solid #48665a; padding: 6px; gap: 6px; }
+.console .drag-handle { flex: 1; min-width: 0; overflow: hidden; text-align: left; background: transparent; font-weight: 600; cursor: grab; touch-action: none; user-select: none; }
+.console-name, .console-status { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.console-status { font-size: 10px; font-weight: 400; color: #a5c5b5; }
+.console-titlebar > button:not(.drag-handle) { flex-shrink: 0; }
+.console [data-action="debug"][aria-pressed="true"] { background: #cfedda; color: #142b28; }
 .console.dragging .drag-handle { cursor: grabbing; }
 .console pre { flex: 1; min-height: 0; overflow-y: auto; user-select: text; padding: 12px; margin: 0; }
-.console form { display: flex; flex-wrap: nowrap; align-items: end; padding: 10px; margin: 0; border-top: 1px solid #48665a; }
-.console label { flex: 1; min-width: 0; margin: 0; font: 12px/1.6 ui-monospace, monospace; }
+.console form { flex-shrink: 0; display: flex; flex-wrap: nowrap; align-items: end; gap: 12px; padding: 12px; margin: 0; border-top: 1px solid #48665a; }
+.console label { flex: 1; min-width: 0; display: grid; gap: 8px; margin: 0; font: 12px/1.6 ui-monospace, monospace; }
+.console-prompt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.console input:focus-visible { outline-offset: -3px; }
 .console input { width: 100%; background: #213e38; color: white; border-color: #668478; font: 12px/1.6 ui-monospace, monospace; }
 .console button { padding: 6px 10px; font-size: .8rem; }
 dialog { max-width: min(500px, calc(100vw - 32px)); border: 1px solid #a7bdb1; border-radius: 12px; padding: 24px; color: #17312f; }
 dialog::backdrop { background: #142b2870; }
 [hidden] { display: none !important; }
 @media (max-width: 760px) { header, main, footer { padding: 16px; } section { padding: 16px; } .section-title { flex-wrap: wrap; } .chapter-banner { gap: 4px; font-size: 10px; } .chapter-banner a { padding: 5px; } }
+@media (max-width: 480px) {
+  .console-titlebar button { padding: 6px; font-size: 12px; }
+}

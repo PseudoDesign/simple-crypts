@@ -40,7 +40,12 @@ async function click(page, selector) {
 }
 async function control(page, name, serial = 'mcu-0001') {
   await hideConsoles(page);
-  await row(page, serial).locator(`[data-action="${name}"]`).click();
+  if (['connection', 'debug'].includes(name)) {
+    await row(page, serial).locator('[data-action="open"]').click();
+    await page.locator(`.console[data-serial="${serial}"] [data-action="${name}"]`).click();
+  } else {
+    await row(page, serial).locator(`[data-action="${name}"]`).click();
+  }
   await wait(page);
 }
 async function device(page, line, serial = 'mcu-0001') {
@@ -76,6 +81,9 @@ try {
       assert.match(await device(page, 'help'), /sync/);
       await control(page, 'begin');
       assert.equal((await state(page)).registered, false);
+      assert.doesNotMatch(await page.locator('.console pre').textContent(), /signed enrollment challenge/);
+      assert.equal(await page.locator('.console [data-action="debug"]').getAttribute('aria-pressed'), 'false');
+      assert.equal(await row(page).locator('[data-action="connection"]').count(), 0);
       const deviceKey = (await state(page)).candidate_key;
       assert.notEqual(deviceKey, '00'.repeat(32));
       assert.match(await device(page, 'status'), /awaiting enrollment/);
@@ -87,8 +95,18 @@ try {
       await control(page, 'approve');
       assert.equal((await state(page)).registered, true);
       assert.match(await device(page, 'status'), /Registration: registered/);
+      await control(page, 'debug');
+      assert.equal(await page.locator('.console [data-action="debug"]').getAttribute('aria-pressed'), 'true');
       await click(page, '.device-row[data-serial="mcu-0001"] [data-action="issue"] button');
       assert.match(await device(page, 'status'), /Credits issued: 100/);
+      assert.match(await page.locator('.console pre').textContent(), /Server → device: encrypted message/);
+      await control(page, 'debug');
+      assert.doesNotMatch(await page.locator('.console pre').textContent(), /Server → device: encrypted message/);
+      assert.match(await page.locator('.console pre').textContent(), /Credits issued: 100/);
+      // Enabling debug never creates an exchange; disabled logging did not
+      // capture the earlier enrollment. Each console owns its own setting.
+      await control(page, 'debug');
+      assert.doesNotMatch(await page.locator('.console pre').textContent(), /signed enrollment challenge/);
       assert.match(await device(page, 'consume 25'), /Consumed 25/);
       assert.equal((await state(page)).credits_consumed, '0');
       await device(page, 'sync');
@@ -116,6 +134,7 @@ try {
       const restored = await device(page, 'status');
       assert.match(restored, /Credits issued: 200/);
       assert.match(restored, /Credits consumed: 25/);
+      assert.equal(await page.locator('.console [data-action="debug"]').getAttribute('aria-pressed'), 'false');
       assert.ok(restored.includes(deviceKey));
       await device(page, 'reboot');
       assert.match(await device(page, 'status'), /Credits remaining: 175/);
@@ -172,6 +191,9 @@ try {
       await page.locator('#serial').fill('mcu-0002');
       await click(page, '#create-form button');
       assert.equal(await page.locator('.console').count(), 2);
+      await control(page, 'debug');
+      assert.equal(await page.locator('.console[data-serial="mcu-0001"] [data-action="debug"]').getAttribute('aria-pressed'), 'true');
+      assert.equal(await page.locator('.console[data-serial="mcu-0002"] [data-action="debug"]').getAttribute('aria-pressed'), 'false');
       assert.equal((await state(page, 'mcu-0002')).credits_consumed, '0');
       assert.notEqual((await state(page, 'mcu-0002')).public_key, firstKey);
       await control(page, 'connection', 'mcu-0002');
@@ -202,6 +224,27 @@ try {
       const mobileWindow = await page.locator('.console').first().boundingBox();
       assert.ok(mobileWindow.x >= 0 && mobileWindow.x + mobileWindow.width <= 390);
       assert.ok(mobileWindow.y >= 40 && mobileWindow.y + mobileWindow.height <= 844);
+      // Check actual geometry with the input focused: neither its focus ring nor
+      // titlebar controls may collide, even in a narrow mobile viewport.
+      for (const width of [390, 320]) {
+        await page.setViewportSize({width, height: 844});
+        const panel = page.locator('.console').first();
+        await panel.locator('input').focus();
+        const prompt = await panel.locator('.console-prompt').boundingBox();
+        const input = await panel.locator('input').boundingBox();
+        assert.ok(input.y >= prompt.y + prompt.height + 7);
+        const buttons = await panel.locator('.console-titlebar button').all();
+        let right = 0;
+        for (const button of buttons) {
+          const box = await button.boundingBox();
+          assert.ok(box.x >= right && box.x + box.width <= width - 8);
+          right = box.x + box.width;
+        }
+        const form = await panel.locator('form').boundingBox();
+        const output = await panel.locator('pre').boundingBox();
+        assert.ok(output.y + output.height <= form.y + 1);
+        assert.ok(input.y + input.height < form.y + form.height - 8);
+      }
       await page.screenshot({path: join(artifacts, `${name}-fleet.png`), fullPage: true});
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 
@@ -258,7 +301,7 @@ try {
       await click(page, '#create-form button');
       assert.notEqual((await state(page)).public_key, firstKey);
       assert.deepEqual(errors, []);
-      console.log(`${name}: fleet table controls, draggable consoles, persistent connection toggles, reset, isolation and storage recovery passed.`);
+      console.log(`${name}: console titlebar controls, debug logging, narrow-window layout, connections, reset and persistence passed.`);
     } finally {
       await context.tracing.stop({path: join(artifacts, `${name}-trace.zip`)});
       await browser.close();

@@ -20,7 +20,7 @@ under `examples/fleet_manager/`.
 1. **Create device** opens its C++ console. Type `help` or `status` and press
    Enter. Up/down arrows recall previous commands.
 2. **Authorize enrollment** delivers the signed challenge and the device's
-   encrypted response. The console reports that it is awaiting approval.
+   encrypted response. Its fleet row shows that it is awaiting approval.
 3. Compare the candidate key in **Enrollment identity** with device `status`,
    then **Approve device**. Confirmation is delivered to the device.
 4. In the fleet table, set **Cumulative credits issued** to `100`. The request, device response, and
@@ -31,16 +31,23 @@ under `examples/fleet_manager/`.
    server changes made while a device is stopped arrive when it starts.
 
 The top banner links back to Home and the guided demos. All enrollment, credit,
-report, power, and connection controls live in each device's fleet row. Consoles
+report, and power controls live in each device's fleet row. Consoles
 are small floating windows: drag their title bar, or focus it and use arrow keys.
 Escape cancels a drag. Hide/Open preserves the window position within the page;
 viewport resizing keeps windows reachable. Positions and command history are
 only UI state, not device checkpoints.
 
-**Disconnect** disables the simulated link without stopping the device. Local
+**Disconnect** in the console title bar disables the simulated link without stopping the device. Local
 commands still work, while issuance, reports, and enrollment messages wait.
 **Connect** resumes pending exchanges. The setting survives reload/reboot and
 stop/start; previously saved devices default to connected.
+
+**Debug: off/on**, next to Hide, toggles protocol debug logging for that device.
+Debug starts off on page load. While off, no new protocol chatter is recorded
+and previously captured debug lines are hidden. Command output and errors stay
+visible. Enabling it shows previously captured lines and records future exchanges;
+it does not trigger message delivery. Debug settings survive hide/reopen and
+stop/start within the page, but are not persisted across reloads.
 
 **Reset browser data** at the top asks for confirmation, then atomically clears
 all saved fleet entries and endpoint checkpoints, including retired external

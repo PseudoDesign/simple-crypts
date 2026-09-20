@@ -97,7 +97,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    await dragPacket(page,pending(page),'#device-panel');assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
    assert.match(await page.locator('#tour-title').textContent(),/Enrollment complete/);
    assert.equal(await page.locator('#chapter-attack').count(),0);
-   assert.match(await page.locator('#tour-text').textContent(),/Corruption.*server time.*expiry/);
+   assert.match(await page.locator('#tour-text').textContent(),/Continue to credits.*retry enrollment.*corrupt.*server time/);
    const enrolledState=await page.locator('#server-details').textContent();
    await page.locator('#advance-time').click();await ready(page);
    assert.equal(await page.locator('#server-details').textContent(),enrolledState);
@@ -105,7 +105,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    await corrupt(saved(page));await dragPacket(page,saved(page),'#device-panel');
    assert.match(await page.locator('#device-result').textContent(),/authentication/);
    await corrupt(saved(page));
-   assert.equal(await page.locator('#next').textContent(),'Continue to credits →');
+   assert.equal(await page.locator('#next').textContent(),'On to credits →');
    await dragPacket(page,saved(page),'#device-panel');assert.match(await page.locator('#device-result').textContent(),/ok \(0\).*no newer state/i);
    // Reflect the saved server confirmation back to the server and surface its actual error.
    await dragPacket(page,saved(page),'#server-panel');assert.match(await page.locator('#server-result').textContent(),/\(-\d+\).*Rejected/);
@@ -132,6 +132,12 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
   assert.equal(await page.locator('#message-log .packet').count(),0);
   await next(page);await dragPacket(page,pending(page),'#device-panel');await next(page);await dragPacket(page,pending(page),'#server-panel');await next(page);await next(page);await dragPacket(page,pending(page),'#device-panel');
   assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
+  assert.equal(await page.locator('#restart-enrollment').textContent(),'Retry enrollment ↺');
+  await page.locator('#restart-enrollment').click();await ready(page);
+  assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
+  assert.equal(await page.locator('#message-log .packet').count(),0);
+  assert.equal(await page.locator('body').getAttribute('data-chapter'),'trust');
+  await generate(page);
   assert.equal((await page.request.get(base+'report/')).status(),200);assert.deepEqual(errors,[]);
   await context.close();
   if(name==='chromium'){
@@ -139,6 +145,9 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    await corrupt(pending(t));await dragPacket(t,pending(t),'#device-panel',true);assert.match(await t.locator('#device-result').textContent(),/\(-3\)/);
    await corrupt(saved(t));await dragPacket(t,saved(t),'#device-panel',true);await next(t);await dragPacket(t,pending(t),'#server-panel',true);await next(t);await next(t);await dragPacket(t,pending(t),'#device-panel',true);
    assert.equal(await t.locator('#device-status').textContent(),'Confirmed');assert(await t.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+   const nextBox=await t.locator('#next').boundingBox(),retryBox=await t.locator('#restart-enrollment').boundingBox();
+   assert(Math.abs(nextBox.y-retryBox.y)<4,'Completion actions should be side by side on touchscreens');
+   await t.screenshot({path:'/tmp/simple-crypts-enrollment-complete.png',fullPage:true});
    await creditFlow(t,true);
    await t.screenshot({path:'/tmp/simple-crypts-touch-log.png',fullPage:true});await touch.close();
   }

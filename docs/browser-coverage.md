@@ -76,3 +76,16 @@ physical touch devices, every viewport, or an unreliable demonstration network.
 A quick check on the actual presentation device remains useful. Storage and
 crypto-provider fault injection, nonce exhaustion, and cross-language behavior
 belong to the separate protocol/conformance tests rather than browser mocks.
+
+## QT Py USB host
+
+The fleet browser target also runs `qtpy_browser_test.mjs` against a production
+Wasm server and the exact native QT Py firmware application simulator. The test
+replaces only Web Serial's port streams. It covers explicit approval, aborted
+host registry persistence before setup, a committed setup with a lost response,
+reload/reconnect, reboot/startup entropy, exact uint64 issuance, foreign-host
+rejection without writes, single-tab ownership, and factory-reset/re-enrollment.
+It also checks a cancelled chooser and unsupported-browser guidance. Node tests
+cover chunked COBS/CRC framing, bounds, negative statuses, unexpected sequences,
+timeouts, disconnects, and mutation non-retry behavior. Actual Windows USB CDC
+and browser chooser behavior still require physical Windows Chrome/Edge testing.

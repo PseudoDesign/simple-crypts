@@ -11,3 +11,14 @@ subprocess.run(
     check=True,
     timeout=240,
 )
+
+subprocess.run(
+    [
+        "/usr/bin/node",
+        "examples/fleet_manager/qtpy_browser_test.mjs",
+        "examples/fleet_manager/site",
+        "examples/embedded/qtpy_rp2040/sim",
+    ],
+    check=True,
+    timeout=240,
+)

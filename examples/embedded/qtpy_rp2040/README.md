@@ -61,6 +61,14 @@ when preserving identity or counters matters. Initial installation replaces any
 existing CircuitPython/application image; it does not preserve that application's
 filesystem or provide a CircuitPython backup.
 
+## Browser host (Windows, macOS, or Linux)
+
+The static site's **QT Py USB** page can register and manage this firmware using
+Web Serial in desktop Chrome or Edge. See the
+[browser workflow](../../fleet_manager/README.md#physical-qt-py-over-web-serial).
+A board enrolled by the Python operator must be factory-reset before moving to
+a new browser host; browser and Python host identities are not interchangeable.
+
 ## Run the demo (Linux host)
 
 The operator and simulator reuse the repository's existing native host build,

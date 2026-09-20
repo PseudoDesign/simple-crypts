@@ -122,3 +122,8 @@ evidence remains a separately attributed historical snapshot.
 Establish Trust ends at confirmation with suggestions to corrupt and replay saved packets or advance server time. Completed enrollment stays valid after time advances; reset the session and delay its response to explore expiration. The Credits chapter reuses a freshly enrolled pair when reached from enrollment, or completes a real local enrollment as setup when opened directly. Only credit packets appear in its message log.
 
 In Credits, + beside server issuance adds 100 and + beside device consumption spends 25. After the exchange, users press + until a debit is rejected, drop a new grant, request a retry, and deliver that retry twice. Dropping calls no receiver and returns no fabricated library error; retries remain pending and duplicates do not add credits. A report and receipt settle the exchange before users can restart the exercise.
+
+The **QT Py USB** navigation link opens
+`examples/fleet_manager/qtpy.html`, a persistent browser host for the physical
+USB demo. See the [hardware browser workflow](../examples/fleet_manager/README.md#physical-qt-py-over-web-serial)
+for enrollment, origin/profile persistence, and required browser support.

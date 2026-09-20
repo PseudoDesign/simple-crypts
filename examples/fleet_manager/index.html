@@ -17,11 +17,13 @@
     <header>
       <div class="section-title">
         <p class="eyebrow">SIMPLE CRYPTS / INTERACTIVE CONSOLE DEMO</p>
-        <button type="button" id="reset" class="secondary">Reset browser data</button>
+        <button type="button" id="reset" class="secondary">Reset simulated devices</button>
       </div>
       <h1>Your fleet, at the console.</h1>
-      <p>Have a physical board? <a href="./qtpy.html">Connect a QT Py over USB</a>.</p>
-      <p>Create devices, manage their connections, and type commands in their consoles.</p>
+      <p>
+        Create simulated devices or register a QT Py over USB, then manage enrollment and credits in
+        the fleet.
+      </p>
       <p class="muted">Saved in this browser. Drag a console by its title bar to move it.</p>
     </header>
     <main>
@@ -41,6 +43,26 @@
           /></label>
           <button type="submit">Create device</button>
         </form>
+        <button type="button" id="register-qtpy" disabled>Register QT Py</button>
+        <p id="qtpy-support" class="muted" role="status">Checking USB support…</p>
+        <details>
+          <summary>Using a physical QT Py</summary>
+          <p>
+            Connect a board running the Simple Crypts demo, choose Register QT Py, then review its
+            identity and approve it in the table. Press BOOT on the board to consume credits;
+            Request report refreshes the balance. USB disconnection does not power off the board.
+          </p>
+          <p>
+            Keep the same browser profile and site address. Registrations from the separate QT Py
+            page appear here automatically. A board enrolled by the Python operator or another host
+            must be factory-reset before registering here; resetting erases its identity and
+            credits.
+          </p>
+          <p>
+            After a reboot, connect USB and request a report to resume. Use Chrome or Edge over
+            HTTPS or localhost. No background polling or automatic factory reset is performed.
+          </p>
+        </details>
         <div class="table-scroll">
           <table>
             <thead>
@@ -62,7 +84,7 @@
         </p>
       </section>
       <section>
-        <h2>Try it</h2>
+        <h2>Try a simulated device</h2>
         <ol>
           <li>
             <strong>Create device</strong>, then <strong>Authorize enrollment</strong> in its fleet
@@ -90,20 +112,22 @@
     </main>
     <div id="consoles" role="group" aria-label="Device console windows"></div>
     <dialog id="reset-dialog" aria-labelledby="reset-title">
-      <h2 id="reset-title">Reset all saved demo data?</h2>
+      <h2 id="reset-title">Reset saved simulated devices?</h2>
       <p>
-        This deletes every saved fleet device, identity, credit balance, and connection setting in
-        this browser, including retired external-device records. This cannot be undone.
+        This deletes simulated device identities, credit balances, and connection settings in this
+        browser, including retired external-device records. This cannot be undone. QT Py host
+        registrations and physical boards are unchanged.
       </p>
       <form method="dialog" class="actions">
         <button type="submit" value="cancel" class="secondary" autofocus>Cancel</button>
-        <button type="submit" id="confirm-reset" value="reset">Delete saved demo data</button>
+        <button type="submit" id="confirm-reset" value="reset">Delete simulated devices</button>
       </form>
     </dialog>
     <template id="row-template">
       <tr class="device-row">
         <td>
           <strong data-field="serial"></strong>
+          <p data-field="kind" class="muted"></p>
           <p data-field="error" class="error" role="alert"></p>
           <button type="button" data-action="open" class="secondary">Open console</button>
         </td>
@@ -111,6 +135,10 @@
           <p data-field="running"></p>
           <button type="button" data-action="power" class="secondary">Start device</button>
           <p data-field="connection"></p>
+          <button type="button" data-action="usb" class="secondary" hidden>Connect USB</button>
+          <button type="button" data-action="inspect" class="secondary" hidden>
+            Inspect device
+          </button>
         </td>
         <td>
           <p data-field="enrollment"></p>
@@ -154,7 +182,7 @@
         </td>
       </tr>
     </template>
-    <footer>Real encrypted messages · C++ device consoles · Browser-local storage</footer>
+    <footer>Real encrypted messages · Simulated and USB devices · Browser-local storage</footer>
     <script type="module" src="./app.mjs"></script>
   </body>
 </html>

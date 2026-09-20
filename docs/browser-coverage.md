@@ -85,6 +85,11 @@ replaces only Web Serial's port streams. It covers explicit approval, aborted
 host registry persistence before setup, a committed setup with a lost response,
 reload/reconnect, reboot/startup entropy, exact uint64 issuance, foreign-host
 rejection without writes, single-tab ownership, and factory-reset/re-enrollment.
+The integrated fleet restores the standalone host identity, registers reset boards
+from its toolbar, approves and issues through shared row controls, and preserves
+hardware registration through simulated-device reset. It checks distinct routing
+for identical simulated/physical serials, disconnected restoration, read-only
+hardware activity, and ownership exclusion across both pages.
 It also checks a cancelled chooser and unsupported-browser guidance. Node tests
 cover chunked COBS/CRC framing, bounds, negative statuses, unexpected sequences,
 timeouts, disconnects, and mutation non-retry behavior. Actual Windows USB CDC

@@ -32,6 +32,7 @@ local socket. They test both chapters in Chromium and Firefox, corruption toggle
 replays and reflections, delayed responses, rejection recovery, bounded history,
 and simulated touch dragging. Screenshots are written to
 `/tmp/simple-crypts-{browser}-{chapter}-log.png` and `/tmp/simple-crypts-touch-log.png`.
+The [browser coverage audit](../docs/browser-coverage.md) lists the checked behaviors, failure diagnostics, and remaining limits. Pages now runs browser acceptance against the exact committed site before deployment.
 The Node/Bazel protocol tests additionally check native C interoperability in
 both roles, byte-identical fixtures, full uint64 revisions, storage failures,
 nonce reservation/reboot, and the production build's absence of test exports.

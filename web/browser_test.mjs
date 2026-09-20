@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-import {readFile} from 'node:fs/promises';
+import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {resolve,extname,sep} from 'node:path';
 import {chromium,firefox} from 'playwright';
 const root=resolve(process.argv[2]||'bazel-bin/web/site');
@@ -8,12 +8,56 @@ const mime={'.html':'text/html','.mjs':'text/javascript','.css':'text/css','.was
 const server=createServer(async(req,res)=>{try{
  let route=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
  if(!route.startsWith('/simple-crypts/')){res.writeHead(404);return res.end();}
- route=route.slice('/simple-crypts/'.length);if(!route||route.endsWith('/'))route+='index.html';
+ route=route.slice('/simple-crypts/'.length);
+ const missingWasm=route.startsWith('missing-wasm/');if(missingWasm)route=route.slice('missing-wasm/'.length);
+ if(missingWasm&&route.endsWith('.wasm')){res.writeHead(503);return res.end('Wasm unavailable');}
+ if(!route||route.endsWith('/'))route+='index.html';
  const file=resolve(root,route);if(!file.startsWith(root+sep))throw new Error('Invalid path');
  res.setHeader('Content-Type',mime[extname(file)]||'text/plain');res.end(await readFile(file));
 }catch{res.writeHead(404);res.end('Not found');}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}/simple-crypts/`;
-async function ready(page){await page.waitForFunction(()=>document.body.dataset.ready==='true'&&document.body.dataset.busy==='false');}
+const artifacts=resolve(process.env.TEST_UNDECLARED_OUTPUTS_DIR||process.env.BROWSER_ARTIFACTS_DIR||'/tmp/simple-crypts-browser-artifacts');
+await mkdir(artifacts,{recursive:true});
+const contexts=new Map();let contextNumber=0;
+async function monitoredContext(browser,options={},expectedFailure=false){
+ const context=await browser.newContext(options),record={name:`${browser.browserType().name()}-${++contextNumber}`,issues:[],expectedFailure};
+ contexts.set(context,record);await context.tracing.start({screenshots:true,snapshots:true,sources:true});
+ context.on('page',page=>{
+  page.setDefaultTimeout(12000);
+  page.on('pageerror',error=>record.issues.push(`pageerror: ${error.message}`));
+  page.on('console',message=>{if(message.type()==='error'&&!message.location().url.endsWith('/favicon.ico'))record.issues.push(`console: ${message.text()}`);});
+ });
+ context.on('requestfailed',request=>{if(!/ABORTED|NS_BINDING_ABORTED/.test(request.failure()?.errorText??''))record.issues.push(`request: ${request.url()} ${request.failure()?.errorText}`);});
+ context.on('response',response=>{if(response.status()>=400&&!response.url().endsWith('/favicon.ico'))record.issues.push(`HTTP ${response.status()}: ${response.url()}`);});
+ return context;
+}
+async function closeContext(context){
+ const record=contexts.get(context);
+ if(!record.expectedFailure)assert.deepEqual(record.issues,[],record.name+' background errors');
+ await context.tracing.stop({path:resolve(artifacts,record.name+'.zip')});
+ await writeFile(resolve(artifacts,record.name+'.json'),JSON.stringify(record,null,2));
+ contexts.delete(context);await context.close();
+}
+async function captureFailure(error){
+ for(const [context,record] of contexts){
+  for(const [index,page] of context.pages().entries()){
+   const stem=resolve(artifacts,`${record.name}-failure-${index}`);
+   await page.screenshot({path:stem+'.png',fullPage:true}).catch(()=>{});
+   await writeFile(stem+'.html',await page.content().catch(()=>''));
+  }
+  await writeFile(resolve(artifacts,record.name+'-failure.json'),JSON.stringify({...record,error:error.stack},null,2));
+  await context.tracing.stop({path:resolve(artifacts,record.name+'-failure.zip')}).catch(()=>{});
+ }
+}
+async function ready(page){
+ await page.waitForFunction(()=>document.body.dataset.ready==='true'&&document.body.dataset.busy==='false');
+ assert(await page.locator('#error').isHidden(),await page.locator('#error').textContent());
+ const record=contexts.get(page.context());if(record&&!record.expectedFailure)assert.deepEqual(record.issues,[],record.name+' background errors');
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Unexpected horizontal scrolling');
+}
+async function state(page,role){return Object.fromEntries((await page.locator('#'+role+'-details').textContent()).split('\n').filter(Boolean).map(line=>{const at=line.indexOf(':');return [line.slice(0,at),line.slice(at+1).trim()];}));}
+async function assertNext(page,label){assert.equal(await page.locator('#next').textContent(),label);assert(await page.locator('#next').isEnabled());}
+
 async function next(page){await page.locator('#next').click();await ready(page);}
 const pending=page=>page.locator('#message-log .packet[data-pending="true"]').first();
 const saved=page=>page.locator('#message-log .packet[data-pending="false"]').first();
@@ -55,18 +99,19 @@ async function creditFlow(page,touch=false){
  assert.equal(await page.locator('#message-log .packet').count(),0);
  assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
  assert(await page.locator('#next').isHidden());
- await page.locator('#add-credit').click();await ready(page);const grantId=await pending(page).getAttribute('data-packet');
+ assert(await page.locator('#add-credit').isEnabled());assert(await page.locator('#consume-credit').isDisabled());
+ await page.locator('#add-credit').click();await ready(page);assert(await page.locator('#add-credit').isDisabled());const grantId=await pending(page).getAttribute('data-packet');
  await dragPacket(page,pending(page),'#device-panel',touch);assert.equal(await page.locator('#device-issued').textContent(),'100');
  const grant=page.locator(`[data-packet="-${grantId}"]`);
  await dragPacket(page,grant,'#device-panel',touch);assert.equal(await page.locator('#device-issued').textContent(),'100');
- await next(page);await dragPacket(page,pending(page),'#server-panel',touch);assert.equal(await page.locator('#server-consumed').textContent(),'0');
- await next(page);assert.match(await pending(page).textContent(),/Receipt for request/);assert(!/Credits consumed/.test(await pending(page).textContent()));await dragPacket(page,pending(page),'#device-panel',touch);
+ await assertNext(page,'Create status report →');await next(page);await dragPacket(page,pending(page),'#server-panel',touch);assert.equal(await page.locator('#server-consumed').textContent(),'0');
+ await assertNext(page,'Create receipt →');await next(page);assert.match(await pending(page).textContent(),/Receipt for request/);assert(!/Credits consumed/.test(await pending(page).textContent()));await dragPacket(page,pending(page),'#device-panel',touch);
  assert(await page.locator('#next').isHidden());
  await page.locator('#consume-credit').click();await ready(page);assert.equal(await pending(page).count(),0);assert.equal(await page.locator('#device-consumed').textContent(),'25');assert.equal(await page.locator('#server-consumed').textContent(),'0');
- await next(page);await dragPacket(page,pending(page),'#device-panel',touch);
- await next(page);await corrupt(pending(page));await dragPacket(page,pending(page),'#server-panel',touch);assert.match(await page.locator('#server-result').textContent(),/authentication/);assert.equal(await page.locator('#server-consumed').textContent(),'0');
+ await assertNext(page,'Request current status →');await next(page);await dragPacket(page,pending(page),'#device-panel',touch);
+ await assertNext(page,'Create status report →');await next(page);await corrupt(pending(page));await dragPacket(page,pending(page),'#server-panel',touch);assert.match(await page.locator('#server-result').textContent(),/authentication/);assert.equal(await page.locator('#server-consumed').textContent(),'0');
  await corrupt(saved(page));await dragPacket(page,saved(page),'#server-panel',touch);assert.equal(await page.locator('#server-consumed').textContent(),'25');
- await next(page);await dragPacket(page,pending(page),'#device-panel',touch);assert.match(await page.locator('#tour-title').textContent(),/Credit exchange complete/);
+ await assertNext(page,'Create receipt →');await next(page);await dragPacket(page,pending(page),'#device-panel',touch);assert.equal((await state(page,'device')).pending,'false');assert.equal((await state(page,'server')).pending,'false');assert.match(await page.locator('#tour-title').textContent(),/Credit exchange complete/);
 }
 async function errorFlow(page,touch=false){
  if(!touch){
@@ -99,6 +144,8 @@ async function errorFlow(page,touch=false){
  await next(page);
  const grantTotal=(BigInt(issued)+100n).toString();
  assert.match(await page.locator('#tour-title').textContent(),/Drop this credit packet/);
+ const droppedWire=await pending(page).locator('pre').textContent();
+ const requestId=(await state(page,'server')).request_id;assert.equal((await state(page,'server')).pending,'true');
  const deviceBefore=await page.locator('#device-details').textContent();
  const serverBefore=await page.locator('#server-details').textContent();
  await pending(page).locator('[data-action="drop"]').click();await ready(page);
@@ -106,7 +153,7 @@ async function errorFlow(page,touch=false){
  assert.equal(await page.locator('#server-details').textContent(),serverBefore);
  assert.match(await page.locator('#tour-text').textContent(),/no receive error/);
  assert.equal(await pending(page).count(),0);
- await next(page);await dragPacket(page,pending(page),'#device-panel',touch);
+ await next(page);assert.notEqual(await pending(page).locator('pre').textContent(),droppedWire,'Retry must use a fresh nonce');assert.equal((await state(page,'server')).request_id,requestId);await dragPacket(page,pending(page),'#device-panel',touch);
  assert.equal(await page.locator('#device-issued').textContent(),grantTotal);
  assert.match(await page.locator('#tour-title').textContent(),/again/);
  await dragPacket(page,saved(page),'#device-panel',touch);
@@ -115,18 +162,62 @@ async function errorFlow(page,touch=false){
  await next(page);await dragPacket(page,pending(page),'#server-panel',touch);
  assert.equal(await page.locator('#server-consumed').textContent(),consumed.toString());
  await next(page);await dragPacket(page,pending(page),'#device-panel',touch);
+ assert.equal((await state(page,'device')).pending,'false');assert.equal((await state(page,'server')).pending,'false');
  assert.match(await page.locator('#tour-title').textContent(),/Exercise complete/);
  assert.equal(await page.locator('#chapter-sandbox').count(),0);
  assert.equal(await page.locator('#next').textContent(),'Restart credits ↺');
  assert.equal(await page.locator('#device-consumed').textContent(),consumed.toString());
 }
 
+async function cancelledDrag(page,touch=false){
+ const before=await page.locator('#message-log').textContent(),device=await state(page,'device'),server=await state(page,'server');
+ const box=await pending(page).locator('[data-select]').boundingBox();
+ const a={x:box.x+box.width/2,y:box.y+20},b={x:a.x+20,y:a.y-20};
+ if(touch){
+  const cdp=await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[a]});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[b]});
+  assert(await page.locator('.touch-packet').isVisible());
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});await cdp.detach();
+ }else{
+  await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:4});
+  assert(await page.locator('.touch-packet').isVisible());await page.keyboard.press('Escape');await page.mouse.up();
+ }
+ await ready(page);assert.equal(await page.locator('.touch-packet,.drag-over').count(),0);
+ assert.equal(await page.locator('#message-log').textContent(),before);assert.deepEqual(await state(page,'device'),device);assert.deepEqual(await state(page,'server'),server);
+ // A tap/click is not a delivery either.
+ await pending(page).locator('[data-select]').click();await ready(page);assert.equal(await pending(page).count(),1);
+}
+async function lifecycle(page,touch=false){
+ assert.deepEqual(await page.locator('.chapter-banner a').allTextContents(),['1 · Establish trust','2 · Credits']);
+ assert(await page.locator('#add-credit').isHidden());assert(await page.locator('#consume-credit').isHidden());
+ await generate(page);await cancelledDrag(page,touch);
+ // The message details are visible on the actual draggable box.
+ assert.match(await pending(page).textContent(),/Serial: mcu-0001/);assert.match(await pending(page).textContent(),/Expires: .*UTC/);
+ const key=await page.locator('#server-public-key').textContent();
+ await page.locator('#reset').click();await ready(page);
+ assert.notEqual(await page.locator('#server-public-key').textContent(),key);assert.equal(await page.locator('#message-log .packet').count(),0);
+ // A clean enrollment without corruptions or replays, including explicit approval.
+ await generate(page);await dragPacket(page,pending(page),'#device-panel',touch);await next(page);await dragPacket(page,pending(page),'#server-panel',touch);
+ assert.equal((await state(page,'server')).registered,'false');assert.equal((await state(page,'device')).registered,'false');
+ await assertNext(page,'Approve this serial + key →');await next(page);
+ assert.equal((await state(page,'server')).registered,'true');assert.equal((await state(page,'device')).registered,'false');
+ await assertNext(page,'Create confirmation →');await next(page);await dragPacket(page,pending(page),'#device-panel',touch);
+ assert.equal((await state(page,'device')).registered,'true');
+ // Switching chapter discards pending work; reload starts fresh enrollment.
+ await page.locator('#chapter-credits').click();await ready(page);await page.locator('#add-credit').click();await ready(page);
+ await page.locator('#chapter-trust').click();await ready(page);assert.equal(await page.locator('#message-log .packet').count(),0);
+ assert.equal(await page.locator('#device-public-key').textContent(),'Not generated yet');
+ await page.reload();await ready(page);assert.equal(await page.locator('body').getAttribute('data-chapter'),'trust');
+ console.log('PASS lifecycle',touch?'touch':'mouse',': cancellation, clean enrollment, reset, chapter switch, reload');
+}
+
 try{
 for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
  const browser=await type.launch({headless:true});
  try{
-  const context=await browser.newContext({viewport:{width:1366,height:768},reducedMotion:'reduce'}),page=await context.newPage(),errors=[];
-  page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await ready(page);
+  const context=await monitoredContext(browser,{viewport:{width:1366,height:768},reducedMotion:'reduce'}),page=await context.newPage(),errors=[];
+  page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await ready(page);await lifecycle(page);
   for(const chapter of ['trust']){
    assert(await page.locator('#message-log').isVisible());assert.equal(await page.locator('#drop-target').count(),0);assert.equal(await page.locator('.inbox,#deliver,.show-tip').count(),0);
    await page.locator('#hide-tip').click();await page.locator('#chapter-'+chapter).click();assert(await page.locator('#guide-popup').isVisible());
@@ -194,9 +285,9 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
   assert.equal(await page.locator('body').getAttribute('data-chapter'),'trust');
   await generate(page);
   assert.equal((await page.request.get(base+'report/')).status(),200);assert.deepEqual(errors,[]);
-  await context.close();
+  await closeContext(context);
   if(name==='chromium'){
-   const touch=await browser.newContext({viewport:{width:390,height:844},hasTouch:true}),t=await touch.newPage();await t.goto(base);await ready(t);await generate(t);
+   const touch=await monitoredContext(browser,{viewport:{width:390,height:844},hasTouch:true}),t=await touch.newPage();await t.goto(base);await ready(t);await lifecycle(t,true);await generate(t);
    await corrupt(pending(t));await dragPacket(t,pending(t),'#device-panel',true);assert.match(await t.locator('#device-result').textContent(),/\(-3\)/);
    await corrupt(saved(t));await dragPacket(t,saved(t),'#device-panel',true);await next(t);await dragPacket(t,pending(t),'#server-panel',true);await next(t);await next(t);await dragPacket(t,pending(t),'#device-panel',true);
    assert.equal(await t.locator('#device-status').textContent(),'Confirmed');assert(await t.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
@@ -204,10 +295,23 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    assert(Math.abs(nextBox.y-retryBox.y)<4,'Completion actions should be side by side on touchscreens');
    await t.screenshot({path:'/tmp/simple-crypts-enrollment-complete.png',fullPage:true});
    await creditFlow(t,true);await errorFlow(t,true);
-   await t.screenshot({path:'/tmp/simple-crypts-touch-log.png',fullPage:true});await touch.close();
+   await t.screenshot({path:'/tmp/simple-crypts-touch-log.png',fullPage:true});await closeContext(touch);
   }
-  const unavailable=await browser.newContext();await unavailable.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const p=await unavailable.newPage();await p.goto(base);await p.locator('#error').waitFor({state:'visible'});assert.match(await p.locator('#error').textContent(),/randomness/);await unavailable.close();
+  const unavailable=await monitoredContext(browser,{},true);await unavailable.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const p=await unavailable.newPage();await p.goto(base);await p.locator('#error').waitFor({state:'visible'});assert.match(await p.locator('#error').textContent(),/randomness/);await closeContext(unavailable);
+  const loading=await monitoredContext(browser);let releaseLoad;
+  const loadGate=new Promise(resolve=>{releaseLoad=resolve;});
+  await loading.route('**/endpoint.wasm.wasm*',async route=>{await loadGate;await route.continue();});
+  const loadingPage=await loading.newPage();await loadingPage.goto(base);
+  await loadingPage.waitForFunction(()=>document.body.dataset.busy==='true');
+  assert(await loadingPage.locator('#next').isDisabled());
+  assert.equal(await loadingPage.locator('#chapter-credits').getAttribute('aria-disabled'),'true');
+  const disabledLink=await loadingPage.locator('#chapter-credits').boundingBox();await loadingPage.mouse.click(disabledLink.x+disabledLink.width/2,disabledLink.y+disabledLink.height/2);assert.equal(await loadingPage.locator('body').getAttribute('data-chapter'),'trust');
+  releaseLoad();await ready(loadingPage);await generate(loadingPage);await closeContext(loading);
+  // Fail on the HTTP server too: Firefox may recover routed fetch failures via sync XHR.
+  const broken=await monitoredContext(browser,{},true);
+  const brokenPage=await broken.newPage();await brokenPage.goto(base+'missing-wasm/');await brokenPage.locator('#error').waitFor({state:'visible'});
+  assert.match(await brokenPage.locator('#error').textContent(),/runtime failed|load|fetch|wasm|WebAssembly|Aborted/i);assert(await brokenPage.locator('#next').isDisabled());await closeContext(broken);
   console.log(`PASS ${name}: common log, reversible corruption, direct replay, real result codes, challenge before keygen, rejection recovery, expiry, bounded history`);
- }finally{await browser.close();}
+ }catch(error){await captureFailure(error);throw error;}finally{await browser.close();}
 }
 }finally{server.close();}

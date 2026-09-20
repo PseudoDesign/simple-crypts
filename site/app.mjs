@@ -1,6 +1,6 @@
-import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=6d550667e48da10bb61f';
-import {resources} from './resources.mjs?v=6d550667e48da10bb61f';
-import {hex} from './endpoint.mjs?v=6d550667e48da10bb61f';
+import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=e574c95ce10839c1155f';
+import {resources} from './resources.mjs?v=e574c95ce10839c1155f';
+import {hex} from './endpoint.mjs?v=e574c95ce10839c1155f';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
 let expected=null,completed=false,original=null,setup=0,chapter='trust',consumedLocally=false;
@@ -171,7 +171,10 @@ function render(){
       const outbox=$(role+'-outbox');
       outbox.replaceChildren();
       const pending=lab.queue.filter(packet=>packet.from===role);
-      outbox.parentElement.hidden=pending.length===0;
+      if(!pending.length){
+        const empty=document.createElement('p');empty.className='outbox-empty';
+        empty.textContent='No pending message';outbox.append(empty);
+      }
       for(const packet of pending)outbox.append(card(packet));
     }
     if(!lab.archive.length){

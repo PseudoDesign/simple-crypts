@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import shutil
+import stat
 import sys
 import tempfile
 from pathlib import Path
@@ -145,9 +146,19 @@ def verify(root, require_commit=True):
 def copy_api(api, root):
     """Replace the generated subtree so removed declarations leave no stale pages."""
     destination = Path(root) / "api"
+
+    def writable_directories():
+        # Bazel tree artifacts have read-only directories. copytree preserves
+        # directory modes even with copyfile, so normalize this generated copy.
+        for directory in [destination, *destination.rglob("*")]:
+            if directory.is_dir():
+                directory.chmod(directory.stat().st_mode | stat.S_IWUSR)
+
     if destination.exists():
+        writable_directories()
         shutil.rmtree(destination)
     shutil.copytree(Path(api) / "html", destination, copy_function=shutil.copyfile)
+    writable_directories()
 
 
 def assemble(

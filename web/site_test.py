@@ -39,6 +39,25 @@ class SiteTest(unittest.TestCase):
             self.assertFalse((root / "api/obsolete.html").exists())
             self.assertEqual((root / "api/index.html").read_text(), "new")
 
+    def test_api_replacement_accepts_readonly_bazel_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "site"
+            api = Path(tmp) / "generated"
+            (root / "api/search").mkdir(parents=True)
+            (api / "html/search").mkdir(parents=True)
+            (root / "api/search/stale.js").write_text("old")
+            (api / "html/search/search.js").write_text("new")
+            for path in (root / "api/search", root / "api", api / "html/search", api / "html"):
+                path.chmod(0o555)
+            try:
+                site.copy_api(api, root)
+                site.copy_api(api, root)
+                self.assertFalse((root / "api/search/stale.js").exists())
+                self.assertEqual((root / "api/search/search.js").read_text(), "new")
+            finally:
+                for path in (root / "api", root / "api/search", api / "html", api / "html/search"):
+                    path.chmod(0o755)
+
     def test_api_inventory(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "site"

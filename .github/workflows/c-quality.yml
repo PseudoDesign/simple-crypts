@@ -17,8 +17,6 @@ jobs:
   quality:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    env:
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -39,7 +37,9 @@ jobs:
       - name: Bootstrap pinned SDKs
         run: python3 tools/bootstrap.py
       - name: Install pinned browser and quality tools
-        run: npm ci --prefix web --ignore-scripts --no-audit --no-fund
+        run: |
+          npm ci --prefix web --ignore-scripts --no-audit --no-fund
+          echo "PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/playwright" >> "$GITHUB_ENV"
       - name: Install browser engines and system libraries
         run: web/node_modules/.bin/playwright install --with-deps chromium firefox
       - name: Enforce quality and run regressions

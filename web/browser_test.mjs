@@ -115,34 +115,10 @@ async function errorFlow(page,touch=false){
  await next(page);await dragPacket(page,pending(page),'#server-panel',touch);
  assert.equal(await page.locator('#server-consumed').textContent(),consumed.toString());
  await next(page);await dragPacket(page,pending(page),'#device-panel',touch);
- assert.match(await page.locator('#tour-title').textContent(),/Ready to experiment/);
- assert(await page.locator('#restart-enrollment').isVisible());
- assert.equal(await page.locator('#next').textContent(),'Open sandbox →');
+ assert.match(await page.locator('#tour-title').textContent(),/Exercise complete/);
+ assert.equal(await page.locator('#chapter-sandbox').count(),0);
+ assert.equal(await page.locator('#next').textContent(),'Restart credits ↺');
  assert.equal(await page.locator('#device-consumed').textContent(),consumed.toString());
-}
-async function sandboxFlow(page,touch=false){
- const identity=await page.locator('#device-public-key').textContent();
- const consumed=BigInt(await page.locator('#device-consumed').textContent());
- await next(page);assert.equal(await page.locator('body').getAttribute('data-chapter'),'sandbox');
- assert.equal(await page.locator('#device-public-key').textContent(),identity);
- await page.locator('#consume-credit').click();await ready(page);
- assert.equal(await page.locator('#device-consumed').textContent(),(consumed+25n).toString());
- assert.equal(await page.locator('#server-consumed').textContent(),consumed.toString());
- await page.locator('#sandbox-request').click();await ready(page);
- await pending(page).locator('[data-action="drop"]').click();await ready(page);
- await page.locator('#sandbox-server-send').click();await ready(page);await dragPacket(page,pending(page),'#device-panel',touch);
- await page.locator('#sandbox-device-send').click();await ready(page);await dragPacket(page,pending(page),'#server-panel',touch);
- assert.equal(await page.locator('#server-consumed').textContent(),(consumed+25n).toString());
- await page.locator('#sandbox-server-send').click();await ready(page);await dragPacket(page,pending(page),'#device-panel',touch);
- await corrupt(saved(page));await dragPacket(page,saved(page),'#device-panel',touch);assert.match(await page.locator('#device-result').textContent(),/authentication/);
- await page.locator('#restart-enrollment').click();await ready(page);
- assert.equal(await page.locator('body').getAttribute('data-chapter'),'sandbox');
- assert.equal(await page.locator('#device-issued').textContent(),'0');
- assert.equal(await page.locator('#message-log .packet').count(),0);
- await page.locator('#chapter-trust').click();await ready(page);
- await page.locator('#chapter-sandbox').click();await ready(page);
- assert.equal(await page.locator('#device-status').textContent(),'Confirmed');
-
 }
 
 try{
@@ -188,14 +164,14 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    await dragPacket(page,saved(page),'#device-panel');assert.match(await page.locator('#device-result').textContent(),/ok \(0\).*no newer state/i);
    // Reflect the saved server confirmation back to the server and surface its actual error.
    await dragPacket(page,saved(page),'#server-panel');assert.match(await page.locator('#server-result').textContent(),/\(-\d+\).*Rejected/);
-   await creditFlow(page);await errorFlow(page);await sandboxFlow(page);
+   await creditFlow(page);await errorFlow(page);
    await page.screenshot({path:`/tmp/simple-crypts-${name}-${chapter}-log.png`,fullPage:true});console.log('PASS',name,chapter,'log workflow');
   }
   // Credits is independently accessible, with actual enrollment completed as setup.
   await page.locator('#chapter-trust').click();await ready(page);
   await page.locator('#chapter-credits').click();await ready(page);
   await creditFlow(page);await errorFlow(page);
-  await page.locator('#restart-enrollment').click();await ready(page);assert.equal(await page.locator('#device-issued').textContent(),'0');
+  await next(page);assert.equal(await page.locator('#device-issued').textContent(),'0');
   assert.equal(await page.locator('#message-log .packet').count(),0);
   await page.locator('#chapter-trust').click();await ready(page);
   // Advancing simulated server time alone does not call receive. A later response fails expiry.
@@ -227,7 +203,7 @@ for(const [name,type]of [['chromium',chromium],['firefox',firefox]]){
    const nextBox=await t.locator('#next').boundingBox(),retryBox=await t.locator('#restart-enrollment').boundingBox();
    assert(Math.abs(nextBox.y-retryBox.y)<4,'Completion actions should be side by side on touchscreens');
    await t.screenshot({path:'/tmp/simple-crypts-enrollment-complete.png',fullPage:true});
-   await creditFlow(t,true);await errorFlow(t,true);await sandboxFlow(t,true);
+   await creditFlow(t,true);await errorFlow(t,true);
    await t.screenshot({path:'/tmp/simple-crypts-touch-log.png',fullPage:true});await touch.close();
   }
   const unavailable=await browser.newContext();await unavailable.addInitScript(()=>Object.defineProperty(globalThis,'crypto',{value:undefined}));const p=await unavailable.newPage();await p.goto(base);await p.locator('#error').waitFor({state:'visible'});assert.match(await p.locator('#error').textContent(),/randomness/);await unavailable.close();

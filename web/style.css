@@ -249,5 +249,3 @@ body[data-mode="tour"] .identity-card .public-key{font-size:9px}
 
 .credit-value{display:flex;align-items:center;justify-content:space-between;gap:6px}
 .credit-plus{font-size:20px;line-height:1;width:36px;min-height:36px;padding:5px;border-color:var(--green);color:var(--green);flex-shrink:0}
-
-.sandbox-controls{display:flex;flex-wrap:wrap;gap:4px}.sandbox-controls button{font-size:10px;padding:6px}.sandbox-controls[hidden]{display:none}

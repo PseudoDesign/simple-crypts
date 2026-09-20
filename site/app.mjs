@@ -1,9 +1,9 @@
-import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=fa4270edf7b740719aca';
-import {resources} from './resources.mjs?v=fa4270edf7b740719aca';
-import {hex} from './endpoint.mjs?v=fa4270edf7b740719aca';
+import {Lab,tour,DEVICE_SERIAL} from './lab.mjs?v=2c7af89c2e7578a17961';
+import {resources} from './resources.mjs?v=2c7af89c2e7578a17961';
+import {hex} from './endpoint.mjs?v=2c7af89c2e7578a17961';
 const $=id=>document.getElementById(id);
 let busy=false,mode='tour',step=-1,operation=0,queueKey='',archiveKey='',selected=null,dragged=null;
-let expected=null,completed=false,original=null,setup=0,chapter='trust',attackChapter=false,consumedLocally=false;
+let expected=null,completed=false,original=null,setup=0,chapter='trust',consumedLocally=false;
 const lab=new Lab(render);
 const logCorruption=new Map();
 function packetView(id){
@@ -112,14 +112,14 @@ async function prepareChapter(){
 }
 async function startChapter(name){
   if(busy)return;
-  cancelTouch();chapter=name;attackChapter=name==='attack';mode='tour';intro();
+  cancelTouch();chapter=name;mode='tour';intro();
   await run(prepareChapter);
 }
-for(const name of ['trust','attack','credits'])$('chapter-'+name).onclick=e=>{
+for(const name of ['trust','credits'])$('chapter-'+name).onclick=e=>{
   e.preventDefault();if(busy)return;if(chapter===name){showTip();return;}startChapter(name);
 };
 function render(){
-  for(const name of ['trust','attack','credits']){const link=$('chapter-'+name);if(name===chapter)link.setAttribute('aria-current','step');else link.removeAttribute('aria-current');link.setAttribute('aria-disabled',String(busy));}
+  for(const name of ['trust','credits']){const link=$('chapter-'+name);if(name===chapter)link.setAttribute('aria-current','step');else link.removeAttribute('aria-current');link.setAttribute('aria-disabled',String(busy));}
   document.body.dataset.chapter=chapter;
   document.body.dataset.mode=mode;
   document.body.dataset.phase=step<0?'intro':completed?'complete':'deliver';
@@ -169,10 +169,10 @@ function render(){
   for(const el of document.querySelectorAll('[data-select]')){el.querySelector('.packet-title').textContent=`⠿ #${Math.abs(Number(el.dataset.select))} · ${packetView(Number(el.dataset.select)).from==='device'?'Device → Server':'Server → Device'}`;el.draggable=!locked;el.setAttribute('aria-disabled',String(locked));el.tabIndex=locked?-1:0;el.closest('.packet').classList.toggle('selected',Number(el.dataset.select)===selected);el.closest('.packet').classList.toggle('tour-message',mode==='tour'&&!completed&&Number(el.closest('.packet').dataset.origin)===expected);}
   for(const zone of document.querySelectorAll('[data-destination]')){zone.disabled=locked;zone.dataset.dropEnabled=String(!locked);zone.classList.toggle('suggested',step>=0&&!completed&&zone.dataset.destination===tour[step].target);zone.setAttribute('aria-describedby','move-hint');}
   $('restart-enrollment').disabled=locked;
-  $('advance-time').disabled=locked||!lab.states.server||lab.states.server.enrollment_expires==='0';
+  $('advance-time').disabled=locked||!lab.states.server;
   $('begin-enrollment').disabled=locked||mode!=='sandbox'||!!lab.states.server?.registered;
   $('approve-enrollment').disabled=locked||mode!=='sandbox'||!lab.states.server||lab.states.server.candidate_revision==='0';
-  $('packet-inspector').hidden=attackChapter||mode!=='tour'||step<0;
+  $('packet-inspector').hidden=mode!=='tour'||step<0;
   $('experiment-tools').hidden=true;
   $('next').hidden=mode==='tour'&&step>=0&&!completed;
   $('next').disabled=locked||(mode==='tour'&&step>=0&&!completed);
@@ -181,7 +181,7 @@ function render(){
   positionTip();
   text('session-status',!lab.ready?'Initializing local endpoints…':busy?'Running the library…':mode==='sandbox'?'Sandbox · every message may be tried against either endpoint.':step<0?'Start the tour to generate the first message.':completed?'Action complete · continue when you are ready.':'Your turn · move the highlighted message.');
 }
-function intro(){logCorruption.clear();rejectionRole=null;$('restart-enrollment').hidden=true;text('clock-result','Expiration is checked when a response arrives.');for(const role of ['device','server'])$(role+'-result').hidden=true;showTip();$('packet-inspector').open=false;$('experiment-tools').open=false;setup=0;consumedLocally=false;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress',chapter==='credits'?'CREDITS · START':'STEP 1 OF 5');text('tour-title',chapter==='credits'?'Share credits between enrolled endpoints.':'Authorize an enrollment session.');text('tour-text',chapter==='credits'?'Enrollment is already complete. The server issues credits; the device consumes them locally and reports only when asked.':attackChapter?'Try disrupting enrollment. You control delivery and bytes, but cannot sign as either endpoint.':'The server signs a challenge for this device’s unique ID. The device already knows the server’s public key.');text('next',chapter==='credits'?'Issue 100 credits →':'Authorize session & create challenge →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An endpoint receives only when you drop a message onto it.');$('result-changes').replaceChildren();}
+function intro(){logCorruption.clear();rejectionRole=null;$('restart-enrollment').hidden=true;text('clock-result','Expiration is checked when a response arrives.');for(const role of ['device','server'])$(role+'-result').hidden=true;showTip();$('packet-inspector').open=false;$('experiment-tools').open=false;setup=0;consumedLocally=false;step=-1;completed=false;expected=null;original=null;selected=null;dragged=null;hint();text('tour-progress',chapter==='credits'?'CREDITS · START':'STEP 1 OF 5');text('tour-title',chapter==='credits'?'Share credits between enrolled endpoints.':'Authorize an enrollment session.');text('tour-text',chapter==='credits'?'Enrollment is already complete. The server issues credits; the device consumes them locally and reports only when asked.':'The server signs a challenge for this device’s unique ID. The device already knows the server’s public key.');text('next',chapter==='credits'?'Issue 100 credits →':'Authorize session & create challenge →');$('progress-fill').style.width='0%';text('result-title','No message has been delivered.');text('result-text','An endpoint receives only when you drop a message onto it.');$('result-changes').replaceChildren();}
 async function run(fn){if(busy)return;const id=++operation;busy=true;$('error').hidden=true;render();try{await fn();}catch(error){if(id===operation&&error.name!=='AbortError'){text('error',error.message);$('error').hidden=false;}}finally{if(id===operation){busy=false;render();}}}
 async function place(id,target){
   if(id<0)id=lab.replay(packetView(id));
@@ -211,7 +211,7 @@ $('restart-enrollment').onclick=()=>run(async()=>{
 });
 $('reset').onclick=()=>startChapter(chapter);
 $('next').onclick=()=>run(async()=>{
-  if(mode==='sandbox'||step===chapterEnd()){mode='tour';chapter='credits';attackChapter=false;await prepareChapter();return;}
+  if(mode==='sandbox'||step===chapterEnd()){mode='tour';chapter='credits';await prepareChapter();return;}
 
   if(step===1&&completed&&!lab.states.server.registered){await lab.approveEnrollment();text('tour-progress','STEP 4 OF 5');text('tour-title','The server approved this identity.');text('tour-text','Approval binds the serial and key and consumes the enrollment session.');text('next','Create confirmation →');$('progress-fill').style.width='80%';return;}
   if(step===5&&completed&&!consumedLocally){await lab.update('device','consume',{amount:'25'});consumedLocally=true;text('tour-title','25 credits consumed locally.');text('tour-text','The device saved its consumption. No packet was created: the server still sees its last report of 0.');text('next','Request current status →');return;}
@@ -226,9 +226,9 @@ $('next').onclick=()=>run(async()=>{
   $('packet-fields').replaceChildren();for(const [name,value]of fields){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;dd.textContent=value;$('packet-fields').append(dt,dd);}
   text('packet-wire',`Sender public key: ${sender.public_key}\nRecipient public key: ${(lab.states[original.to]?.public_key??'Not generated yet')}\n\nActual wire frame:\n${hex(original.bytes).match(/.{1,48}/g).join('\n')}`);
   $('enrollment-packet').querySelector('details').open=false;
-  text('tour-progress',step<3?`ENROLLMENT · ${step+1} OF 3`:`CREDITS · ${step-2} OF 6`);text('tour-title',tour[step].title);text('tour-text',attackChapter&&step<3?['Corrupt or replay the signed challenge. The device must verify who is asking before answering.','Duplicate, corrupt, or misdeliver this response. A valid response still requires trusted approval.','Withhold confirmation: the server has enrolled the device, but the device does not know yet.'][step]:tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
+  text('tour-progress',step<3?`ENROLLMENT · ${step+1} OF 3`:`CREDITS · ${step-2} OF 6`);text('tour-title',tour[step].title);text('tour-text',tour[step].text);text('step-code',tour[step].code);text('next','Continue →');
 });
-$('advance-time').onclick=()=>run(()=>{lab.time+=601;lab.event('Simulated server clock advanced by 601 seconds; no packet was delivered.');text('clock-result','Server time advanced. Replay an enrollment response to test the expired session.');});
+$('advance-time').onclick=()=>run(()=>{lab.time+=601;lab.event('Simulated server clock advanced by 601 seconds; no packet was delivered.');text('clock-result',lab.states.server.registered?'Server time advanced. Completed enrollment stays valid; drag a saved packet to see the response.':'Server time advanced. Replay an enrollment response to test the expired session.');});
 $('begin-enrollment').onclick=()=>run(()=>lab.beginEnrollment());
 $('approve-enrollment').onclick=()=>run(()=>lab.approveEnrollment());
 $('retry').onclick=()=>run(()=>{const id=lab.replay(original);lab.move(id,original.from+'-outbox');});

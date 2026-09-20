@@ -1,4 +1,4 @@
-import {hex} from './endpoint.mjs?v=fa4270edf7b740719aca';
+import {hex} from './endpoint.mjs?v=2c7af89c2e7578a17961';
 export const MAX_QUEUE=64, MAX_EVENTS=200;
 // The demo device has a fixed serial before it generates keys or enrolls.
 export const DEVICE_SERIAL='mcu-0001';
@@ -23,7 +23,7 @@ export class Lab {
       // Compatibility slot only: signed enrollment uses no shared enrollment secret.
       const secret='00'.repeat(32);
       for(const role of ['device','server']){
-        const worker=this.workerFactory(new URL('./worker.mjs?v=fa4270edf7b740719aca',import.meta.url));this.workers[role]=worker;
+        const worker=this.workerFactory(new URL('./worker.mjs?v=2c7af89c2e7578a17961',import.meta.url));this.workers[role]=worker;
         worker.onmessage=({data})=>{const p=this.pending.get(data.id);if(!p)return;this.pending.delete(data.id);data.error?p.reject(new Error(data.error)):p.resolve(data.result);};
         worker.onerror=()=>{for(const [id,p]of this.pending){if(p.role===role){this.pending.delete(id);p.reject(new Error(`${role} runtime failed to load or execute`));}}};
       }
@@ -123,7 +123,7 @@ export class Lab {
 export const tour=[
   {title:'Deliver the signed challenge.',text:'The server opens an authorized session. Drag its challenge to the device.',target:'device',success:'The signature is valid. Now generate a private identity using secure local randomness, with the public challenge mixed in as additional input.',code:'sc_enrollment_begin(&server, now, expires);\nsc_receive(&device, frame, length);',prepare:async l=>{await l.beginEnrollment();return l.transmit('server');}},
   {title:'Deliver the encrypted response.',text:'The device returns the challenge, its identity, to prove possession of its private key.',target:'server',success:'The response authenticated. This proposed key is waiting for trusted approval; nothing is registered yet.',code:'sc_receive_at(&server, frame, length, now);',prepare:async l=>{if(!l.states.device){await l.generateDevice({fromChallenge:true});await l.provisionDevice();const r=await l.command('device','rx',{frame:l.verifiedChallenge});if(r.code!==0)throw new Error(r.status);}return l.transmit('device');}},
-  {title:'Deliver the enrollment confirmation.',text:'The approved server reply confirms this enrollment session.',target:'device',success:'The device authenticated the confirmation. Enrollment is complete.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')},
+  {title:'Deliver the enrollment confirmation.',text:'The approved server reply confirms this enrollment session.',target:'device',success:'Enrollment is complete. Turn Corruption on for a saved packet, then drag it to its recipient. Or add server time and replay a packet. Watch the library’s response. Time does not undo completed enrollment; reset the session and delay its response to test expiry.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')},
  {title:'Deliver 100 issued credits.',text:'The server grants a cumulative total of 100 and asks for a status snapshot. Replaying this grant cannot add another 100.',target:'device',success:'The device accepted 100 issued credits and captured its current consumption for this request.',code:'sc_set_credits_issued(&server, 100);',prepare:async l=>{await l.update('server','issue',{total:'100'});return l.transmit('server');}},
  {title:'Deliver the credit snapshot.',text:'This captured response contains 100 issued and 0 consumed. It also confirms that the device accepted the grant.',target:'server',success:'The server knows the device accepted 100 credits and had consumed 0 when it answered.',code:'sc_receive(&server, frame, length);',prepare:l=>l.transmit('device')},
  {title:'Deliver the receipt.',text:'The server acknowledges this exact snapshot. The receipt asks for no additional report.',target:'device',success:'The exchange is settled. Next, spend credits locally without sending a message.',code:'sc_receive(&device, frame, length);',prepare:l=>l.transmit('server')},

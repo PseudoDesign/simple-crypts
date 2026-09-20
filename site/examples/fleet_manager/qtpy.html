@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple Crypts · QT Py USB demo</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./style.css?v=d41a01869d5c9434b1eb" />
+    <script type="module" src="./qtpy.mjs?v=d41a01869d5c9434b1eb"></script>
+  </head>
+  <body>
+    <nav class="chapter-banner" aria-label="Demo chapters">
+      <a href="../../">Home</a>
+      <a href="./">Simulated fleet</a>
+      <a href="./qtpy.html?v=d41a01869d5c9434b1eb" aria-current="page">QT Py USB</a>
+    </nav>
+    <header>
+      <p class="eyebrow">SIMPLE CRYPTS / HARDWARE DEMO</p>
+      <h1>Connect your QT Py.</h1>
+      <p>Register a QT Py RP2040 running the Simple Crypts demo firmware.</p>
+      <p>
+        Use Chrome or Edge on Windows, macOS, or Linux, over HTTPS or localhost. iPad browsers
+        cannot connect directly.
+      </p>
+    </header>
+    <main>
+      <p id="qt-notice" role="status" aria-live="polite">Checking browser support…</p>
+      <section aria-labelledby="connection-title">
+        <h2 id="connection-title">1 · Connect over USB</h2>
+        <button type="button" id="qt-connect">Choose device</button>
+        <button type="button" id="qt-disconnect" disabled>Disconnect</button>
+        <button type="button" id="qt-inspect" disabled>Inspect device</button>
+        <p>
+          Plug in the board with a data-capable cable, then choose its serial port. Close other
+          serial applications first.
+        </p>
+        <dl>
+          <dt>Device</dt>
+          <dd id="qt-serial">Not connected</dd>
+          <dt>Enrollment</dt>
+          <dd id="qt-enrollment">—</dd>
+          <dt>Available credits</dt>
+          <dd id="qt-balance">—</dd>
+        </dl>
+      </section>
+      <section aria-labelledby="enrollment-title">
+        <h2 id="enrollment-title">2 · Register and approve</h2>
+        <button type="button" id="qt-register" disabled>Register device</button>
+        <p>
+          Registration creates or resumes an enrollment. Review the connected device identity before
+          approving it.
+        </p>
+        <p>Device identity: <code id="qt-key">—</code></p>
+        <button type="button" id="qt-approve" disabled>Approve device</button>
+      </section>
+      <section aria-labelledby="credits-title">
+        <h2 id="credits-title">3 · Try credits</h2>
+        <form id="qt-issue-form">
+          <label
+            >Cumulative credits issued
+            <input
+              id="qt-total"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]{1,20}"
+              value="100"
+              required
+            />
+          </label>
+          <button type="submit" id="qt-issue" disabled>Set issued total</button>
+        </form>
+        <button type="button" id="qt-status" disabled>Refresh balance</button>
+        <p>
+          Press and release BOOT to consume one credit. Green means success; three red flashes mean
+          failure. Refresh balance to see button presses. No background polling is performed.
+        </p>
+      </section>
+      <section aria-labelledby="saved-title">
+        <h2 id="saved-title">Keep this browser’s saved data</h2>
+        <p>
+          The server identity is saved in this browser profile for this site address. Return to the
+          same address and profile to reconnect. Clearing site data loses the host identity; private
+          browsing is not suitable for a lasting enrollment.
+        </p>
+        <p>
+          A board already registered by the Python operator or another browser must be managed
+          there, or factory-reset before registering here. Reset erases identity and credits. This
+          page never resets the board automatically.
+        </p>
+        <p>
+          To factory-reset the demo, hold BOOT for five seconds. If it enters RPI-RP2 mode, release
+          BOOT and tap RESET. Reconnect here and register again. After any ordinary reboot, Refresh
+          balance supplies fresh startup entropy and resumes the saved enrollment.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -2,11 +2,11 @@
  * browser device and server peer has its own Wasm instance and identity.
  * The transport runs in response to user actions, never from a retry timer.
  */
-import createServer from './server.mjs?v=ecd9f77dcf02281eaf55';
-import createDevice from './device.mjs?v=ecd9f77dcf02281eaf55';
-import { Endpoint, validSerial } from './endpoint.mjs?v=ecd9f77dcf02281eaf55';
-import { openDatabase, rows, saveRow, endpointStorage, clearFleet } from './storage.mjs?v=ecd9f77dcf02281eaf55';
-import { exchange } from './transport.mjs?v=ecd9f77dcf02281eaf55';
+import createServer from './server.mjs?v=d41a01869d5c9434b1eb';
+import createDevice from './device.mjs?v=d41a01869d5c9434b1eb';
+import { Endpoint, validSerial } from './endpoint.mjs?v=d41a01869d5c9434b1eb';
+import { openDatabase, rows, saveRow, endpointStorage, clearFleet } from './storage.mjs?v=d41a01869d5c9434b1eb';
+import { exchange } from './transport.mjs?v=d41a01869d5c9434b1eb';
 
 const zeroKey = '00'.repeat(32);
 const fleet = new Map();

@@ -357,3 +357,7 @@ dialog::backdrop {
     font-size: 12px;
   }
 }
+
+#qt-key {
+  overflow-wrap: anywhere;
+}

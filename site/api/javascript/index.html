@@ -60,90 +60,104 @@ fresh: Whether initialization requires an absent endpoint record.
 Returns: Asynchronous read/write callbacks used by the Wasm provider.</p></article>
 <article id="entry-14"><h2>module:examples/common/storage.openDatabase</h2><pre>module:examples/common/storage.openDatabase()</pre><p>Open the versioned browser database; incompatible or failed stores reject instead of replacing identities. The owning worker holds the fleet Web Lock.
 Returns: Open database connection.</p></article>
-<article id="entry-15"><h2>module:examples/common/storage.transaction</h2><pre>module:examples/common/storage.transaction(db, store, mode, operation)</pre><p>Run one object-store operation and resolve only after transaction completion.
+<article id="entry-15"><h2>module:examples/common/storage.rows</h2><pre>module:examples/common/storage.rows(db)</pre><p>Read saved fleet rows after transaction completion.
+db: Open database.
+Returns: Copied saved row values.</p></article>
+<article id="entry-16"><h2>module:examples/common/storage.saveRow</h2><pre>module:examples/common/storage.saveRow(db, row, create)</pre><p>Commit a fleet row, optionally requiring it to be absent.
+db: Open database.
+row: Serializable fleet row keyed by serial.
+create: Use add instead of put to reject duplicates.
+Returns: Completion of the durable transaction.</p></article>
+<article id="entry-17"><h2>module:examples/common/storage.transaction</h2><pre>module:examples/common/storage.transaction(db, store, mode, operation)</pre><p>Run one object-store operation and resolve only after transaction completion.
 db: Open database.
 store: Object store name.
 mode: Access mode.
 operation: Callback returning an IDBRequest.
 Returns: Request result after durable completion; aborts reject.</p></article>
-<article id="entry-16"><h2>module:examples/fleet_manager/transport.exchange</h2><pre>module:examples/fleet_manager/transport.exchange(server, device, now, log)</pre><p>Deliver pending opaque frames between connected simulated endpoints until idle or awaiting enrollment approval.
+<article id="entry-18"><h2>module:examples/fleet_manager/transport.exchange</h2><pre>module:examples/fleet_manager/transport.exchange(server, device, now, log)</pre><p>Deliver pending opaque frames between connected simulated endpoints until idle or awaiting enrollment approval.
 server: Server endpoint.
 device: Running device endpoint, or null when stopped.
 now: Trusted server time for enrollment expiry.
 log: Observer for completed transfer messages.
 Returns: Completion; rejected frames or nonconvergence throw.</p></article>
-<article id="entry-17"><h2>module:web/endpoint.Endpoint</h2><pre>module:web/endpoint.Endpoint(module)</pre><p>Wrap one isolated guided-demo Wasm instance.
+<article id="entry-19"><h2>module:web/endpoint.Endpoint</h2><pre>module:web/endpoint.Endpoint(module)</pre><p>Wrap one isolated guided-demo Wasm instance.
 module: Emscripten module with scw exports.</p></article>
-<article id="entry-18"><h2>module:web/endpoint.Endpoint#command</h2><pre>module:web/endpoint.Endpoint#command(command, args)</pre><p>Apply one guided-demo command. Generation, initialization, enrollment, credit, receive and transmit commands delegate to the C bridge. Producing a frame does not deliver it.
+<article id="entry-20"><h2>module:web/endpoint.Endpoint#command</h2><pre>module:web/endpoint.Endpoint#command(command, args)</pre><p>Apply one guided-demo command. Generation, initialization, enrollment, credit, receive and transmit commands delegate to the C bridge. Producing a frame does not deliver it.
 command: Command name.
 args: Command-specific inputs; uint64 values must be exact.
 Returns: Native status, copied state and optional frame; malformed inputs reject.</p></article>
-<article id="entry-19"><h2>module:web/endpoint.Endpoint#put</h2><pre>module:web/endpoint.Endpoint#put(bytes, offset)</pre><p>Copy input bytes into the instance-owned bridge buffer.
+<article id="entry-21"><h2>module:web/endpoint.Endpoint#put</h2><pre>module:web/endpoint.Endpoint#put(bytes, offset)</pre><p>Copy input bytes into the instance-owned bridge buffer.
 bytes: Input bytes.
 offset: Offset within the 4096-byte buffer.</p></article>
-<article id="entry-20"><h2>module:web/endpoint.Endpoint#state</h2><pre>module:web/endpoint.Endpoint#state()</pre><p>Copy public diagnostics; this is not a restorable native context.
+<article id="entry-22"><h2>module:web/endpoint.Endpoint#state</h2><pre>module:web/endpoint.Endpoint#state()</pre><p>Copy public diagnostics; this is not a restorable native context.
 Returns: Public state with exact decimal counters.</p></article>
-<article id="entry-21"><h2>module:web/endpoint.unhex</h2><pre>module:web/endpoint.unhex(text)</pre><p>Decode exactly one 32-byte public key from hexadecimal.
+<article id="entry-23"><h2>module:web/endpoint.hex</h2><pre>module:web/endpoint.hex(bytes)</pre><p>Encode bytes as lowercase hexadecimal without changing the input.
+bytes: Bytes to encode.
+Returns: Hexadecimal representation.</p></article>
+<article id="entry-24"><h2>module:web/endpoint.unhex</h2><pre>module:web/endpoint.unhex(text)</pre><p>Decode exactly one 32-byte public key from hexadecimal.
 text: A 64-character hexadecimal key.
 Returns: Fresh key bytes; malformed input throws.</p></article>
-<article id="entry-22"><h2>module:web/lab.Lab</h2><pre>module:web/lab.Lab(onChange, workerFactory)</pre><p>Create a lab without starting workers; reset initializes them.
+<article id="entry-25"><h2>module:web/lab.DEVICE_SERIAL</h2><pre>module:web/lab.DEVICE_SERIAL</pre><p>Fixed demo serial used before key generation or enrollment.</p></article>
+<article id="entry-26"><h2>module:web/lab.Lab</h2><pre>module:web/lab.Lab(onChange, workerFactory)</pre><p>Create a lab without starting workers; reset initializes them.
 onChange: Observer called after state changes.
 workerFactory: Factory for isolated endpoint workers.</p></article>
-<article id="entry-23"><h2>module:web/lab.Lab#approveEnrollment</h2><pre>module:web/lab.Lab#approveEnrollment()</pre><p>Approve the displayed candidate binding at the current simulated time.
+<article id="entry-27"><h2>module:web/lab.Lab#approveEnrollment</h2><pre>module:web/lab.Lab#approveEnrollment()</pre><p>Approve the displayed candidate binding at the current simulated time.
 Returns: Completion; stale or absent candidates fail.</p></article>
-<article id="entry-24"><h2>module:web/lab.Lab#beginEnrollment</h2><pre>module:web/lab.Lab#beginEnrollment()</pre><p>Authorize a ten-minute session using the simulated server clock.
+<article id="entry-28"><h2>module:web/lab.Lab#beginEnrollment</h2><pre>module:web/lab.Lab#beginEnrollment()</pre><p>Authorize a ten-minute session using the simulated server clock.
 Returns: Completion; native failures reject.</p></article>
-<article id="entry-25"><h2>module:web/lab.Lab#command</h2><pre>module:web/lab.Lab#command(role, command, args)</pre><p>Execute a worker command and update visible state and events.
+<article id="entry-29"><h2>module:web/lab.Lab#command</h2><pre>module:web/lab.Lab#command(role, command, args)</pre><p>Execute a worker command and update visible state and events.
 role: Endpoint role.
 command: Bridge command.
 args: Command arguments.
 Returns: Worker result.</p></article>
-<article id="entry-26"><h2>module:web/lab.Lab#corrupt</h2><pre>module:web/lab.Lab#corrupt(id)</pre><p>Flip ciphertext bytes for authentication-failure testing.
+<article id="entry-30"><h2>module:web/lab.Lab#corrupt</h2><pre>module:web/lab.Lab#corrupt(id)</pre><p>Flip ciphertext bytes for authentication-failure testing.
 id: Packet identifier.</p></article>
-<article id="entry-27"><h2>module:web/lab.Lab#deliver</h2><pre>module:web/lab.Lab#deliver(id, target)</pre><p>Deliver a queued packet to one endpoint and record its acceptance or failure.
+<article id="entry-31"><h2>module:web/lab.Lab#deliver</h2><pre>module:web/lab.Lab#deliver(id, target)</pre><p>Deliver a queued packet to one endpoint and record its acceptance or failure.
 id: Packet identifier.
 target: Destination role.
 Returns: Receive result.</p></article>
-<article id="entry-28"><h2>module:web/lab.Lab#drop</h2><pre>module:web/lab.Lab#drop(id)</pre><p>Discard a packet without reception and record the outcome.
+<article id="entry-32"><h2>module:web/lab.Lab#drop</h2><pre>module:web/lab.Lab#drop(id)</pre><p>Discard a packet without reception and record the outcome.
 id: Packet identifier.</p></article>
-<article id="entry-29"><h2>module:web/lab.Lab#duplicate</h2><pre>module:web/lab.Lab#duplicate(id)</pre><p>Queue a second copy without mutating the original.
+<article id="entry-33"><h2>module:web/lab.Lab#duplicate</h2><pre>module:web/lab.Lab#duplicate(id)</pre><p>Queue a second copy without mutating the original.
 id: Packet identifier.</p></article>
-<article id="entry-30"><h2>module:web/lab.Lab#event</h2><pre>module:web/lab.Lab#event(message, kind)</pre><p>Append a bounded diagnostic event and notify observers.
+<article id="entry-34"><h2>module:web/lab.Lab#event</h2><pre>module:web/lab.Lab#event(message, kind)</pre><p>Append a bounded diagnostic event and notify observers.
 message: Display text.
 kind: Event category.</p></article>
-<article id="entry-31"><h2>module:web/lab.Lab#generateDevice</h2><pre>module:web/lab.Lab#generateDevice(options)</pre><p>Generate a fresh device identity after optional challenge verification.
+<article id="entry-35"><h2>module:web/lab.Lab#generateDevice</h2><pre>module:web/lab.Lab#generateDevice(options)</pre><p>Generate a fresh device identity after optional challenge verification.
 options: Set fromChallenge to verify the displayed invitation first.
 Returns: Completion; invalid session or verification failures reject.</p></article>
-<article id="entry-32"><h2>module:web/lab.Lab#move</h2><pre>module:web/lab.Lab#move(id, location)</pre><p>Move a visible packet between transport locations.
+<article id="entry-36"><h2>module:web/lab.Lab#move</h2><pre>module:web/lab.Lab#move(id, location)</pre><p>Move a visible packet between transport locations.
 id: Packet identifier.
 location: New location.</p></article>
-<article id="entry-33"><h2>module:web/lab.Lab#notify</h2><pre>module:web/lab.Lab#notify()</pre><p>Notify the UI with the current lab state.</p></article>
-<article id="entry-34"><h2>module:web/lab.Lab#packet</h2><pre>module:web/lab.Lab#packet(id)</pre><p>Find a queued packet or throw if it is no longer available.
+<article id="entry-37"><h2>module:web/lab.Lab#notify</h2><pre>module:web/lab.Lab#notify()</pre><p>Notify the UI with the current lab state.</p></article>
+<article id="entry-38"><h2>module:web/lab.Lab#packet</h2><pre>module:web/lab.Lab#packet(id)</pre><p>Find a queued packet or throw if it is no longer available.
 id: Packet identifier.
 Returns: Mutable queue record.</p></article>
-<article id="entry-35"><h2>module:web/lab.Lab#provisionDevice</h2><pre>module:web/lab.Lab#provisionDevice()</pre><p>Initialize the generated device with its serial and pinned server key.
+<article id="entry-39"><h2>module:web/lab.Lab#provisionDevice</h2><pre>module:web/lab.Lab#provisionDevice()</pre><p>Initialize the generated device with its serial and pinned server key.
 Returns: Completion; missing provisioning inputs reject.</p></article>
-<article id="entry-36"><h2>module:web/lab.Lab#raw</h2><pre>module:web/lab.Lab#raw(role, command, args)</pre><p>Send a command to one worker and correlate its response; no peer transfer occurs.
+<article id="entry-40"><h2>module:web/lab.Lab#raw</h2><pre>module:web/lab.Lab#raw(role, command, args)</pre><p>Send a command to one worker and correlate its response; no peer transfer occurs.
 role: Endpoint role.
 command: Bridge command.
 args: Command arguments.
 Returns: Worker response; runtime errors reject.</p></article>
-<article id="entry-37"><h2>module:web/lab.Lab#remember</h2><pre>module:web/lab.Lab#remember(packet, outcome)</pre><p>Archive a packet with its final outcome, keeping bounded history.
+<article id="entry-41"><h2>module:web/lab.Lab#remember</h2><pre>module:web/lab.Lab#remember(packet, outcome)</pre><p>Archive a packet with its final outcome, keeping bounded history.
 packet: Queue record.
 outcome: Final outcome.</p></article>
-<article id="entry-38"><h2>module:web/lab.Lab#replay</h2><pre>module:web/lab.Lab#replay(packet)</pre><p>Queue a copy of archived bytes for explicit replay testing.
+<article id="entry-42"><h2>module:web/lab.Lab#replay</h2><pre>module:web/lab.Lab#replay(packet)</pre><p>Queue a copy of archived bytes for explicit replay testing.
 packet: Archived record.</p></article>
-<article id="entry-39"><h2>module:web/lab.Lab#reset</h2><pre>module:web/lab.Lab#reset(options)</pre><p>Discard transient state and initialize fresh workers and server identity.
+<article id="entry-43"><h2>module:web/lab.Lab#reset</h2><pre>module:web/lab.Lab#reset(options)</pre><p>Discard transient state and initialize fresh workers and server identity.
 options: Set deferDevice to postpone device provisioning.
 Returns: Completion; initialization failures reject.</p></article>
-<article id="entry-40"><h2>module:web/lab.Lab#stop</h2><pre>module:web/lab.Lab#stop()</pre><p>Terminate workers and reject pending calls, invalidating the current session.</p></article>
-<article id="entry-41"><h2>module:web/lab.Lab#transmit</h2><pre>module:web/lab.Lab#transmit(role, budget)</pre><p>Generate and stage a packet in its sender box; do not deliver it.
+<article id="entry-44"><h2>module:web/lab.Lab#stop</h2><pre>module:web/lab.Lab#stop()</pre><p>Terminate workers and reject pending calls, invalidating the current session.</p></article>
+<article id="entry-45"><h2>module:web/lab.Lab#transmit</h2><pre>module:web/lab.Lab#transmit(role, budget)</pre><p>Generate and stage a packet in its sender box; do not deliver it.
 role: Sending endpoint.
 budget: Maximum frame bytes.
 Returns: Queued packet ID, or null when idle.</p></article>
-<article id="entry-42"><h2>module:web/lab.Lab#update</h2><pre>module:web/lab.Lab#update(role, command, args)</pre><p>Apply a state-changing command and report its result; frame generation is separate.
+<article id="entry-46"><h2>module:web/lab.Lab#update</h2><pre>module:web/lab.Lab#update(role, command, args)</pre><p>Apply a state-changing command and report its result; frame generation is separate.
 role: Endpoint role.
 command: Bridge command.
 args: Command arguments.
 Returns: Command result; delivery remains explicit.</p></article>
+<article id="entry-47"><h2>module:web/lab.MAX_EVENTS</h2><pre>module:web/lab.MAX_EVENTS</pre><p>Maximum number of diagnostic events retained by a lab.</p></article>
+<article id="entry-48"><h2>module:web/lab.MAX_QUEUE</h2><pre>module:web/lab.MAX_QUEUE</pre><p>Maximum number of pending packets retained by a lab.</p></article>
 <script>document.querySelector("#search").addEventListener("input",event=>{const query=event.target.value.toLowerCase();document.querySelectorAll("article").forEach(entry=>entry.hidden=!entry.textContent.toLowerCase().includes(query))});</script></html>

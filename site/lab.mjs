@@ -1,7 +1,8 @@
 /** @module web/lab */
-/** Maximum pending packet count and retained event count, respectively. */
-export const MAX_QUEUE = 64,
-  MAX_EVENTS = 200;
+/** Maximum number of pending packets retained by a lab. */
+export const MAX_QUEUE = 64;
+/** Maximum number of diagnostic events retained by a lab. */
+export const MAX_EVENTS = 200;
 /** Fixed demo serial used before key generation or enrollment. */
 export const DEVICE_SERIAL = 'mcu-0001';
 /**
@@ -81,7 +82,7 @@ export class Lab {
       // Compatibility slot only: signed enrollment uses no shared enrollment secret.
       const secret = '00'.repeat(32);
       for (const role of ['device', 'server']) {
-        const worker = this.workerFactory(new URL('./worker.mjs?v=f7ac1ff01689f4d7a1b1', import.meta.url));
+        const worker = this.workerFactory(new URL('./worker.mjs?v=ecd9f77dcf02281eaf55', import.meta.url));
         this.workers[role] = worker;
         worker.onmessage = ({ data }) => {
           const p = this.pending.get(data.id);

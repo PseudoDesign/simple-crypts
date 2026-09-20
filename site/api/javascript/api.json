@@ -75,6 +75,16 @@
     "signature": "module:examples/common/storage.openDatabase()"
   },
   {
+    "description": "Read saved fleet rows after transaction completion.\ndb: Open database.\nReturns: Copied saved row values.",
+    "name": "module:examples/common/storage.rows",
+    "signature": "module:examples/common/storage.rows(db)"
+  },
+  {
+    "description": "Commit a fleet row, optionally requiring it to be absent.\ndb: Open database.\nrow: Serializable fleet row keyed by serial.\ncreate: Use add instead of put to reject duplicates.\nReturns: Completion of the durable transaction.",
+    "name": "module:examples/common/storage.saveRow",
+    "signature": "module:examples/common/storage.saveRow(db, row, create)"
+  },
+  {
     "description": "Run one object-store operation and resolve only after transaction completion.\ndb: Open database.\nstore: Object store name.\nmode: Access mode.\noperation: Callback returning an IDBRequest.\nReturns: Request result after durable completion; aborts reject.",
     "name": "module:examples/common/storage.transaction",
     "signature": "module:examples/common/storage.transaction(db, store, mode, operation)"
@@ -105,9 +115,19 @@
     "signature": "module:web/endpoint.Endpoint#state()"
   },
   {
+    "description": "Encode bytes as lowercase hexadecimal without changing the input.\nbytes: Bytes to encode.\nReturns: Hexadecimal representation.",
+    "name": "module:web/endpoint.hex",
+    "signature": "module:web/endpoint.hex(bytes)"
+  },
+  {
     "description": "Decode exactly one 32-byte public key from hexadecimal.\ntext: A 64-character hexadecimal key.\nReturns: Fresh key bytes; malformed input throws.",
     "name": "module:web/endpoint.unhex",
     "signature": "module:web/endpoint.unhex(text)"
+  },
+  {
+    "description": "Fixed demo serial used before key generation or enrollment.",
+    "name": "module:web/lab.DEVICE_SERIAL",
+    "signature": "module:web/lab.DEVICE_SERIAL"
   },
   {
     "description": "Create a lab without starting workers; reset initializes them.\nonChange: Observer called after state changes.\nworkerFactory: Factory for isolated endpoint workers.",
@@ -213,5 +233,15 @@
     "description": "Apply a state-changing command and report its result; frame generation is separate.\nrole: Endpoint role.\ncommand: Bridge command.\nargs: Command arguments.\nReturns: Command result; delivery remains explicit.",
     "name": "module:web/lab.Lab#update",
     "signature": "module:web/lab.Lab#update(role, command, args)"
+  },
+  {
+    "description": "Maximum number of diagnostic events retained by a lab.",
+    "name": "module:web/lab.MAX_EVENTS",
+    "signature": "module:web/lab.MAX_EVENTS"
+  },
+  {
+    "description": "Maximum number of pending packets retained by a lab.",
+    "name": "module:web/lab.MAX_QUEUE",
+    "signature": "module:web/lab.MAX_QUEUE"
   }
 ]

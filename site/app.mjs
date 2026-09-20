@@ -1,6 +1,6 @@
-import { Lab, tour, DEVICE_SERIAL } from './lab.mjs?v=f7ac1ff01689f4d7a1b1';
-import { resources } from './resources.mjs?v=f7ac1ff01689f4d7a1b1';
-import { hex } from './endpoint.mjs?v=f7ac1ff01689f4d7a1b1';
+import { Lab, tour, DEVICE_SERIAL } from './lab.mjs?v=ecd9f77dcf02281eaf55';
+import { resources } from './resources.mjs?v=ecd9f77dcf02281eaf55';
+import { hex } from './endpoint.mjs?v=ecd9f77dcf02281eaf55';
 const $ = (id) => document.getElementById(id);
 let busy = false,
   mode = 'tour',

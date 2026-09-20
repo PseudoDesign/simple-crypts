@@ -2,11 +2,11 @@
  * browser device and server peer has its own Wasm instance and identity.
  * The transport runs in response to user actions, never from a retry timer.
  */
-import createServer from './server.mjs?v=d58ba208009013e6b13a';
-import createDevice from './device.mjs?v=d58ba208009013e6b13a';
-import {Endpoint, validSerial} from './endpoint.mjs?v=d58ba208009013e6b13a';
-import {openDatabase, rows, saveRow, endpointStorage} from './storage.mjs?v=d58ba208009013e6b13a';
-import {exchange} from './transport.mjs?v=d58ba208009013e6b13a';
+import createServer from './server.mjs?v=2642f78c8f6fdbb238be';
+import createDevice from './device.mjs?v=2642f78c8f6fdbb238be';
+import {Endpoint, validSerial} from './endpoint.mjs?v=2642f78c8f6fdbb238be';
+import {openDatabase, rows, saveRow, endpointStorage, clearFleet} from './storage.mjs?v=2642f78c8f6fdbb238be';
+import {exchange} from './transport.mjs?v=2642f78c8f6fdbb238be';
 
 const zeroKey = '00'.repeat(32);
 const fleet = new Map();
@@ -28,6 +28,10 @@ async function openEndpoint(row, role, fresh) {
 }
 
 async function synchronize(entry) {
+  if (entry.row.connected === false) {
+    log(entry, 'Connection disabled. Pending messages wait until you reconnect.');
+    return;
+  }
   try {
     await exchange(entry.server, entry.device, BigInt(Math.floor(Date.now() / 1000)), text => log(entry, text));
   } catch (error) {
@@ -73,7 +77,7 @@ else navigator.locks.request('simple-crypts-fleet-v1', {ifAvailable: true}, asyn
 
 function view() {
   return Array.from(fleet.values(), ({row, server, device, error, activity}) => ({
-    serial: row.serial, running: Boolean(device), error, activity,
+    serial: row.serial, running: Boolean(device), connected: row.connected !== false, error, activity,
     server: server?.state(), device: device?.state(),
   }));
 }
@@ -81,7 +85,7 @@ function view() {
 async function create(serial) {
   validSerial(serial);
   if (savedSerials.has(serial)) throw new Error('That serial exists in saved storage. Choose a different serial.');
-  const row = {serial, kind: 'browser', phase: 'creating', running: true};
+  const row = {serial, kind: 'browser', phase: 'creating', running: true, connected: true};
   await saveRow(db, row, true);
   savedSerials.add(serial);
   const entry = {row, activity: []};
@@ -106,12 +110,27 @@ async function stop(entry) {
 
 async function dispatch({command, serial, args = {}}) {
   if (command === 'list') return {};
+  if (command === 'reset') {
+    await clearFleet(db);
+    fleet.clear();
+    savedSerials.clear();
+    return {};
+  }
   if (command === 'create') { await create(serial); return {}; }
   const entry = fleet.get(serial);
   if (!entry) throw new Error('Unknown serial.');
   if (entry.error) throw new Error(entry.error);
   const now = BigInt(Math.floor(Date.now() / 1000));
   switch (command) {
+    case 'connection': {
+      if (typeof args.enabled !== 'boolean') throw new Error('Connection setting must be boolean.');
+      const next = {...entry.row, connected: args.enabled};
+      await saveRow(db, next);
+      entry.row = next;
+      log(entry, args.enabled ? 'Connection enabled.' : 'Connection disabled. Device power unchanged.');
+      if (args.enabled) await synchronize(entry);
+      return {};
+    }
     case 'server': {
       const labels = {begin: 'Server authorized enrollment.', cancel: 'Server canceled enrollment.',
         approve: 'Server approved the device identity.', issue: `Server set issued total to ${args.total}.`,

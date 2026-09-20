@@ -63,7 +63,7 @@ filesystem or provide a CircuitPython backup.
 
 ## Browser host (Windows, macOS, or Linux)
 
-The static site's **QT Py USB** page can register and manage this firmware using
+The static site's **Fleet / QT Py** demo can register and manage this firmware using
 Web Serial in desktop Chrome or Edge. See the
 [browser workflow](../../fleet_manager/README.md#physical-qt-py-over-web-serial).
 A board enrolled by the Python operator must be factory-reset before moving to

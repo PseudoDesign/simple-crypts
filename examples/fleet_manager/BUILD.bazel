@@ -41,6 +41,7 @@ fleet_site(
         "qtpy.mjs",
         "qtpy-serial.mjs",
         "qtpy-session.mjs",
+        "qtpy-fleet.mjs",
         "//examples/common:endpoint.mjs",
         "//examples/common:storage.mjs",
     ],

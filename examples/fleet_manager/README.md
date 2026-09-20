@@ -119,26 +119,32 @@ run in Chromium and Firefox, with artifacts under `/tmp/simple-crypts-fleet-brow
 
 ## Physical QT Py over Web Serial
 
-Open `qtpy.html` from the same preview (or
-`examples/fleet_manager/qtpy.html` in the complete site). Desktop Chrome and Edge
+Open the fleet demo (`index.html`) from the preview or complete site.
+Physical boards and simulated devices share the table and server controls. Desktop Chrome and Edge
 on Windows, macOS, and Linux can select the QT Py's USB CDC port. HTTPS or
 localhost, Web Serial, Web Locks, IndexedDB, and secure browser randomness are
 required. iPad browsers do not support this connection. The firmware must be the
 [QT Py demo](../embedded/qtpy_rp2040/README.md), not its ROM bootloader.
 
-1. Close other serial clients and choose the board's port.
-2. Select **Register device**, review the displayed device identity, then select
+1. Close other serial clients, select **Register QT Py**, and choose the board's port.
+2. Review the candidate identity and challenge in its fleet row, then select
    **Approve device**. Approval is a separate action; the serial number alone is
    not authentication.
 3. Set the cumulative issued total (for example, `100`). Press BOOT on the board
-   to consume credits; select **Refresh balance** to obtain an authenticated report.
+   to consume credits; select **Request report** to obtain an authenticated report.
 4. After a reboot or page reload, reconnect using the same browser profile and
-   site address, then select **Refresh balance**. This supplies fresh per-boot
+   site address, then select **Request report**. This supplies fresh per-boot
    entropy and restores the existing host/device relationship.
 
 The browser persists the production Wasm server's identity, encoded state, and
 nonce reservations in a separate `simple-crypts-qtpy-v1` IndexedDB database.
-A Web Lock prevents two tabs from concurrently owning it. The page is the trusted
+The fleet page holds the same Web Lock as the standalone `qtpy.html` page,
+preventing simultaneous ownership across both interfaces. Existing standalone
+registrations appear automatically; close that tab before opening the fleet.
+Saved rows restore disconnected. **Connect USB** selects the matching board, and
+**Disconnect USB** closes the port without changing power or device state.
+**View activity** shows public management results; physical consumption uses the
+BOOT button, with no simulated console, debug, or power controls. The page is the trusted
 application owner; private checkpoint bytes stay in its provider/storage layer,
 not DOM messages or logs. Clearing site data, changing origin/profile, or private
 browsing can lose the host identity. This first version has no host-key export or
@@ -166,6 +172,8 @@ The existing manual `//examples/fleet_manager:browser_test` additionally runs th
 production Wasm server and exact native firmware simulator through a Web Serial
 stream fixture: enrollment, approval, persistence failure before provisioning,
 lost-setup-response recovery, page reload, device reboot, full uint64 issuance,
-foreign-host rejection, competing tabs, and reset/re-enrollment. A Firefox check
+foreign-host rejection, competing tabs, and reset/re-enrollment. Integrated fleet
+checks cover existing-host restoration, physical registration and approval, shared
+credit controls, identical physical/simulated serials, and simulated-reset isolation. A Firefox check
 verifies the unsupported-browser message. These fixtures do not prove Windows
 USB-driver behavior; physical Windows Chrome/Edge qualification remains required.

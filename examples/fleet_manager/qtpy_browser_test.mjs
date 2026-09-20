@@ -221,6 +221,18 @@ try {
   await notice(outsider, 'trusts another host');
   assert.equal(await outsider.locator('#qt-register').isDisabled(), true);
   assert.deepEqual(commands.slice(before), [1]);
+  await click(outsider, 'disconnect');
+  await outsider.goto(url.replace('qtpy.html', 'index.html'));
+  await outsider.waitForFunction(() => !document.querySelector('#register-qtpy').disabled);
+  const fleetBefore = commands.length;
+  await outsider.locator('#register-qtpy').click();
+  await outsider.waitForFunction(() =>
+    document.querySelector('#notice').textContent.includes('trusts another host'),
+  );
+  assert.deepEqual(commands.slice(fleetBefore), [1, 1]);
+  assert.equal(await outsider.locator('.device-row [data-action="approve"]').isDisabled(), true);
+  await outsider.locator('.device-row [data-action="usb"]').click();
+  await outsider.waitForFunction(() => !document.querySelector('#register-qtpy').disabled);
   await foreign.close();
   // Simulate a physical factory reset, then reconnect and explicitly register anew.
   const reset = new Uint8Array(12);
@@ -238,6 +250,86 @@ try {
   assert.equal(await page.locator('#qt-balance').textContent(), '0');
   assert.deepEqual(errors, []);
   await click(page, 'disconnect');
+  // The fleet restores standalone hosts and uses the same identity and credit controls.
+  await page.goto(url.replace('qtpy.html', 'index.html'));
+  const ready = () =>
+    page.waitForFunction(() => !document.querySelector('#create-form button').disabled);
+  await ready();
+  const physical = page.locator('.device-row[data-kind="qtpy"]');
+  const field = (name) => physical.locator(`[data-field="${name}"]`).textContent();
+  const control = async (name) => {
+    await physical.locator(`[data-action="${name}"]`).click();
+    await ready();
+  };
+  assert.equal(await physical.count(), 1);
+  assert.match(await field('running'), /USB disconnected/);
+  const savedHost = await field('server-key');
+  await control('usb');
+  await control('request');
+  assert.equal(await field('server-key'), savedHost);
+  assert.equal(await field('enrollment'), 'Registered');
+  assert.equal(await physical.locator('[data-action="power"]').isVisible(), false);
+  assert.equal(await physical.locator('[data-action="cancel"]').isVisible(), false);
+  await physical.locator('[name="total"]').fill('100');
+  await physical.locator('[data-action="issue"] button').click();
+  await ready();
+  assert.equal(await field('issued'), '100');
+  await control('inspect');
+  const activity = page.locator('.console[data-kind="qtpy"]');
+  assert.equal(await activity.locator('form').isVisible(), false);
+  assert.equal(await activity.locator('[data-action="debug"]').isVisible(), false);
+  assert.match(await activity.locator('pre').textContent(), new RegExp(newKey));
+  await activity.getByRole('button', { name: 'Hide', exact: true }).click();
+  // Identical serial labels must still route to distinct physical/simulated owners.
+  await page.locator('#serial').fill('qtpy-simulator');
+  await page.locator('#create-form button').click();
+  await ready();
+  assert.equal(await page.locator('.device-row').count(), 2);
+  await page
+    .locator('.console[data-kind="browser"]')
+    .getByRole('button', { name: 'Hide', exact: true })
+    .click();
+  await page.locator('#reset').click();
+  await page.locator('#confirm-reset').click();
+  await page.waitForFunction(() => document.querySelectorAll('.device-row').length === 1);
+  await ready();
+  assert.equal(await page.locator('.device-row').count(), 1);
+  assert.equal(await field('server-key'), savedHost);
+  assert.equal(await field('issued'), '100');
+  await control('request');
+  assert.equal(await field('issued'), '100');
+  // The standalone page cannot bypass the fleet's persistent host ownership.
+  const competing = await context.newPage();
+  await competing.goto(url);
+  await click(competing, 'connect');
+  await notice(competing, 'Another QT Py tab');
+  await competing.close();
+  await control('usb');
+  await page.reload();
+  await ready();
+  assert.equal(await field('server-key'), savedHost);
+  assert.equal(await field('issued'), '100');
+  assert.match(await field('running'), /USB disconnected/);
+  // Only a physical reset permits a new enrollment; the toolbar starts it in place.
+  await transfer(Array.from(encode(reset)));
+  await stop();
+  boot();
+  await page.locator('#register-qtpy').click();
+  await ready();
+  assert.equal(await field('enrollment'), 'Awaiting approval');
+  assert.notEqual(await field('server-key'), savedHost);
+  await control('approve');
+  assert.equal(await field('enrollment'), 'Registered');
+  assert.equal(await field('issued'), '0');
+  await page.screenshot({
+    path: join(
+      globalThis.process.env.TEST_UNDECLARED_OUTPUTS_DIR ?? '/tmp',
+      'qtpy-fleet-browser.png',
+    ),
+    fullPage: true,
+  });
+  assert.deepEqual(errors, []);
+  await control('usb');
   await context.close();
   await browser.close();
   browser = null;

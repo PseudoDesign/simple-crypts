@@ -2,7 +2,7 @@
  * and movable console windows; dragging/hiding never changes device lifetime.
  */
 const $ = id => document.getElementById(id);
-const worker = new Worker(new URL('./worker.mjs?v=ebd9e8afe1f1db83b370', import.meta.url), {type: 'module'});
+const worker = new Worker(new URL('./worker.mjs?v=39acb451fd0a98387170', import.meta.url), {type: 'module'});
 const waiting = new Map();
 const consoles = new Map();
 const rows = new Map();

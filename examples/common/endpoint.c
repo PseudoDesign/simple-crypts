@@ -39,10 +39,12 @@ EM_ASYNC_JS(int, disk_write, (const uint8_t *bytes, size_t length), {
     }
 });
 
-EM_ASYNC_JS(int, disk_read, (uint8_t *bytes, size_t capacity), {
+EM_ASYNC_JS(int, disk_read, (uint8_t * bytes, size_t capacity), {
     try {
         const blob = await Module.storage.load();
-        if (!(blob instanceof Uint8Array) || blob.length > capacity) return -5;
+        if (!(blob instanceof Uint8Array) || blob.length > capacity) {
+            return -5;
+        }
         HEAPU8.set(blob, bytes);
         return blob.length;
     } catch (error) {
@@ -51,12 +53,16 @@ EM_ASYNC_JS(int, disk_read, (uint8_t *bytes, size_t capacity), {
 });
 
 static void put64(uint8_t *p, uint64_t value) {
-    for (unsigned i = 0; i < 8; ++i) p[7 - i] = (uint8_t)(value >> (8 * i));
+    for (unsigned i = 0; i < 8; ++i) {
+        p[7 - i] = (uint8_t)(value >> (8 * i));
+    }
 }
 
 static uint64_t get64(const uint8_t *p) {
     uint64_t value = 0;
-    for (unsigned i = 0; i < 8; ++i) value = (value << 8) | p[i];
+    for (unsigned i = 0; i < 8; ++i) {
+        value = (value << 8) | p[i];
+    }
     return value;
 }
 
@@ -64,8 +70,8 @@ static uint64_t get64(const uint8_t *p) {
  * Config and identity precede the protocol record and reservation high-water
  * marks. Runtime nonce cursors are deliberately absent: reboot burns leftovers.
  */
-static int persist(const uint8_t *record, size_t length, uint64_t generation,
-                   uint64_t device_next, uint64_t server_next) {
+static int persist(const uint8_t *record, size_t length, uint64_t generation, uint64_t device_next,
+                   uint64_t server_next) {
     memset(checkpoint, 0, HEADER_SIZE);
     memcpy(checkpoint, "SCEX0001", 8);
     checkpoint[8] = (uint8_t)config.role;
@@ -81,7 +87,9 @@ static int persist(const uint8_t *record, size_t length, uint64_t generation,
     memcpy(checkpoint + HEADER_SIZE, record, length);
     int result = disk_write(checkpoint, HEADER_SIZE + length);
     sodium_memzero(checkpoint, sizeof checkpoint);
-    if (result != SC_OK) failed = 1; /* Require reopening after ambiguous I/O. */
+    if (result != SC_OK) {
+        failed = 1; /* Require reopening after ambiguous I/O. */
+    }
     return result;
 }
 
@@ -89,21 +97,24 @@ static int restore(void) {
     int length = disk_read(checkpoint, sizeof checkpoint);
     int result = SC_ERR_STORAGE;
     if (length < (int)HEADER_SIZE || memcmp(checkpoint, "SCEX0001", 8) ||
-        checkpoint[8] != config.role ||
-        memcmp(checkpoint + 9, config.serial, 33) ||
+        checkpoint[8] != config.role || memcmp(checkpoint + 9, config.serial, 33) ||
         memcmp(checkpoint + 42, config.peer_public_key, 32) ||
-        !sodium_is_zero(checkpoint + 202, 11)) goto done;
+        !sodium_is_zero(checkpoint + 202, 11)) {
+        goto done;
+    }
     uint64_t record_length = get64(checkpoint + 170);
-    if (record_length > SC_MAX_RECORD ||
-        record_length + HEADER_SIZE != (uint64_t)length ||
-        get64(checkpoint + 178) == 0) goto done;
+    if (record_length > SC_MAX_RECORD || record_length + HEADER_SIZE != (uint64_t)length ||
+        get64(checkpoint + 178) == 0) {
+        goto done;
+    }
     /* Check the seed-derived keypair, including the public half in the secret. */
     uint8_t pk[32], sk[64];
     crypto_sign_seed_keypair(pk, sk, checkpoint + 106);
-    int mismatch = sodium_memcmp(pk, checkpoint + 74, 32) |
-                   sodium_memcmp(sk, checkpoint + 106, 64);
+    int mismatch = sodium_memcmp(pk, checkpoint + 74, 32) | sodium_memcmp(sk, checkpoint + 106, 64);
     sodium_memzero(sk, sizeof sk);
-    if (mismatch) goto done;
+    if (mismatch) {
+        goto done;
+    }
     memcpy(saved.public_key, checkpoint + 74, 32);
     memcpy(saved.secret_key, checkpoint + 106, 64);
     saved.length = (size_t)record_length;
@@ -117,10 +128,11 @@ done:
     return result;
 }
 
-static sc_status lookup(void *user, sc_key_handle key,
-                        const uint8_t **pk, const uint8_t **sk) {
+static sc_status lookup(void *user, sc_key_handle key, const uint8_t **pk, const uint8_t **sk) {
     (void)user;
-    if (key != 1 || !ready || failed) return SC_ERR_STORAGE;
+    if (key != 1 || !ready || failed) {
+        return SC_ERR_STORAGE;
+    }
     *pk = saved.public_key;
     *sk = saved.secret_key;
     return SC_OK;
@@ -138,25 +150,34 @@ static sc_status unused_secret(void *user, uint8_t out[32]) {
     return SC_OK;
 }
 
-static sc_status load(void *user, uint8_t *out, size_t capacity,
-                      size_t *length, uint64_t *generation) {
+static sc_status load(void *user, uint8_t *out, size_t capacity, size_t *length,
+                      uint64_t *generation) {
     (void)user;
-    if (failed) return SC_ERR_STORAGE;
-    if (!saved.generation) return SC_NOT_FOUND;
-    if (capacity < saved.length) return SC_ERR_BOUNDS;
+    if (failed) {
+        return SC_ERR_STORAGE;
+    }
+    if (!saved.generation) {
+        return SC_NOT_FOUND;
+    }
+    if (capacity < saved.length) {
+        return SC_ERR_BOUNDS;
+    }
     memcpy(out, saved.record, saved.length);
     *length = saved.length;
     *generation = saved.generation;
     return SC_OK;
 }
 
-static sc_status commit(void *user, uint64_t generation,
-                        const uint8_t *record, size_t length) {
+static sc_status commit(void *user, uint64_t generation, const uint8_t *record, size_t length) {
     (void)user;
     if (failed || generation != saved.generation || generation == UINT64_MAX ||
-        length > sizeof saved.record) return SC_ERR_STORAGE;
+        length > sizeof saved.record) {
+        return SC_ERR_STORAGE;
+    }
     int result = persist(record, length, generation + 1, saved.next[1], saved.next[2]);
-    if (result != SC_OK) return (sc_status)result;
+    if (result != SC_OK) {
+        return (sc_status)result;
+    }
     memcpy(saved.record, record, length);
     saved.length = length;
     saved.generation = generation + 1;
@@ -165,20 +186,27 @@ static sc_status commit(void *user, uint64_t generation,
 
 static sc_status reserve(void *user, uint32_t domain, uint64_t count, uint64_t *first) {
     (void)user;
-    if (failed) return SC_ERR_STORAGE;
-    if (domain < 1 || domain > 2 || count > UINT64_MAX - saved.next[domain])
+    if (failed) {
+        return SC_ERR_STORAGE;
+    }
+    if (domain < 1 || domain > 2 || count > UINT64_MAX - saved.next[domain]) {
         return SC_ERR_EXHAUSTED;
+    }
     uint64_t next[3] = {0, saved.next[1], saved.next[2]};
     next[domain] += count;
     int result = persist(saved.record, saved.length, saved.generation, next[1], next[2]);
-    if (result != SC_OK) return (sc_status)result;
+    if (result != SC_OK) {
+        return (sc_status)result;
+    }
     *first = saved.next[domain];
     saved.next[domain] = next[domain];
     return SC_OK;
 }
 
 API int ex_reboot(void) {
-    if (!ready || failed) return SC_ERR_STORAGE;
+    if (!ready || failed) {
+        return SC_ERR_STORAGE;
+    }
     sc_provider provider = {0};
     provider.user = &keystore;
     provider.public_key = sc_sodium_public;
@@ -198,79 +226,120 @@ API int ex_reboot(void) {
 }
 
 API int ex_init(int role, int fresh) {
-    if (ready || (role != SC_DEVICE && role != SC_SERVER) ||
-        !memchr(input + 32, 0, 33) || !input[32]) return SC_ERR_ARGUMENT;
-    if (sodium_init() < 0) return SC_ERR_RANDOM;
+    if (ready || (role != SC_DEVICE && role != SC_SERVER) || !memchr(input + 32, 0, 33) ||
+        !input[32]) {
+        return SC_ERR_ARGUMENT;
+    }
+    if (sodium_init() < 0) {
+        return SC_ERR_RANDOM;
+    }
     config.role = (sc_role)role;
     config.identity_key = 1;
     memcpy(config.peer_public_key, input, 32);
     memcpy(config.serial, input + 32, 33);
-    for (size_t i = 0; config.serial[i]; ++i)
-        if ((unsigned char)config.serial[i] < 33 || (unsigned char)config.serial[i] > 126)
+    for (size_t i = 0; config.serial[i]; ++i) {
+        if ((unsigned char)config.serial[i] < 33 || (unsigned char)config.serial[i] > 126) {
             return SC_ERR_ARGUMENT;
+        }
+    }
     sodium_memzero(input, sizeof input);
     int result = fresh ? crypto_sign_keypair(saved.public_key, saved.secret_key) : restore();
-    if (result != 0) return result < 0 ? result : SC_ERR_CRYPTO;
+    if (result != 0) {
+        return result < 0 ? result : SC_ERR_CRYPTO;
+    }
     keystore.lookup = lookup;
     ready = 1;
     return ex_reboot();
 }
 
-API uint8_t *ex_input(void) { return input; }
-API const char *ex_status(int status) { return sc_status_string((sc_status)status); }
-API int ex_begin(void) { return failed ? SC_ERR_STORAGE : sc_enrollment_begin(&context, get64(input + 2048), get64(input + 2056)); }
-API int ex_approve(void) { return failed ? SC_ERR_STORAGE : sc_enrollment_approve(&context, input, input + 32, get64(input + 2048)); }
-API int ex_cancel(void) { return failed ? SC_ERR_STORAGE : sc_enrollment_cancel(&context); }
-API int ex_issue(void) { return failed ? SC_ERR_STORAGE : sc_set_credits_issued(&context, get64(input + 2048)); }
-int ex_consume(uint64_t value) { return failed ? SC_ERR_STORAGE : sc_consume_credits(&context, value); }
+API uint8_t *ex_input(void) {
+    return input;
+}
+API const char *ex_status(int status) {
+    return sc_status_string((sc_status)status);
+}
+API int ex_begin(void) {
+    return failed ? SC_ERR_STORAGE
+                  : sc_enrollment_begin(&context, get64(input + 2048), get64(input + 2056));
+}
+API int ex_approve(void) {
+    return failed ? SC_ERR_STORAGE
+                  : sc_enrollment_approve(&context, input, input + 32, get64(input + 2048));
+}
+API int ex_cancel(void) {
+    return failed ? SC_ERR_STORAGE : sc_enrollment_cancel(&context);
+}
+API int ex_issue(void) {
+    return failed ? SC_ERR_STORAGE : sc_set_credits_issued(&context, get64(input + 2048));
+}
+int ex_consume(uint64_t value) {
+    return failed ? SC_ERR_STORAGE : sc_consume_credits(&context, value);
+}
 /* Read public balances for console diagnostics, without parsing display text
  * or duplicating the core's validation/commit decision. */
 int ex_device_credits(uint64_t *issued, uint64_t *consumed) {
     sc_state state;
     int result = sc_inspect(&context, &state);
-    if (result != SC_OK) return result;
+    if (result != SC_OK) {
+        return result;
+    }
     *issued = state.data.groups[0].values[0].u64;
     *consumed = state.data.groups[0].values[1].u64;
     return SC_OK;
 }
-API int ex_request(void) { return failed ? SC_ERR_STORAGE : sc_request_credit_status(&context); }
+API int ex_request(void) {
+    return failed ? SC_ERR_STORAGE : sc_request_credit_status(&context);
+}
 API int ex_receive(size_t length) {
-    if (failed) return SC_ERR_STORAGE;
-    if (length > SC_MAX_FRAME) return SC_ERR_BOUNDS;
+    if (failed) {
+        return SC_ERR_STORAGE;
+    }
+    if (length > SC_MAX_FRAME) {
+        return SC_ERR_BOUNDS;
+    }
     return sc_receive_at(&context, input, length, get64(input + 2048));
 }
 API int ex_outbound(void) {
     frame_length = 0;
     return failed ? SC_ERR_STORAGE : sc_outbound(&context, 512, frame, sizeof frame, &frame_length);
 }
-API const uint8_t *ex_frame(void) { return frame; }
-API size_t ex_frame_length(void) { return frame_length; }
+API const uint8_t *ex_frame(void) {
+    return frame;
+}
+API size_t ex_frame_length(void) {
+    return frame_length;
+}
 
 /* Human-readable device status for the C++ console. The JS inspector below
  * remains structured so the fleet can render exact counters without parsing
  * terminal output. Both views read the public core inspection API. */
 const char *ex_device_summary(void) {
     sc_state state;
-    if (sc_inspect(&context, &state) != SC_OK) return "Device unavailable.";
+    if (sc_inspect(&context, &state) != SC_OK) {
+        return "Device unavailable.";
+    }
     const sc_group_state *group = &state.data.groups[0];
     uint64_t issued = group->values[0].u64, consumed = group->values[1].u64;
     char key[65];
     sodium_bin2hex(key, sizeof key, saved.public_key, 32);
     snprintf(state_json, sizeof state_json,
-             "Device: %s\nRegistration: %s\nCredits issued: %" PRIu64
-             "\nCredits consumed: %" PRIu64 "\nCredits remaining: %" PRIu64
-             "\nPublic key: %s",
-             state.serial, state.registered ? "registered" : "awaiting enrollment",
-             issued, consumed, issued - consumed, key);
+             "Device: %s\nRegistration: %s\nCredits issued: %" PRIu64 "\nCredits consumed: %" PRIu64
+             "\nCredits remaining: %" PRIu64 "\nPublic key: %s",
+             state.serial, state.registered ? "registered" : "awaiting enrollment", issued,
+             consumed, issued - consumed, key);
     return state_json;
 }
 
 API const char *ex_state(void) {
     sc_state state;
-    if (sc_inspect(&context, &state) != SC_OK) return "null";
+    if (sc_inspect(&context, &state) != SC_OK) {
+        return "null";
+    }
     char serial[2 * SC_MAX_SERIAL + 1], *out = serial;
     for (const char *p = state.serial; *p; ++p) {
-        if (*p == '"' || *p == '\\') *out++ = '\\';
+        if (*p == '"' || *p == '\\') {
+            *out++ = '\\';
+        }
         *out++ = *p;
     }
     *out = 0;
@@ -287,8 +356,8 @@ API const char *ex_state(void) {
              "\"candidate_key\":\"%s\",\"enrollment_expires\":\"%" PRIu64 "\","
              "\"storage_generation\":\"%" PRIu64 "\",\"storage_failed\":%s}",
              serial, pk, peer, state.registered ? "true" : "false",
-             state.pending ? "true" : "false", group->values[0].u64,
-             group->values[1].u64, challenge, candidate, state.enrollment_expires,
-             state.storage_generation, failed ? "true" : "false");
+             state.pending ? "true" : "false", group->values[0].u64, group->values[1].u64,
+             challenge, candidate, state.enrollment_expires, state.storage_generation,
+             failed ? "true" : "false");
     return state_json;
 }

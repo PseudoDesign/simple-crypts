@@ -1,2 +1,8 @@
 package(default_visibility = ["//visibility:public"])
-exports_files(["endpoint.c", "endpoint.h", "endpoint.mjs", "storage.mjs"])
+
+exports_files([
+    "endpoint.c",
+    "endpoint.h",
+    "endpoint.mjs",
+    "storage.mjs",
+])

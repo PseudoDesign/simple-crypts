@@ -1,4 +1,5 @@
 """Doxygen output is an explicit Bazel tree artifact, never a source mutation."""
+
 def _api_impl(ctx):
     out = ctx.actions.declare_directory(ctx.label.name)
     ctx.actions.run(
@@ -10,6 +11,7 @@ def _api_impl(ctx):
         mnemonic = "GenerateAPI",
     )
     return [DefaultInfo(files = depset([out]), runfiles = ctx.runfiles(files = [out]))]
+
 api_docs = rule(implementation = _api_impl, attrs = {
     "srcs": attr.label_list(allow_files = True),
     "driver": attr.label(default = "//docs:build_api.py", allow_single_file = True),

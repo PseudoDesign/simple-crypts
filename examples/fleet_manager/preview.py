@@ -1,4 +1,5 @@
 """Serve the built example on loopback (a secure context for browser APIs)."""
+
 import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer

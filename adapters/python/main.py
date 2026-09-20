@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Test-only JSONL process adapter exercising the public Python SDK."""
+
 import base64
 import json
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "bindings" / "python"))
 from simplecrypts import Endpoint, Error, fixture_public_key
 
@@ -25,11 +27,24 @@ def main():
             if command == "init":
                 if endpoint:
                     raise ValueError("already initialized")
-                server_public = hex32(item["server_public_key"]) if "server_public_key" in item else fixture_public_key(hex32(item.get("server_seed", "22" * 32)))
-                endpoint = Endpoint(item["role"], item["storage"], item.get("serial", "SAMPLE-001"),
-                    hex32(item.get("secret", "33" * 32)), server_public_key=server_public,
-                    provisioned_seed=hex32(item["key_seed"]) if item.get("key_seed") is not None else None,
-                    random_unavailable=item.get("random_unavailable", item.get("provision_without_random", False)))
+                server_public = (
+                    hex32(item["server_public_key"])
+                    if "server_public_key" in item
+                    else fixture_public_key(hex32(item.get("server_seed", "22" * 32)))
+                )
+                endpoint = Endpoint(
+                    item["role"],
+                    item["storage"],
+                    item.get("serial", "SAMPLE-001"),
+                    hex32(item.get("secret", "33" * 32)),
+                    server_public_key=server_public,
+                    provisioned_seed=hex32(item["key_seed"])
+                    if item.get("key_seed") is not None
+                    else None,
+                    random_unavailable=item.get(
+                        "random_unavailable", item.get("provision_without_random", False)
+                    ),
+                )
                 if "initial_revision" in item:
                     endpoint.fixture_revision(int(item["initial_revision"]))
             elif endpoint is None:
@@ -39,7 +54,9 @@ def main():
             elif command == "enrollment_begin":
                 endpoint.enrollment_begin(item["now"], item["expires"])
             elif command == "enrollment_approve":
-                endpoint.enrollment_approve(hex32(item["challenge"]), hex32(item["key"]), item["now"])
+                endpoint.enrollment_approve(
+                    hex32(item["challenge"]), hex32(item["key"]), item["now"]
+                )
             elif command == "enrollment_cancel":
                 endpoint.enrollment_cancel()
             elif command == "rx_at":

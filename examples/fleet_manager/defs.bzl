@@ -1,4 +1,5 @@
 """Build a standalone static example, also consumed by the main site build."""
+
 def _site_impl(ctx):
     out = ctx.actions.declare_directory(ctx.label.name)
     files = ctx.files.assets + ctx.files.server + ctx.files.device

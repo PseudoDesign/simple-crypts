@@ -1,38 +1,57 @@
 /* Production Wasm endpoints. Storage failures are injected at the real provider
  * boundary; no test cryptography or fake protocol responses are linked. */
 import assert from 'node:assert/strict';
-import {webcrypto} from 'node:crypto';
-import {pathToFileURL} from 'node:url';
-import {resolve} from 'node:path';
-import {Endpoint} from '../common/endpoint.mjs';
-import {exchange} from './transport.mjs';
+import { webcrypto } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import { Endpoint } from '../common/endpoint.mjs';
+import { exchange } from './transport.mjs';
 
 globalThis.crypto ??= webcrypto;
 const serverFactory = (await import(pathToFileURL(resolve(process.argv[2])))).default;
 const deviceFactory = (await import(pathToFileURL(resolve(process.argv[3])))).default;
-const zero = '00'.repeat(32), now = 1900000000n;
+const zero = '00'.repeat(32),
+  now = 1900000000n;
 const stores = new Map();
 let failWrite = null;
-const storage = key => ({
-  async load() { return stores.get(key)?.slice(); },
+const storage = (key) => ({
+  async load() {
+    return stores.get(key)?.slice();
+  },
   async save(bytes) {
     if (failWrite?.(key, bytes)) throw new Error('Injected transaction failure');
     stores.set(key, bytes.slice());
   },
 });
-const open = (role, serial, pin = zero, fresh = true) => Endpoint.open(
-  role === 'server' ? serverFactory : deviceFactory,
-  storage(`${role}:${serial}`), role, serial, pin, fresh);
-const approve = server => {
+const open = (role, serial, pin = zero, fresh = true) =>
+  Endpoint.open(
+    role === 'server' ? serverFactory : deviceFactory,
+    storage(`${role}:${serial}`),
+    role,
+    serial,
+    pin,
+    fresh,
+  );
+const approve = (server) => {
   const candidate = server.state();
-  return server.server('approve', {challenge: candidate.challenge, key: candidate.candidate_key}, now);
+  return server.server(
+    'approve',
+    { challenge: candidate.challenge, key: candidate.candidate_key },
+    now,
+  );
 };
 
 let server = await open('server', 'wasm-01');
 let device = await open('device', 'wasm-01', server.state().public_key);
 const identity = device.state().public_key;
 assert.match((await device.console('help', now)).output, /sync/);
-for (const command of ['tx', 'rx aabb', 'consume -1', 'consume 18446744073709551616', 'status extra'])
+for (const command of [
+  'tx',
+  'rx aabb',
+  'consume -1',
+  'consume 18446744073709551616',
+  'status extra',
+])
   assert.equal((await device.console(command, now)).error, true);
 for (const command of ['consume 0', 'consume -1', 'consume 1.5', 'consume 18446744073709551616']) {
   const result = await device.console(command, now);
@@ -46,12 +65,12 @@ assert.equal((await device.console('sync', now)).sync, true);
 assert.equal(await device.outbound(), null);
 await server.server('begin', {}, now);
 const events = [];
-await exchange(server, device, now, text => events.push(text));
+await exchange(server, device, now, (text) => events.push(text));
 assert.equal(server.state().registered, false);
 assert.equal(device.state().registered, false);
 assert.equal(server.state().candidate_key, identity);
 assert.match(events.join('\n'), /Awaiting server approval/);
-await assert.rejects(server.server('approve', {challenge: zero, key: identity}, now));
+await assert.rejects(server.server('approve', { challenge: zero, key: identity }, now));
 await approve(server);
 // A server restart before confirmation must recover through the same transport.
 server = await open('server', 'wasm-01', zero, false);
@@ -63,7 +82,7 @@ assert.match(emptyBalance.output, /Insufficient credits: requested 25, available
 assert.match(emptyBalance.output, /No credits consumed.*fleet table/);
 assert.equal(device.state().credits_consumed, '0');
 
-await server.server('issue', {total: '100'}, now);
+await server.server('issue', { total: '100' }, now);
 const grant = await server.outbound();
 await device.receive(grant, now);
 await exchange(server, device, now);
@@ -88,7 +107,7 @@ assert.equal(device.state().public_key, identity);
 assert.equal(device.state().credits_consumed, '25');
 
 // Server work remains durable while a simulated device is stopped.
-await server.server('issue', {total: '200'}, now);
+await server.server('issue', { total: '200' }, now);
 await exchange(server, null, now);
 assert.equal(device.state().credits_issued, '100');
 await exchange(server, device, now);
@@ -110,12 +129,14 @@ await second.server('begin', {}, now);
 await exchange(second, other, now);
 await approve(second);
 await exchange(second, other, now);
-await second.server('issue', {total: '18446744073709551614'}, now);
+await second.server('issue', { total: '18446744073709551614' }, now);
 await exchange(second, other, now);
-assert.match((await other.console('consume 18446744073709551615', now)).output,
-  /requested 18446744073709551615, available 18446744073709551614/);
+assert.match(
+  (await other.console('consume 18446744073709551615', now)).output,
+  /requested 18446744073709551615, available 18446744073709551614/,
+);
 assert.equal(other.state().credits_consumed, '0');
-await second.server('issue', {total: '18446744073709551615'}, now);
+await second.server('issue', { total: '18446744073709551615' }, now);
 await exchange(second, other, now);
 assert.equal(other.state().credits_issued, '18446744073709551615');
 await other.console('consume 18446744073709551615', now);
@@ -128,7 +149,7 @@ assert.match(exhausted.output, /lifetime consumption is 18446744073709551615.*wo
 
 // A failed debit is neither reported successful nor recovered as successful.
 const before = stores.get('device:wasm-01').slice();
-failWrite = key => key === 'device:wasm-01';
+failWrite = (key) => key === 'device:wasm-01';
 const storageFailure = await device.console('consume 1', now);
 assert.equal(storageFailure.error, true);
 assert.match(storageFailure.output, /Could not safely read or save device state/);
@@ -144,7 +165,7 @@ assert.equal(device.state().credits_consumed, '25');
 await server.server('request', {}, now);
 await device.receive(await server.outbound(), now);
 const beforeReservation = stores.get('device:wasm-01').slice();
-failWrite = key => key === 'device:wasm-01';
+failWrite = (key) => key === 'device:wasm-01';
 await assert.rejects(device.outbound());
 assert.deepEqual(stores.get('device:wasm-01'), beforeReservation);
 failWrite = null;
@@ -160,10 +181,10 @@ await exchange(server, device, now);
 await server.server('request', {}, now);
 await device.receive(await server.outbound(), now);
 device = await open('device', 'wasm-01', server.state().public_key, false);
-const highWater = blob => new DataView(blob.buffer, blob.byteOffset).getBigUint64(186, false);
+const highWater = (blob) => new DataView(blob.buffer, blob.byteOffset).getBigUint64(186, false);
 const oldHighWater = highWater(stores.get('device:wasm-01'));
 let writes = 0;
-failWrite = key => key === 'device:wasm-01' && ++writes === 2;
+failWrite = (key) => key === 'device:wasm-01' && ++writes === 2;
 await assert.rejects(device.outbound());
 assert.equal(writes, 2);
 assert.equal(highWater(stores.get('device:wasm-01')), oldHighWater + 32n);
@@ -177,8 +198,16 @@ await assert.rejects(open('device', 'wasm-01', server.state().public_key, false)
 
 // The action-driven transport has a finite limit even for a broken endpoint.
 let count = 0;
-const looping = {state: () => ({registered: true}),
-  outbound: async () => { count++; return new Uint8Array([1]); }, receive: async () => {}};
+const looping = {
+  state: () => ({ registered: true }),
+  outbound: async () => {
+    count++;
+    return new Uint8Array([1]);
+  },
+  receive: async () => {},
+};
 await assert.rejects(exchange(looping, looping, now), /did not settle/);
 assert.equal(count, 16);
-console.log('Interactive transport, explicit approval, C++ commands, exact credits, persistence and nonce safety passed.');
+console.log(
+  'Interactive transport, explicit approval, C++ commands, exact credits, persistence and nonce safety passed.',
+);

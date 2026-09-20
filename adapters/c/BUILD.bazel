@@ -1,4 +1,15 @@
 load("//build:defs.bzl", "c_binary")
-package(default_visibility=["//visibility:public"])
-c_binary(name="adapter", srcs=["main.c"], deps=["//providers/host:host_testing"], copts=["-DSC_ENABLE_TESTING"])
-filegroup(name="sources", srcs=["main.c"])
+
+package(default_visibility = ["//visibility:public"])
+
+c_binary(
+    name = "adapter",
+    srcs = ["main.c"],
+    copts = ["-DSC_ENABLE_TESTING"],
+    deps = ["//providers/host:host_testing"],
+)
+
+filegroup(
+    name = "sources",
+    srcs = ["main.c"],
+)

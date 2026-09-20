@@ -1,5 +1,34 @@
 load("//build:defs.bzl", "c_library")
+
 package(default_visibility = ["//visibility:public"])
-c_library(name = "proto", srcs = ["sc.pb.c"], hdrs = ["sc.pb.h", "resources.h", "test_resources.h"], deps = ["//third_party/nanopb:runtime"])
-exports_files(glob(["*.proto", "*.options", "*.pb.c", "*.pb.h", "resources.h", "test_resources.h", "*.json"]))
-filegroup(name="sources", srcs=["sc.pb.c", "sc.pb.h", "resources.h", "test_resources.h"])
+
+c_library(
+    name = "proto",
+    srcs = ["sc.pb.c"],
+    hdrs = [
+        "resources.h",
+        "sc.pb.h",
+        "test_resources.h",
+    ],
+    deps = ["//third_party/nanopb:runtime"],
+)
+
+exports_files(glob([
+    "*.proto",
+    "*.options",
+    "*.pb.c",
+    "*.pb.h",
+    "resources.h",
+    "test_resources.h",
+    "*.json",
+]))
+
+filegroup(
+    name = "sources",
+    srcs = [
+        "resources.h",
+        "sc.pb.c",
+        "sc.pb.h",
+        "test_resources.h",
+    ],
+)

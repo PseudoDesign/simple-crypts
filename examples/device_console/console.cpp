@@ -12,13 +12,12 @@
 namespace {
 char line[4097];
 std::string output;
-constexpr const char *help =
-    "help                Show commands\n"
-    "status              Show identity and credit balance\n"
-    "consume <amount>    Spend credits on this device\n"
-    "sync                Exchange pending messages with the server\n"
-    "reboot              Restart with saved identity and credits\n"
-    "quit                Stop this device";
+constexpr const char *help = "help                Show commands\n"
+                             "status              Show identity and credit balance\n"
+                             "consume <amount>    Spend credits on this device\n"
+                             "sync                Exchange pending messages with the server\n"
+                             "reboot              Restart with saved identity and credits\n"
+                             "quit                Stop this device";
 
 // These explanations belong to the example application. The public library's
 // status codes and its validation/storage behavior remain unchanged.
@@ -60,20 +59,26 @@ std::string explain(int status) {
 
 bool amount(const std::string &text, uint64_t &value) {
     value = 0;
-    if (text.empty() || text.size() > 20) return false;
+    if (text.empty() || text.size() > 20) {
+        return false;
+    }
     for (char c : text) {
-        if (c < '0' || c > '9' ||
-            value > (std::numeric_limits<uint64_t>::max() - (c - '0')) / 10)
+        if (c < '0' || c > '9' || value > (std::numeric_limits<uint64_t>::max() - (c - '0')) / 10) {
             return false;
+        }
         value = value * 10 + (c - '0');
     }
     return true;
 }
-}
+} // namespace
 
 extern "C" {
-EMSCRIPTEN_KEEPALIVE char *device_line() { return line; }
-EMSCRIPTEN_KEEPALIVE const char *device_output() { return output.c_str(); }
+EMSCRIPTEN_KEEPALIVE char *device_line() {
+    return line;
+}
+EMSCRIPTEN_KEEPALIVE const char *device_output() {
+    return output.c_str();
+}
 
 // 0=local result, 1=quit, 2=error, 3=synchronize. The worker reads output only
 // after this awaited call returns, including any durable storage operations.
@@ -82,18 +87,24 @@ EMSCRIPTEN_KEEPALIVE int device_command(void) {
     std::istringstream stream(line);
     std::string command, argument, extra;
     stream >> command;
-    if (command.empty()) return 0;
+    if (command.empty()) {
+        return 0;
+    }
     stream >> argument >> extra;
     if (!extra.empty() || (command == "consume" ? argument.empty() : !argument.empty())) {
         output = command == "consume"
-            ? "error: Usage: consume <amount>. Enter one positive whole number, for example: consume 25."
-            : "error: " + command + " does not accept arguments. Type help for available commands.";
+                     ? "error: Usage: consume <amount>. Enter one positive whole number, for "
+                       "example: consume 25."
+                     : "error: " + command +
+                           " does not accept arguments. Type help for available commands.";
         return 2;
     }
     int status = 0;
-    if (command == "help") output = help;
-    else if (command == "status") output = ex_device_summary();
-    else if (command == "sync") {
+    if (command == "help") {
+        output = help;
+    } else if (command == "status") {
+        output = ex_device_summary();
+    } else if (command == "sync") {
         output = "Synchronizing with server...";
         return 3;
     } else if (command == "quit") {
@@ -109,12 +120,14 @@ EMSCRIPTEN_KEEPALIVE int device_command(void) {
         uint64_t value;
         if (!amount(argument, value) || value == 0) {
             output = "error: Invalid credit amount. Enter a positive whole number from 1 to "
-                     "18446744073709551615, without signs, decimals, or separators. Example: consume 25.";
+                     "18446744073709551615, without signs, decimals, or separators. Example: "
+                     "consume 25.";
             return 2;
         }
         status = ex_consume(value);
         if (status == SC_OK) {
-            output = "Consumed " + std::to_string(value) + " credits. Server learns this on its next report request.";
+            output = "Consumed " + std::to_string(value) +
+                     " credits. Server learns this on its next report request.";
         } else {
             uint64_t issued = 0, consumed = 0;
             // Inspect only after the core rejects the operation. Storage and
@@ -127,10 +140,12 @@ EMSCRIPTEN_KEEPALIVE int device_command(void) {
                              "fleet table, then connect this device or run sync.";
                     return 2;
                 }
-                if (status == SC_ERR_EXHAUSTED && value > std::numeric_limits<uint64_t>::max() - consumed) {
+                if (status == SC_ERR_EXHAUSTED &&
+                    value > std::numeric_limits<uint64_t>::max() - consumed) {
                     output = "error: Cannot consume " + std::to_string(value) +
                              " credits: lifetime consumption is " + std::to_string(consumed) +
-                             " and would exceed the maximum of 18446744073709551615. No credits consumed.";
+                             " and would exceed the maximum of 18446744073709551615. No credits "
+                             "consumed.";
                     return 2;
                 }
             }

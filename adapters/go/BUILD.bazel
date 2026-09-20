@@ -1,3 +1,20 @@
 load("//build:defs.bzl", "sdk_binary")
-package(default_visibility=["//visibility:public"])
-sdk_binary(name="adapter", kind="go", module="adapters/go", sdk="@go_sdk//:files", sdk_marker="@go_sdk//:bin/go", shared="//providers/host:libsimplecrypts_testing", srcs=glob(["*.go", "go.mod"])+["//bindings/go:sources", "//providers/host:sc_host.h", "//core:sources"])
+
+package(default_visibility = ["//visibility:public"])
+
+sdk_binary(
+    name = "adapter",
+    srcs = glob([
+        "*.go",
+        "go.mod",
+    ]) + [
+        "//bindings/go:sources",
+        "//core:sources",
+        "//providers/host:sc_host.h",
+    ],
+    kind = "go",
+    module = "adapters/go",
+    sdk = "@go_sdk//:files",
+    sdk_marker = "@go_sdk//:bin/go",
+    shared = "//providers/host:libsimplecrypts_testing",
+)

@@ -20,8 +20,8 @@ int main(void) {
         return 1;
     }
     randombytes_buf(secret, sizeof secret);
-    status = sc_host_initialize(SC_SERVER, directory, "example-device", secret,
-                                NULL, NULL, 0, &server);
+    status =
+        sc_host_initialize(SC_SERVER, directory, "example-device", secret, NULL, NULL, 0, &server);
     sodium_memzero(secret, sizeof secret);
     if (status == SC_OK) {
         status = sc_host_enrollment_enable(server);

@@ -1,12 +1,37 @@
-module(name = "simple_crypts", version = "0.1.0")
+module(
+    name = "simple_crypts",
+    version = "0.1.0",
+)
 
 bazel_dep(name = "platforms", version = "0.0.11")
-local_path_override(module_name = "platforms", path = "third_party/platforms")
+local_path_override(
+    module_name = "platforms",
+    path = "third_party/platforms",
+)
 
 local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
-local_repository(name = "go_sdk", path = ".toolchains/go")
-local_repository(name = "rust_sdk", path = ".toolchains/rust")
-local_repository(name = "python_packages", path = ".toolchains/python")
-local_repository(name = "protobuf_sdk", path = ".toolchains/protobuf")
 
-local_repository(name = "emscripten_sdk", path = ".toolchains/emscripten")
+local_repository(
+    name = "go_sdk",
+    path = ".toolchains/go",
+)
+
+local_repository(
+    name = "rust_sdk",
+    path = ".toolchains/rust",
+)
+
+local_repository(
+    name = "python_packages",
+    path = ".toolchains/python",
+)
+
+local_repository(
+    name = "protobuf_sdk",
+    path = ".toolchains/protobuf",
+)
+
+local_repository(
+    name = "emscripten_sdk",
+    path = ".toolchains/emscripten",
+)

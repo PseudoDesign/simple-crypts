@@ -1,17 +1,66 @@
-load("//build:defs.bzl", "c_test", "py_test", "conformance_matrix")
+load("//build:defs.bzl", "c_test", "conformance_matrix", "py_test")
+
 exports_files(["coordinator.py"])
-c_test(name="core_test", srcs=["core_test.c"], hdrs=["//schema:test_resources.h"], deps=["//core:sc_testing"], copts=["-DSC_ENABLE_TESTING"])
-py_test(name="bindings_python", main="bindings_python.py", shared="//providers/host:libsimplecrypts_testing", data=["//bindings/python:simplecrypts.py"])
-conformance_matrix()
-c_test(name="core_fuzz_smoke", srcs=["core_fuzz.c"], deps=["//core:sc_testing"], copts=["-DSC_ENABLE_TESTING", "-DSC_FUZZ_STANDALONE"])
-py_test(name="relay_replay", main="relay_replay.py", data=["coordinator.py", "conformance.py", "//adapters/c:adapter", "//adapters/python:adapter"], script_args=["--device", "adapters/c/adapter", "--server", "adapters/python/adapter"])
+
+c_test(
+    name = "core_test",
+    srcs = ["core_test.c"],
+    hdrs = ["//schema:test_resources.h"],
+    copts = ["-DSC_ENABLE_TESTING"],
+    deps = ["//core:sc_testing"],
+)
+
 py_test(
-    name="sanitizers",
-    main="sanitizers.py",
-    data=[
-        "core_test.c", "core_fuzz.c", "conformance.py", "coordinator.py",
-        "//core:sources", "//schema:sources", "//third_party/nanopb:sources",
-        "//providers/sodium:sources", "//providers/host:sources", "//adapters/c:sources",
-        "//third_party/libsodium:headers", "//third_party/libsodium:sodium",
+    name = "bindings_python",
+    data = ["//bindings/python:simplecrypts.py"],
+    main = "bindings_python.py",
+    shared = "//providers/host:libsimplecrypts_testing",
+)
+
+conformance_matrix()
+
+c_test(
+    name = "core_fuzz_smoke",
+    srcs = ["core_fuzz.c"],
+    copts = [
+        "-DSC_ENABLE_TESTING",
+        "-DSC_FUZZ_STANDALONE",
     ],
+    deps = ["//core:sc_testing"],
+)
+
+py_test(
+    name = "relay_replay",
+    data = [
+        "conformance.py",
+        "coordinator.py",
+        "//adapters/c:adapter",
+        "//adapters/python:adapter",
+    ],
+    main = "relay_replay.py",
+    script_args = [
+        "--device",
+        "adapters/c/adapter",
+        "--server",
+        "adapters/python/adapter",
+    ],
+)
+
+py_test(
+    name = "sanitizers",
+    data = [
+        "conformance.py",
+        "coordinator.py",
+        "core_fuzz.c",
+        "core_test.c",
+        "//adapters/c:sources",
+        "//core:sources",
+        "//providers/host:sources",
+        "//providers/sodium:sources",
+        "//schema:sources",
+        "//third_party/libsodium:headers",
+        "//third_party/libsodium:sodium",
+        "//third_party/nanopb:sources",
+    ],
+    main = "sanitizers.py",
 )

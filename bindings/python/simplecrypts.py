@@ -4,6 +4,7 @@ Each Endpoint owns one native handle; use it as a context manager or close it.
 Endpoint methods are synchronous and require external synchronization if shared
 between threads. Encryption, enrollment and persistence run in the shared core.
 """
+
 import json
 import os
 from pathlib import Path
@@ -66,18 +67,35 @@ def fixture_public_key(seed):
 
 
 class Endpoint:
-    def __init__(self, role, storage, serial, secret, *, server_public_key=None,
-                 provisioned_seed=None, random_unavailable=False):
+    def __init__(
+        self,
+        role,
+        storage,
+        serial,
+        secret,
+        *,
+        server_public_key=None,
+        provisioned_seed=None,
+        random_unavailable=False,
+    ):
         if role not in ("device", "server"):
             raise ValueError("role must be device or server")
         if "\0" in str(storage) or "\0" in serial:
             raise ValueError("NUL in storage or serial")
         self._handle = _ffi.NULL
         result = _ffi.new("sc_host **")
-        _check(_lib.sc_host_initialize(
-            1 if role == "device" else 2, os.fsencode(storage), serial.encode(),
-            _bytes32(secret), _bytes32(provisioned_seed, True),
-            _bytes32(server_public_key, True), bool(random_unavailable), result))
+        _check(
+            _lib.sc_host_initialize(
+                1 if role == "device" else 2,
+                os.fsencode(storage),
+                serial.encode(),
+                _bytes32(secret),
+                _bytes32(provisioned_seed, True),
+                _bytes32(server_public_key, True),
+                bool(random_unavailable),
+                result,
+            )
+        )
         self._handle = result[0]
 
     def _open(self):
@@ -108,7 +126,9 @@ class Endpoint:
         _check(_lib.sc_host_enrollment_begin(self._open(), now, expires))
 
     def enrollment_approve(self, challenge, key, now):
-        _check(_lib.sc_host_enrollment_approve(self._open(), _bytes32(challenge), _bytes32(key), now))
+        _check(
+            _lib.sc_host_enrollment_approve(self._open(), _bytes32(challenge), _bytes32(key), now)
+        )
 
     def enrollment_cancel(self):
         _check(_lib.sc_host_enrollment_cancel(self._open()))
@@ -120,7 +140,7 @@ class Endpoint:
 
     @staticmethod
     def _uint64(value):
-        if isinstance(value,bool) or not isinstance(value,int) or not 0<=value<2**64:
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < 2**64:
             raise ValueError("value must be a uint64")
         return value
 
@@ -135,37 +155,59 @@ class Endpoint:
 
     def update_group(self, group_id, updates):
         """Atomically apply [(field_id, type, value)], validated by the schema."""
-        types={"uint64":1,"int64":2,"bool":3,"text":4,"bytes":5}
-        data=bytearray()
-        for field,kind,value in updates:
-            tag=types[kind]
-            if tag in (1,2):
-                if isinstance(value,bool) or not isinstance(value,int):raise ValueError("integer required")
-                raw=value.to_bytes(8,"big",signed=tag==2)
-            elif tag==3:
-                if not isinstance(value,bool):raise ValueError("Boolean required")
-                raw=bytes([value])
-            elif tag==4:raw=value.encode("utf-8")
+        types = {"uint64": 1, "int64": 2, "bool": 3, "text": 4, "bytes": 5}
+        data = bytearray()
+        for field, kind, value in updates:
+            tag = types[kind]
+            if tag in (1, 2):
+                if isinstance(value, bool) or not isinstance(value, int):
+                    raise ValueError("integer required")
+                raw = value.to_bytes(8, "big", signed=tag == 2)
+            elif tag == 3:
+                if not isinstance(value, bool):
+                    raise ValueError("Boolean required")
+                raw = bytes([value])
+            elif tag == 4:
+                raw = value.encode("utf-8")
             else:
-                if not isinstance(value,bytes):raise ValueError("bytes required")
-                raw=value
-            if len(raw)>64:raise ValueError("resource exceeds value bound")
-            data+=int(field).to_bytes(2,"big")+bytes([tag,len(raw)])+raw
-        if not 0<group_id<65536:raise ValueError("invalid group")
-        _check(_lib.sc_host_update_group(self._open(),group_id,bytes(data),len(data)))
+                if not isinstance(value, bytes):
+                    raise ValueError("bytes required")
+                raw = value
+            if len(raw) > 64:
+                raise ValueError("resource exceeds value bound")
+            data += int(field).to_bytes(2, "big") + bytes([tag, len(raw)]) + raw
+        if not 0 < group_id < 65536:
+            raise ValueError("invalid group")
+        _check(_lib.sc_host_update_group(self._open(), group_id, bytes(data), len(data)))
 
     def request_group(self, group_id):
-        if not 0<group_id<65536:raise ValueError("invalid group")
-        _check(_lib.sc_host_request_group(self._open(),group_id))
+        if not 0 < group_id < 65536:
+            raise ValueError("invalid group")
+        _check(_lib.sc_host_request_group(self._open(), group_id))
 
     def inspect_group(self, group_id):
-        if not 0<group_id<65536:raise ValueError("invalid group")
-        out=_ffi.new("char[1024]");_check(_lib.sc_host_inspect_group(self._open(),group_id,out,1024))
-        result=json.loads(_ffi.string(out));data=bytes.fromhex(result.pop("data"));values={}
+        if not 0 < group_id < 65536:
+            raise ValueError("invalid group")
+        out = _ffi.new("char[1024]")
+        _check(_lib.sc_host_inspect_group(self._open(), group_id, out, 1024))
+        result = json.loads(_ffi.string(out))
+        data = bytes.fromhex(result.pop("data"))
+        values = {}
         while data:
-            field=int.from_bytes(data[:2],"big");tag,n=data[2:4];raw=data[4:4+n];data=data[4+n:]
-            values[field]=int.from_bytes(raw,"big",signed=tag==2) if tag in (1,2) else bool(raw[0]) if tag==3 else raw.decode("utf-8") if tag==4 else raw
-        result["values"]=values
+            field = int.from_bytes(data[:2], "big")
+            tag, n = data[2:4]
+            raw = data[4 : 4 + n]
+            data = data[4 + n :]
+            values[field] = (
+                int.from_bytes(raw, "big", signed=tag == 2)
+                if tag in (1, 2)
+                else bool(raw[0])
+                if tag == 3
+                else raw.decode("utf-8")
+                if tag == 4
+                else raw
+            )
+        result["values"] = values
         return result
 
     def receive(self, frame):
@@ -174,7 +216,7 @@ class Endpoint:
         _check(_lib.sc_host_receive(self._open(), frame, len(frame)))
 
     def outbound(self, budget=512, capacity=512):
-        if not 0 <= capacity <= 65536 or not 0 <= budget <= 2**32-1:
+        if not 0 <= capacity <= 65536 or not 0 <= budget <= 2**32 - 1:
             raise ValueError("invalid buffer or byte budget")
         output = _ffi.new("unsigned char[]", max(1, capacity))
         length = _ffi.new("size_t *")
@@ -190,11 +232,11 @@ class Endpoint:
         return json.loads(_ffi.string(output))
 
     def fail(self, operation, count=1):
-        if not 0 <= count <= 2**32-1 or "\0" in operation:
+        if not 0 <= count <= 2**32 - 1 or "\0" in operation:
             raise ValueError("invalid fault request")
         _check(_lib.sc_host_fail(self._open(), operation.encode(), count))
 
     def fixture_revision(self, revision):
-        if not 0 <= revision <= 2**64-1:
+        if not 0 <= revision <= 2**64 - 1:
             raise ValueError("revision out of range")
         _check(_lib.sc_host_fixture_revision(self._open(), revision))

@@ -1,3 +1,18 @@
 load("//build:defs.bzl", "sdk_binary")
-package(default_visibility=["//visibility:public"])
-sdk_binary(name="adapter", kind="rust", module="bindings/rust", binary="simplecrypts-rust", sdk="@rust_sdk//:files", sdk_marker="@rust_sdk//:bin/rustc", shared="//providers/host:libsimplecrypts_testing", srcs=["main.rs", "//bindings/rust:sources", "//third_party/rust_crates:sources"])
+
+package(default_visibility = ["//visibility:public"])
+
+sdk_binary(
+    name = "adapter",
+    srcs = [
+        "main.rs",
+        "//bindings/rust:sources",
+        "//third_party/rust_crates:sources",
+    ],
+    binary = "simplecrypts-rust",
+    kind = "rust",
+    module = "bindings/rust",
+    sdk = "@rust_sdk//:files",
+    sdk_marker = "@rust_sdk//:bin/rustc",
+    shared = "//providers/host:libsimplecrypts_testing",
+)

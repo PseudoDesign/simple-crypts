@@ -1,21 +1,132 @@
-load(":defs.bzl", "wasm_build")
-package(default_visibility=["//visibility:public"])
+load("//build:defs.bzl", "py_binary", "py_test")
+load(":defs.bzl", "demo_site", "wasm_build")
+
+package(default_visibility = ["//visibility:public"])
+
 exports_files(["build.py"])
-wasm_build(name="sodium", kind="sodium", output="libsodium_web.a", inputs=["//third_party/libsodium:sources"])
-SOURCES=["bridge.c","//core:sc.c","//providers/sodium:sc_sodium.c","//schema:sc.pb.c","//third_party/nanopb:pb_common.c","//third_party/nanopb:pb_encode.c","//third_party/nanopb:pb_decode.c"]
-HEADERS=["//core:sources","//providers/sodium:sources","//schema:sources","//third_party/nanopb:sources","//third_party/libsodium:headers"]
-wasm_build(name="module",kind="module",output="endpoint.wasm.mjs",sources=SOURCES,inputs=HEADERS,sodium=":sodium")
-wasm_build(name="test_module",kind="module",output="endpoint.test.mjs",sources=SOURCES,inputs=HEADERS,sodium=":sodium",testing=True)
-load("//build:defs.bzl", "py_test", "py_binary")
-py_test(name="protocol_test",main="run_protocol_test.py",data=["protocol_test.mjs","endpoint.mjs",":module",":test_module","//adapters/c:adapter"])
-load(":defs.bzl", "demo_site")
-demo_site(name="site",inputs=["THIRD_PARTY_NOTICES.txt","index.html","landing.css","demo.html","style.css","app.mjs","lab.mjs","endpoint.mjs","worker.mjs","resources.mjs","//site:report_snapshot","//tools:test_report.py"])
-py_binary(name="preview",main="preview.py",data=[":site"])
-py_test(name="lab_test",main="run_lab_test.py",data=["lab_test.mjs","lab.mjs","endpoint.mjs"])
-py_test(name="site_test",main="site_test.py",data=["site.py",":site","//tools:test_report.py"])
+
+wasm_build(
+    name = "sodium",
+    inputs = ["//third_party/libsodium:sources"],
+    kind = "sodium",
+    output = "libsodium_web.a",
+)
+
+SOURCES = [
+    "bridge.c",
+    "//core:sc.c",
+    "//providers/sodium:sc_sodium.c",
+    "//schema:sc.pb.c",
+    "//third_party/nanopb:pb_common.c",
+    "//third_party/nanopb:pb_encode.c",
+    "//third_party/nanopb:pb_decode.c",
+]
+
+HEADERS = [
+    "//core:sources",
+    "//providers/sodium:sources",
+    "//schema:sources",
+    "//third_party/nanopb:sources",
+    "//third_party/libsodium:headers",
+]
+
+wasm_build(
+    name = "module",
+    inputs = HEADERS,
+    kind = "module",
+    output = "endpoint.wasm.mjs",
+    sodium = ":sodium",
+    sources = SOURCES,
+)
+
+wasm_build(
+    name = "test_module",
+    inputs = HEADERS,
+    kind = "module",
+    output = "endpoint.test.mjs",
+    sodium = ":sodium",
+    sources = SOURCES,
+    testing = True,
+)
+
+py_test(
+    name = "protocol_test",
+    data = [
+        "endpoint.mjs",
+        "protocol_test.mjs",
+        ":module",
+        ":test_module",
+        "//adapters/c:adapter",
+    ],
+    main = "run_protocol_test.py",
+)
+
+demo_site(
+    name = "site",
+    inputs = [
+        "THIRD_PARTY_NOTICES.txt",
+        "index.html",
+        "landing.css",
+        "demo.html",
+        "style.css",
+        "app.mjs",
+        "lab.mjs",
+        "endpoint.mjs",
+        "worker.mjs",
+        "resources.mjs",
+        "//site:report_snapshot",
+        "//tools:test_report.py",
+    ],
+)
+
+py_binary(
+    name = "preview",
+    data = [":site"],
+    main = "preview.py",
+)
+
+py_test(
+    name = "lab_test",
+    data = [
+        "endpoint.mjs",
+        "lab.mjs",
+        "lab_test.mjs",
+    ],
+    main = "run_lab_test.py",
+)
+
+py_test(
+    name = "site_test",
+    data = [
+        "site.py",
+        ":site",
+        "//tools:test_report.py",
+    ],
+    main = "site_test.py",
+)
+
 # Explicit acceptance target: browser caches and local sockets are prerequisites.
 # Kept manual so a core-only checkout need not install browser engines.
-filegroup(name="browser_packages",srcs=glob(["node_modules/**"],allow_empty=True))
-py_test(name="browser_test",main="run_browser_test.py",data=["browser_test.mjs",":site",":browser_packages"],tags=["manual","local"])
+filegroup(
+    name = "browser_packages",
+    srcs = glob(
+        ["node_modules/**"],
+        allow_empty = True,
+    ),
+)
+
+py_test(
+    name = "browser_test",
+    data = [
+        "browser_test.mjs",
+        ":browser_packages",
+        ":site",
+    ],
+    main = "run_browser_test.py",
+    tags = [
+        "local",
+        "manual",
+    ],
+)
 
 exports_files(["resources.mjs"])

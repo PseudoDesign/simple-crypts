@@ -12,8 +12,9 @@ export async function exchange(server, device, now, log = () => {}) {
     const frame = await sender.outbound();
     if (!frame) return false;
     const before = receiver.state();
-    try { await receiver.receive(frame, now); }
-    catch (error) {
+    try {
+      await receiver.receive(frame, now);
+    } catch (error) {
       log(`${label}: rejected (${error.message}).`);
       throw error;
     }

@@ -6,7 +6,7 @@ export async function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('simple-crypts-fleet-v1', 1);
     request.onupgradeneeded = () => {
-      request.result.createObjectStore('fleet', {keyPath: 'serial'});
+      request.result.createObjectStore('fleet', { keyPath: 'serial' });
       request.result.createObjectStore('endpoints');
     };
     request.onerror = () => reject(request.error);
@@ -17,28 +17,34 @@ export async function openDatabase() {
 
 export function transaction(db, store, mode, operation) {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, mode, {durability: 'strict'});
+    const tx = db.transaction(store, mode, { durability: 'strict' });
     let request;
-    try { request = operation(tx.objectStore(store)); }
-    catch (error) { tx.abort(); reject(error); return; }
+    try {
+      request = operation(tx.objectStore(store));
+    } catch (error) {
+      tx.abort();
+      reject(error);
+      return;
+    }
     // Request success is insufficient: a later abort must still fail the call.
     tx.oncomplete = () => resolve(request?.result);
     tx.onabort = tx.onerror = () => reject(tx.error ?? new Error('Storage transaction aborted'));
   });
 }
 
-export const rows = db => transaction(db, 'fleet', 'readonly', store => store.getAll());
+export const rows = (db) => transaction(db, 'fleet', 'readonly', (store) => store.getAll());
 export const saveRow = (db, row, create = false) =>
-  transaction(db, 'fleet', 'readwrite', store => create ? store.add(row) : store.put(row));
+  transaction(db, 'fleet', 'readwrite', (store) => (create ? store.add(row) : store.put(row)));
 
 export function endpointStorage(db, serial, role, fresh) {
   const key = `${role}:${serial}`;
   let first = fresh;
   return {
-    load: () => transaction(db, 'endpoints', 'readonly', store => store.get(key)),
+    load: () => transaction(db, 'endpoints', 'readonly', (store) => store.get(key)),
     async save(bytes) {
-      await transaction(db, 'endpoints', 'readwrite', store =>
-        first ? store.add(bytes, key) : store.put(bytes, key));
+      await transaction(db, 'endpoints', 'readwrite', (store) =>
+        first ? store.add(bytes, key) : store.put(bytes, key),
+      );
       first = false;
     },
   };
@@ -48,7 +54,7 @@ export function endpointStorage(db, serial, role, fresh) {
 // lock. Do not discard live endpoints until the deletion commits successfully.
 export function clearFleet(db) {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(['fleet', 'endpoints'], 'readwrite', {durability: 'strict'});
+    const tx = db.transaction(['fleet', 'endpoints'], 'readwrite', { durability: 'strict' });
     tx.objectStore('fleet').clear();
     tx.objectStore('endpoints').clear();
     tx.oncomplete = resolve;

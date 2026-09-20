@@ -1,5 +1,40 @@
 load("//build:defs.bzl", "c_library")
-package(default_visibility=["//visibility:public"])
-c_library(name="sc", srcs=["sc.c"], hdrs=["sc.h", "data.h", "data.inc", "//modules/credits:credits.inc", "//schema:resources.h"], deps=["//schema:proto"])
-c_library(name="sc_testing", srcs=["sc.c"], hdrs=["sc.h", "data.h", "data.inc", "//modules/credits:credits.inc", "//schema:resources.h", "sc_test.h"], deps=["//schema:proto"], copts=["-DSC_ENABLE_TESTING"])
-filegroup(name="sources", srcs=glob(["*.c", "*.h", "*.inc"])+["//modules/credits:credits.inc"])
+
+package(default_visibility = ["//visibility:public"])
+
+c_library(
+    name = "sc",
+    srcs = ["sc.c"],
+    hdrs = [
+        "data.h",
+        "data.inc",
+        "sc.h",
+        "//modules/credits:credits.inc",
+        "//schema:resources.h",
+    ],
+    deps = ["//schema:proto"],
+)
+
+c_library(
+    name = "sc_testing",
+    srcs = ["sc.c"],
+    hdrs = [
+        "data.h",
+        "data.inc",
+        "sc.h",
+        "sc_test.h",
+        "//modules/credits:credits.inc",
+        "//schema:resources.h",
+    ],
+    copts = ["-DSC_ENABLE_TESTING"],
+    deps = ["//schema:proto"],
+)
+
+filegroup(
+    name = "sources",
+    srcs = glob([
+        "*.c",
+        "*.h",
+        "*.inc",
+    ]) + ["//modules/credits:credits.inc"],
+)

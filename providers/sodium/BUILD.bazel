@@ -1,4 +1,23 @@
 load("//build:defs.bzl", "c_library")
-package(default_visibility=["//visibility:public"])
-c_library(name="sodium", srcs=["sc_sodium.c"], hdrs=["sc_sodium.h", "//core:sc.h", "//core:data.h", "//schema:resources.h"], deps=["//third_party/libsodium:sodium"])
-filegroup(name="sources", srcs=["sc_sodium.c", "sc_sodium.h"])
+
+package(default_visibility = ["//visibility:public"])
+
+c_library(
+    name = "sodium",
+    srcs = ["sc_sodium.c"],
+    hdrs = [
+        "sc_sodium.h",
+        "//core:data.h",
+        "//core:sc.h",
+        "//schema:resources.h",
+    ],
+    deps = ["//third_party/libsodium:sodium"],
+)
+
+filegroup(
+    name = "sources",
+    srcs = [
+        "sc_sodium.c",
+        "sc_sodium.h",
+    ],
+)

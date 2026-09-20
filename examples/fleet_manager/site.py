@@ -1,4 +1,5 @@
 """Copy the explicitly declared static assets; no runtime package downloads."""
+
 import shutil
 import sys
 from pathlib import Path

@@ -21,7 +21,7 @@ def _compile(ctx, output, mode):
 def _library_impl(ctx):
     out = ctx.actions.declare_file("lib" + ctx.label.name + ".a")
     _compile(ctx, out, "archive")
-    return [DefaultInfo(files = depset([out])), CLibrary(archives = depset([out], transitive = [d[CLibrary].archives for d in ctx.attr.deps]), headers = _inputs(ctx), includes = _includes(ctx), commands = [dict(file=f.short_path, includes=_includes(ctx).to_list(), copts=ctx.attr.copts) for f in ctx.files.srcs] + [c for d in ctx.attr.deps for c in d[CLibrary].commands])]
+    return [DefaultInfo(files = depset([out])), CLibrary(archives = depset([out], transitive = [d[CLibrary].archives for d in ctx.attr.deps]), headers = _inputs(ctx), includes = _includes(ctx), commands = [dict(file = f.short_path, includes = _includes(ctx).to_list(), copts = ctx.attr.copts) for f in ctx.files.srcs] + [c for d in ctx.attr.deps for c in d[CLibrary].commands])]
 
 def _binary_impl(ctx):
     out = ctx.actions.declare_file(ctx.attr.output_name or (ctx.label.name + (".so" if ctx.attr.shared else "")))
@@ -29,9 +29,12 @@ def _binary_impl(ctx):
     return [DefaultInfo(files = depset([out]), executable = out, runfiles = ctx.runfiles(files = ctx.files.data))]
 
 _c_attrs = {
-    "srcs": attr.label_list(allow_files = [".c"]), "hdrs": attr.label_list(allow_files = True),
-    "deps": attr.label_list(providers = [CLibrary]), "includes": attr.string_list(),
-    "copts": attr.string_list(), "linkopts": attr.string_list(),
+    "srcs": attr.label_list(allow_files = [".c"]),
+    "hdrs": attr.label_list(allow_files = True),
+    "deps": attr.label_list(providers = [CLibrary]),
+    "includes": attr.string_list(),
+    "copts": attr.string_list(),
+    "linkopts": attr.string_list(),
     "_driver": attr.label(default = "//tools:build_action.py", allow_single_file = True),
 }
 c_library = rule(implementation = _library_impl, attrs = _c_attrs)
@@ -53,6 +56,7 @@ def _script_impl(ctx):
     python_root = ctx.file._python_marker.short_path.rsplit("/", 2)[0]
     shared = ctx.file.shared.short_path if ctx.file.shared else ""
     code = "#!/usr/bin/python3\nimport os,runpy,sys\nfrom pathlib import Path\nr=Path(os.environ.get('RUNFILES_DIR',str(Path(__file__))+'.runfiles'))/'_main'\np=r/%r\nos.chdir(r)\npaths=[str(p),str(r),str(r/'tests'),str((r/%r).parent),str(r/'bindings/python')]\nsys.path[:0]=paths\nos.environ['PYTHONPATH']=os.pathsep.join(paths+[os.environ.get('PYTHONPATH','')])\nshared=%r\nif shared:\n os.environ['SIMPLECRYPTS_LIB']=str(r/shared)\n os.environ['LD_LIBRARY_PATH']=str((r/shared).parent)+os.pathsep+os.environ.get('LD_LIBRARY_PATH','')\nsys.argv=[str(r/%r)]+%r+sys.argv[1:]\nrunpy.run_path(str(r/%r),run_name='__main__')\n" % (python_root, main, shared, main, ctx.attr.script_args, main)
+
     # Nested adapters share this executable's declared runfiles. Bazel test
     # supplies RUNFILES_DIR, but bazel run need not; export the resolved root.
     code = code.replace("os.chdir(r)\n", "os.environ['RUNFILES_DIR']=str(r.parent)\nos.chdir(r)\n")
@@ -66,31 +70,38 @@ _script_attrs = {"main": attr.label(allow_single_file = True), "data": attr.labe
 py_binary = rule(implementation = _script_impl, attrs = _script_attrs, executable = True)
 py_test = rule(implementation = _script_impl, attrs = _script_attrs, test = True)
 
-
 def _sdk_binary_impl(ctx):
     out = ctx.actions.declare_file(ctx.label.name + ".bin")
     launcher = ctx.actions.declare_file(ctx.label.name)
     shared = ctx.file.shared
-    config = {"kind": ctx.attr.kind, "module": ctx.attr.module, "output": out.path,
-              "sdk": ctx.file.sdk_marker.dirname.rsplit("/", 1)[0],
-              "shared": shared.path if shared else "", "binary": ctx.attr.binary,
-              "test_build": ctx.attr.test_build,
-              "sources": [s.path for s in ctx.files.srcs]}
+    config = {
+        "kind": ctx.attr.kind,
+        "module": ctx.attr.module,
+        "output": out.path,
+        "sdk": ctx.file.sdk_marker.dirname.rsplit("/", 1)[0],
+        "shared": shared.path if shared else "",
+        "binary": ctx.attr.binary,
+        "test_build": ctx.attr.test_build,
+        "sources": [s.path for s in ctx.files.srcs],
+    }
     ctx.actions.run(executable = "/usr/bin/python3", arguments = [ctx.file._driver.path, "sdk_binary", json.encode(config)], inputs = depset(ctx.files.srcs + ctx.files.sdk + [ctx.file._driver] + ([shared] if shared else [])), outputs = [out], mnemonic = "CompileSDK", progress_message = "Compiling %s adapter" % ctx.attr.kind)
     code = "#!/usr/bin/python3\nimport os,sys\nfrom pathlib import Path\nr=Path(os.environ.get('RUNFILES_DIR',str(Path(__file__))+'.runfiles'))/'_main'\ns=%r\nif s: os.environ['LD_LIBRARY_PATH']=str((r/s).parent)+os.pathsep+os.environ.get('LD_LIBRARY_PATH','')\nos.execv(str(r/%r),[str(r/%r)]+sys.argv[1:])\n" % (shared.short_path if shared else "", out.short_path, out.short_path)
     ctx.actions.write(launcher, code, is_executable = True)
     return [DefaultInfo(executable = launcher, runfiles = ctx.runfiles(files = [out] + ([shared] if shared else [])))]
 
 _sdk_attrs = {
-    "kind": attr.string(), "module": attr.string(), "binary": attr.string(),
-    "srcs": attr.label_list(allow_files = True), "sdk": attr.label(),
-    "sdk_marker": attr.label(allow_single_file = True), "shared": attr.label(allow_single_file = True),
+    "kind": attr.string(),
+    "module": attr.string(),
+    "binary": attr.string(),
+    "srcs": attr.label_list(allow_files = True),
+    "sdk": attr.label(),
+    "sdk_marker": attr.label(allow_single_file = True),
+    "shared": attr.label(allow_single_file = True),
     "test_build": attr.bool(default = False),
     "_driver": attr.label(default = "//tools:build_action.py", allow_single_file = True),
 }
 sdk_binary = rule(implementation = _sdk_binary_impl, executable = True, attrs = _sdk_attrs)
 sdk_test = rule(implementation = _sdk_binary_impl, test = True, attrs = _sdk_attrs)
-
 
 def conformance_matrix():
     for device in ["c", "python", "rust", "go"]:
@@ -105,20 +116,30 @@ def _resource_report_impl(ctx):
     archive = ctx.attr.sodium[CLibrary].archives.to_list()[0]
     sodium_files = ctx.attr.sodium[DefaultInfo].files.to_list()
     stack = [f for f in sodium_files if f.basename.endswith("_stack.txt")][0]
-    config = {"sources": [f.path for f in ctx.files.srcs if f.extension == "c"], "archive": archive.path,
-              "sodium_stack": stack.path, "linker": ctx.file.linker.path,
-              "outputs": {f.basename: f.path for f in outputs}}
-    ctx.actions.run(executable = "/usr/bin/python3", arguments = [ctx.file._driver.path, "resource_report", json.encode(config)],
-                    inputs = depset(ctx.files.srcs + ctx.files.headers + sodium_files + [ctx.file.linker, ctx.file._driver]), outputs = outputs,
-                    mnemonic = "CortexResourceReport", progress_message = "Linking Cortex-M4 core and reference crypto provider")
+    config = {
+        "sources": [f.path for f in ctx.files.srcs if f.extension == "c"],
+        "archive": archive.path,
+        "sodium_stack": stack.path,
+        "linker": ctx.file.linker.path,
+        "outputs": {f.basename: f.path for f in outputs},
+    }
+    ctx.actions.run(
+        executable = "/usr/bin/python3",
+        arguments = [ctx.file._driver.path, "resource_report", json.encode(config)],
+        inputs = depset(ctx.files.srcs + ctx.files.headers + sodium_files + [ctx.file.linker, ctx.file._driver]),
+        outputs = outputs,
+        mnemonic = "CortexResourceReport",
+        progress_message = "Linking Cortex-M4 core and reference crypto provider",
+    )
     return [DefaultInfo(files = depset(outputs))]
 
 cortex_resource_report = rule(implementation = _resource_report_impl, attrs = {
-    "srcs": attr.label_list(allow_files = True), "headers": attr.label_list(allow_files = True),
-    "sodium": attr.label(providers = [CLibrary]), "linker": attr.label(allow_single_file = True),
+    "srcs": attr.label_list(allow_files = True),
+    "headers": attr.label_list(allow_files = True),
+    "sodium": attr.label(providers = [CLibrary]),
+    "linker": attr.label(allow_single_file = True),
     "_driver": attr.label(default = "//tools:build_action.py", allow_single_file = True),
 })
-
 
 def _analysis_database_impl(ctx):
     out = ctx.actions.declare_file(ctx.label.name + ".json")

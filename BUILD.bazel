@@ -1,3 +1,8 @@
 package(default_visibility = ["//visibility:public"])
 
-exports_files(["PLAN.md", "MCU_FEASIBILITY.md", ".clang-format", ".clang-tidy"])
+exports_files([
+    "PLAN.md",
+    "MCU_FEASIBILITY.md",
+    ".clang-format",
+    ".clang-tidy",
+])

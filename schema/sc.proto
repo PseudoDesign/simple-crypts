@@ -4,60 +4,59 @@ package simplecrypts;
 // Authenticated inner object. Every semantic routing field is repeated here;
 // the untrusted outer frame is only a bounded decoding/routing aid.
 message Packet {
-  required uint32 version = 1;
-  required uint32 profile = 2;
-  required uint32 direction = 3;
-  required uint32 kind = 4;
-  required bytes serial = 5;
-  required bytes sender_key = 6;
-  required bytes recipient_key = 7;
-  required uint64 key_generation = 8;
-  required uint64 revision = 9;
-  reserved 10 to 14;
-  optional uint64 acked_reported_revision = 15;
-  optional bool enrollment_confirmed = 16;
-  // Legacy bearer token, or public session challenge in signed enrollment mode.
-  optional bytes enrollment_token = 17;
-  required bytes schema_hash = 18;
-  optional uint32 group_id = 19;
-  optional bytes data = 20;
-  optional uint64 request_id = 21;
-  optional uint32 data_kind = 22; // 1=request, 2=response, 3=receipt
-
+    required uint32 version = 1;
+    required uint32 profile = 2;
+    required uint32 direction = 3;
+    required uint32 kind = 4;
+    required bytes serial = 5;
+    required bytes sender_key = 6;
+    required bytes recipient_key = 7;
+    required uint64 key_generation = 8;
+    required uint64 revision = 9;
+    reserved 10 to 14;
+    optional uint64 acked_reported_revision = 15;
+    optional bool enrollment_confirmed = 16;
+    // Legacy bearer token, or public session challenge in signed enrollment mode.
+    optional bytes enrollment_token = 17;
+    required bytes schema_hash = 18;
+    optional uint32 group_id = 19;
+    optional bytes data = 20;
+    optional uint64 request_id = 21;
+    optional uint32 data_kind = 22; // 1=request, 2=response, 3=receipt
 }
 
 // Atomic bounded snapshot. Nonce reservations are a separate durable provider
 // namespace and can never be rolled back by committing this record.
 message Record {
-  required uint32 version = 1;
-  required uint32 role = 2;
-  required bytes serial = 3;
-  required bytes local_key = 4;
-  required bytes peer_key = 5;
-  required bool registered = 6;
-  reserved 7 to 10, 12, 13, 16, 17;
-  required uint64 reported_revision = 11;
-  required uint64 acked_reported_revision = 14;
-  required uint64 last_sent_reported_revision = 15;
-  optional uint32 enrollment_mode = 18;
-  optional bytes challenge = 19;
-  optional uint64 enrollment_expires = 20;
-  optional bytes candidate_key = 21;
-  optional uint64 candidate_revision = 22;
-  reserved 23, 24;
-  required bytes schema_hash = 25;
-  repeated GroupRecord groups = 26;
+    required uint32 version = 1;
+    required uint32 role = 2;
+    required bytes serial = 3;
+    required bytes local_key = 4;
+    required bytes peer_key = 5;
+    required bool registered = 6;
+    reserved 7 to 10, 12, 13, 16, 17;
+    required uint64 reported_revision = 11;
+    required uint64 acked_reported_revision = 14;
+    required uint64 last_sent_reported_revision = 15;
+    optional uint32 enrollment_mode = 18;
+    optional bytes challenge = 19;
+    optional uint64 enrollment_expires = 20;
+    optional bytes candidate_key = 21;
+    optional uint64 candidate_revision = 22;
+    reserved 23, 24;
+    required bytes schema_hash = 25;
+    repeated GroupRecord groups = 26;
 }
 message GroupRecord {
- required bytes values = 1;
- required bytes snapshot = 2;
- required uint64 local_revision = 3;
- required uint64 request_id = 4;
- required uint64 snapshot_id = 5;
- required uint64 acknowledged_id = 6;
- required uint64 last_sent_id = 7;
- required bool request_pending = 8;
- required bool response_pending = 9;
- required bool receipt_pending = 10;
- required bool has_snapshot = 11;
+    required bytes values = 1;
+    required bytes snapshot = 2;
+    required uint64 local_revision = 3;
+    required uint64 request_id = 4;
+    required uint64 snapshot_id = 5;
+    required uint64 acknowledged_id = 6;
+    required uint64 last_sent_id = 7;
+    required bool request_pending = 8;
+    required bool response_pending = 9;
+    required bool receipt_pending = 10;
+    required bool has_snapshot = 11;
 }

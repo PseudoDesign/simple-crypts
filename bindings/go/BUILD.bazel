@@ -1,15 +1,27 @@
 load("//build:defs.bzl", "sdk_test")
-package(default_visibility=["//visibility:public"])
-filegroup(name="sources", srcs=glob(["*.go", "go.mod"]))
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "sources",
+    srcs = glob([
+        "*.go",
+        "go.mod",
+    ]),
+)
+
 sdk_test(
     name = "sdk_test",
+    srcs = [
+        ":sources",
+        "//providers/host:sc_host.h",
+    ],
     kind = "go",
-    test_build = True,
     module = "bindings/go",
     sdk = "@go_sdk//:files",
     sdk_marker = "@go_sdk//:bin/go",
     shared = "//providers/host:libsimplecrypts_testing",
-    srcs = [":sources", "//providers/host:sc_host.h"],
+    test_build = True,
 )
 
 exports_files(["resources.go"])

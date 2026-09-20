@@ -1,9 +1,42 @@
 load("//build:defs.bzl", "c_test", "py_test")
 load(":defs.bzl", "api_docs")
-package(default_visibility=["//visibility:public"])
+
+package(default_visibility = ["//visibility:public"])
+
 exports_files(["build_api.py"])
-filegroup(name="doc_inputs", srcs=["Doxyfile", "api.dox", "api.css", "api_example.c", "//core:sources", "//providers/host:sources", "//providers/sodium:sources"])
-INPUTS = [":doc_inputs", "//tools:quality.py", "//tools:build_action.py"]
-api_docs(name="api", srcs=INPUTS)
-py_test(name="api_check", main="build_api.py", data=INPUTS)
-c_test(name="example", srcs=["api_example.c"], deps=["//providers/host:host"])
+
+filegroup(
+    name = "doc_inputs",
+    srcs = [
+        "Doxyfile",
+        "api.css",
+        "api.dox",
+        "api_example.c",
+        "//core:sources",
+        "//providers/host:sources",
+        "//providers/sodium:sources",
+    ],
+)
+
+INPUTS = [
+    ":doc_inputs",
+    "//tools:quality.py",
+    "//tools:build_action.py",
+]
+
+api_docs(
+    name = "api",
+    srcs = INPUTS,
+)
+
+py_test(
+    name = "api_check",
+    data = INPUTS,
+    main = "build_api.py",
+)
+
+c_test(
+    name = "example",
+    srcs = ["api_example.c"],
+    deps = ["//providers/host"],
+)

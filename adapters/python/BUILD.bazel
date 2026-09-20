@@ -1,3 +1,10 @@
 load("//build:defs.bzl", "py_binary")
-package(default_visibility=["//visibility:public"])
-py_binary(name="adapter", main="main.py", shared="//providers/host:libsimplecrypts_testing", data=["//bindings/python:simplecrypts.py"])
+
+package(default_visibility = ["//visibility:public"])
+
+py_binary(
+    name = "adapter",
+    data = ["//bindings/python:simplecrypts.py"],
+    main = "main.py",
+    shared = "//providers/host:libsimplecrypts_testing",
+)

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Verify that an emitted relay transcript can actually be replayed."""
+
 import argparse
 import json
 from pathlib import Path
@@ -17,8 +18,12 @@ def main():
     relay = Relay(args.device, args.server, seed=773521)
     try:
         generated_schedule(relay)
-        content = {"format": 1, "seed": relay.seed, "scenario": "generated_schedule",
-                   "events": relay.events}
+        content = {
+            "format": 1,
+            "seed": relay.seed,
+            "scenario": "generated_schedule",
+            "events": relay.events,
+        }
     finally:
         relay.close()
     with tempfile.TemporaryDirectory() as directory:

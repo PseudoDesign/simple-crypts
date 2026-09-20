@@ -3,6 +3,7 @@
 No sockets, sleeps, background delivery, or wall-clock protocol decisions.
 The readline deadline detects a broken adapter; it does not schedule traffic.
 """
+
 from __future__ import annotations
 
 import base64
@@ -43,8 +44,12 @@ class Endpoint:
     def start(self):
         self.log = open(self.relay.directory / (self.name + ".stderr"), "a+")
         self.process = subprocess.Popen(
-            [self.executable], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=self.log, text=True, bufsize=1,
+            [self.executable],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=self.log,
+            text=True,
+            bufsize=1,
         )
 
     def command(self, command: str, **arguments):
@@ -64,8 +69,9 @@ class Endpoint:
             response = json.loads(line)
         except ValueError as exc:
             raise AssertionError(f"{self.name}: non-JSON stdout {line!r}") from exc
-        self.relay.events.append({"action": "command", "endpoint": self.name,
-                                  "request": request, "response": response})
+        self.relay.events.append(
+            {"action": "command", "endpoint": self.name, "request": request, "response": response}
+        )
         assert isinstance(response, dict) and isinstance(response.get("status"), str), response
         return response
 
@@ -102,13 +108,16 @@ class Relay:
         self.nonces = {}
 
     def spawn(self, name, role, **overrides):
-        config = {"role": role, "storage": str(self.directory / name),
-                  "serial": SERIAL, "secret": SECRET,
-                  "key_seed": DEVICE_SEED if role == "device" else SERVER_SEED,
-                  "server_seed": SERVER_SEED}
+        config = {
+            "role": role,
+            "storage": str(self.directory / name),
+            "serial": SERIAL,
+            "secret": SECRET,
+            "key_seed": DEVICE_SEED if role == "device" else SERVER_SEED,
+            "server_seed": SERVER_SEED,
+        }
         config.update(overrides)
-        self.events.append({"action": "spawn", "endpoint": name,
-                            "role": role, "config": config})
+        self.events.append({"action": "spawn", "endpoint": name, "role": role, "config": config})
         endpoint = Endpoint(self, name, self.executables[role], config)
         self.endpoints[name] = endpoint
         return endpoint, endpoint.command("init", **config)
@@ -128,7 +137,7 @@ class Relay:
         frame = base64.b64decode(response["frame"], validate=True)
         assert 0 < len(frame) <= min(512, budget, capacity), len(frame)
         if frame[:4] == b"SCE3":
-            assert len(frame)==172
+            assert len(frame) == 172
         else:
             assert frame[:4] == b"SC\x03\x02" and len(frame) >= 78, frame.hex()
             assert frame[4] in (1, 2) and frame[38] == frame[4]
@@ -139,8 +148,14 @@ class Relay:
         identifier = str(self.next_frame)
         self.next_frame += 1
         self.queue[identifier] = frame
-        self.events.append({"action": "queue", "frame_id": identifier,
-                            "sender": sender, "frame": response["frame"]})
+        self.events.append(
+            {
+                "action": "queue",
+                "frame_id": identifier,
+                "sender": sender,
+                "frame": response["frame"],
+            }
+        )
         return identifier
 
     def deliver(self, identifier, receiver):
@@ -148,7 +163,8 @@ class Relay:
         self.events.append({"action": "deliver", "frame_id": identifier, "receiver": receiver})
         # Delivery does not remove a frame: keeping an opaque copy models replay.
         return self.endpoints[receiver].command(
-            "rx", frame=base64.b64encode(self.queue[identifier]).decode("ascii"))
+            "rx", frame=base64.b64encode(self.queue[identifier]).decode("ascii")
+        )
 
     def exchange(self, sender, receiver):
         identifier = self.opportunity(sender)
@@ -167,8 +183,15 @@ class Relay:
         new_id = str(self.next_frame)
         self.next_frame += 1
         self.queue[new_id] = bytes(frame)
-        self.events.append({"action": "mutate", "source": identifier,
-                            "frame_id": new_id, "offset": offset, "mask": mask})
+        self.events.append(
+            {
+                "action": "mutate",
+                "source": identifier,
+                "frame_id": new_id,
+                "offset": offset,
+                "mask": mask,
+            }
+        )
         return new_id
 
     def advance(self, ticks):
@@ -184,12 +207,19 @@ class Relay:
         return endpoint.ok("init", **endpoint.config)
 
     def save(self, name, error=None):
-        directory = Path(os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR") or
-                         tempfile.mkdtemp(prefix="simple-crypts-replay-"))
+        directory = Path(
+            os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
+            or tempfile.mkdtemp(prefix="simple-crypts-replay-")
+        )
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / (name + ".json")
-        content = {"format": 1, "seed": self.seed, "scenario": name,
-                   "error": str(error) if error else None, "events": self.events}
+        content = {
+            "format": 1,
+            "seed": self.seed,
+            "scenario": name,
+            "error": str(error) if error else None,
+            "events": self.events,
+        }
         path.write_text(json.dumps(content, indent=2, ensure_ascii=True) + "\n")
         for endpoint in self.endpoints.values():
             if endpoint.log and not endpoint.log.closed:

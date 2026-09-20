@@ -1,8 +1,47 @@
 load("//build:defs.bzl", "c_binary", "c_library")
-package(default_visibility=["//visibility:public"])
-c_library(name="host", srcs=["sc_host.c"], hdrs=["sc_host.h"], deps=["//providers/sodium:sodium", "//core:sc"])
-c_library(name="host_testing", srcs=["sc_host.c"], hdrs=["sc_host.h"], deps=["//providers/sodium:sodium", "//core:sc_testing"], copts=["-DSC_ENABLE_TESTING"])
-c_binary(name="libsimplecrypts", shared=True, deps=[":host"])
-c_binary(name="libsimplecrypts_testing", shared=True, output_name="testing/libsimplecrypts.so", deps=[":host_testing"])
+
+package(default_visibility = ["//visibility:public"])
+
+c_library(
+    name = "host",
+    srcs = ["sc_host.c"],
+    hdrs = ["sc_host.h"],
+    deps = [
+        "//core:sc",
+        "//providers/sodium",
+    ],
+)
+
+c_library(
+    name = "host_testing",
+    srcs = ["sc_host.c"],
+    hdrs = ["sc_host.h"],
+    copts = ["-DSC_ENABLE_TESTING"],
+    deps = [
+        "//core:sc_testing",
+        "//providers/sodium",
+    ],
+)
+
+c_binary(
+    name = "libsimplecrypts",
+    shared = True,
+    deps = [":host"],
+)
+
+c_binary(
+    name = "libsimplecrypts_testing",
+    output_name = "testing/libsimplecrypts.so",
+    shared = True,
+    deps = [":host_testing"],
+)
+
 exports_files(["sc_host.h"])
-filegroup(name="sources", srcs=["sc_host.c", "sc_host.h"])
+
+filegroup(
+    name = "sources",
+    srcs = [
+        "sc_host.c",
+        "sc_host.h",
+    ],
+)

@@ -80,9 +80,24 @@ async function errorFlow(page,touch=false){
   assert.equal(await pending(page).count(),0);
  }
  const issued=await page.locator('#device-issued').textContent();
- const before=await page.locator('#device-consumed').textContent();
+ let consumed=BigInt(await page.locator('#device-consumed').textContent());
+ const reported=await page.locator('#server-consumed').textContent();
  await next(page);
- for(const expected of ['conflict','argument','conflict']){
+ assert(await page.locator('#next').isHidden());
+ assert.match(await page.locator('#tour-text').textContent(),/Press \+ beside/);
+ while(consumed+25n<=BigInt(issued)){
+  await page.locator('#consume-credit').click();await ready(page);consumed+=25n;
+  assert.equal(await page.locator('#device-consumed').textContent(),consumed.toString());
+  assert(await page.locator('#next').isHidden());
+ }
+ await page.locator('#consume-credit').click();await ready(page);
+ assert.match(await page.locator('#tour-text').textContent(),/^conflict \(-7\)/);
+ assert.equal(await page.locator('#device-consumed').textContent(),consumed.toString());
+ assert.equal(await page.locator('#server-consumed').textContent(),reported);
+ assert.equal(await pending(page).count(),0);
+ assert(await page.locator('#consume-credit').isDisabled());
+ await next(page);
+ for(const expected of ['argument','conflict']){
   await next(page);assert((await page.locator('#tour-text').textContent()).startsWith(expected+' (-'));await next(page);
  }
  assert.match(await page.locator('#tour-title').textContent(),/corrupted packet/);
@@ -91,7 +106,7 @@ async function errorFlow(page,touch=false){
  await next(page);await dragPacket(page,pending(page),'#server-panel',touch);
  assert.match(await page.locator('#tour-text').textContent(),/protocol/);
  assert.match(await page.locator('#tour-title').textContent(),/Error tour complete/);
- assert.equal(await page.locator('#device-consumed').textContent(),before);
+ assert.equal(await page.locator('#device-consumed').textContent(),consumed.toString());
  assert.equal(await page.locator('#device-issued').textContent(),issued);
  assert.equal(await page.locator('#server-issued').textContent(),issued);
 }
